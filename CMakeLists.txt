@@ -61,7 +61,7 @@ endif()
 # Prebuilt libs live in <source>/.tools/{ffmpeg,mpv,sherpa-onnx}.
 # rcp::ffmpeg / rcp::mpv / rcp::sherpa-onnx 由 cmake/FindRcpNativeDeps.cmake 定义；
 # 在 BUILD_DEPS_SMOKE 或 BUILD_PLAYER 时都需要。
-if(BUILD_DEPS_SMOKE OR BUILD_PLAYER OR BUILD_SPIKES)
+if(BUILD_DEPS_SMOKE OR BUILD_PLAYER OR BUILD_SPIKES OR BUILD_WORKER)
   include(cmake/FindRcpNativeDeps.cmake)
 endif()
 
@@ -71,6 +71,12 @@ endif()
 
 if(BUILD_PLAYER)
   add_subdirectory(src/player)
+endif()
+
+if(BUILD_WORKER)
+  add_subdirectory(src/audio)
+  add_subdirectory(src/asr)
+  add_subdirectory(src/worker)
 endif()
 
 if(BUILD_SPIKES)
