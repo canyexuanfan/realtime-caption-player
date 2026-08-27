@@ -1,0 +1,20 @@
+{
+  "schema": "realtime-caption-player/asr-benchmark/v1",
+  "note": "合规 ASR 基准语料 manifest。仅收录自录或获授权的素材；每条必须填写 license 字段。whisper 基线按用户规则禁用，本基准统一使用 FunASR 作为对照。",
+  "whisper_baseline": "DISABLED_BY_POLICY",
+  "baseline_engine": "FunASR (paraformer-zh / sensevoice)",
+  "metrics": ["CER", "WER", "RTF", "RSS_MiB"],
+  "entries": [
+    {
+      "id": "sample-001",
+      "audio": "tests/fixtures/asr/sample-001.wav",
+      "reference_text": "这是一个用于字幕对齐测试的中文句子。",
+      "language": "zh",
+      "domain": "general",
+      "duration_sec": 4.0,
+      "license": "SELF_RECORDED",
+      "license_note": "作者本人录制，可自由用于内部基准。"
+    }
+  ],
+  "how_to_add": "复制一条 entry，替换 audio/reference_text/language/license。音频建议 16kHz 单声道 WAV。未填 license 的条目评测脚本会跳过并报错。"
+}
