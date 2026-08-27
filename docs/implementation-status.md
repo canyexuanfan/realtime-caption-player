@@ -5,7 +5,7 @@
 
 ## 当前快照（2026-08-27）
 
-- **Current phase:** P0（技术验证、决策与第三方基线）
+- **Current phase:** P0 阶段门已具备签署条件（T0001–T0024 代码+编译/链接全完成；运行时证据标注 PARTIAL）；产品实现已启动并阶段性成型（P2 播放内核 / P4 caption-worker / P4/IPC / P6 字幕叠加 / P7 UI 集成 均代码+编译验证完成，MSI 已重打为真实产品包）
 - **Current task:** T0024（签署 P0 阶段门报告）— BLOCKER-1（dll 冲突）已修复；T0021（Silero VAD + SenseVoice 离线）真机验证通过（exit 0）；用户硬要求"实时逐字 partial 必须可用、不可降级"→ 原崩溃的 2023-02 双语 Paraformer 模型图与 ORT 流式不兼容，**已换 Zipformer2-CTC 现代流式引擎修复**：2026-08-27 中文 `zipformer-ctc-zh-int8-2025-06-30` 模型由用户本机下载回填，三探针 git-bash 重编 rc=0、`online_probe`/`hybrid_probe` 真机 rc=0 逐块 partial 实时上屏、零崩溃，**BLOCKER-2 关闭**；精准字幕（VAD×SenseVoice+ITN）已由 T0021/T0022 验证满足验收
 - **Current branch:** `main`
 - **Last completed task:** T0023（合规 ASR 基准语料 + FunASR 基线，替换原 whisper 基线）
@@ -98,7 +98,22 @@
 
 - P0：进行中（文档/ADR/基础 DONE；纯逻辑模块 + 单元测试 DONE；原生库+模型已下载锁定 DONE；T0014+ 实现待推进）。
 - P1–P9：P1/P2 依赖的原生库已就绪，可启动。
-- **P8：打包流水线已打通（验证壳版，2026-08-28）** —— CMakeLists 启用 `include(packaging/wix/wix.cmake)`；实测 `ninja package_msi` 生成 `out/package/RealtimeCaptionPlayer-0.1.0.msi`（≈666MB，OLE 安装包校验通过）。内容 = `player_app.exe` + ffmpeg/mpv/sherpa DLL + zipformer-ctc/sensevoice/silero 模型 + Qt6Core，安装到 `ProgramFiles64Folder\RealtimeCaptionPlayer` 并建开始菜单/桌面快捷方式。⚠️ 诚实标注：player_app 当前是 libmpv 链接验证壳（非完整 GUI 播放器），故本 MSI 为「打包机制打通的验证壳版」，非可玩产品；真实产品成型后重跑 `windeployqt` + `package_msi` 即一键出正式包。沙箱内 `light` 需 `-sval` 跳过不可用的 Windows Installer ICE 校验。
+- **P8：打包流水线已打通并产出真实产品 MSI（2026-08-28 第二轮）** —— 刷新 `out/bundle/runtime`（拷入新 player_app.exe 266KB + caption_worker.exe 191KB，并 `windeployqt` 收齐 Qt6Core/Gui/Widgets/OpenGLWidgets/Network + platforms/qwindows.dll），`ninja package_msi` 经 heat→candle→light -sval 产出 `out/package/RealtimeCaptionPlayer-0.1.0.msi`（≈677MB，OLE 头 `d0cf11e0` 校验通过）。包内 = 真实 GUI 播放器(player_app) + 字幕 worker(caption_worker) + FFmpeg/mpv/sherpa DLL + 四套 ASR 模型(zipformer-ctc/sensevoice/silero/paraformer) + Qt6 全套，安装到 `ProgramFiles64Folder\RealtimeCaptionPlayer` 并建快捷方式。⚠️ 诚实标注 PARTIAL：真实播放渲染出图、真实中文语音 ASR 准确率、worker 全速预识别→播放头对齐叠加 的"视角"行为均需在带显示器/语料的真机回填；沙箱无显示器/GPU，无法替代验证。
+
+## Product Milestones (P2 / P4 / P6 / P7) — 2026-08-28 MVP
+
+> 用户指令："把产品开发成型"。从 libmpv 验证壳升级为能打开视频→播放→实时字幕的端到端 MVP。
+> 以下里程碑均为"代码 + 真实编译链接验证(rc=0)"完成；真机运行时验证标注 PARTIAL。
+
+| Milestone | 标题 | Status | Commit | Verification | Notes |
+|---|---|---|---|---|---|
+| P2 | 播放内核（MpvPlayer 播放控制 + MpvRenderWidget Qt OpenGL 渲染 + MainWindow 基础窗口） | DONE | edba059 | `ninja player_app` rc=0，player_app.exe 266KB 链接 mpv-2.dll+Qt6 通过 | 真机渲染出图 PARTIAL（沙箱无 GPU/显示） |
+| P4 | caption-worker 核心（AudioExtractor FFmpeg 抽音轨 + AsrEngine 双引擎 Zipformer2-CTC partial + SenseVoice 终稿 + SRT 导出） | DONE | 28364b0 | `ninja caption_worker` rc=0（核心 97KB→含 IPC 188KB） | 双引擎链路 T0020–22 真机 rc=0 已验证 |
+| P4/IPC | 进程通信：worker 侧 IpcServer(QLocalServer 收命令+后台 QtConcurrent 识别+JsonMessageCodec 回报) + 主进程侧 WorkerSupervisor(QLocalSocket 收发) | DONE | 088a79d | 两侧均 rc=0 编译链接；协议按 ipc/Protocol.h 对齐 | 命令/事件帧格式 = [u32 LE len][UTF-8 JSON] |
+| P6 | 字幕叠加：CaptionController(播放头对齐 active 段→CaptionStateMachine 显示态) + MpvPlayer.showSubtitleOverlay(mpv osd-overlay ass-events) | DONE | 088a79d | 编译 rc=0；ASS 由 AssEscaper 转义 | 真机叠加出图 PARTIAL；worker 全速预识别、播放头对齐展示（非逐帧跟随抽音） |
+| P7 | UI 集成 + 全量编译 + 重打 MSI：MainWindow 打开即启动 worker、播放头驱动叠加层、字幕开关、导出 SRT | DONE | 088a79d | player_app+caption_worker 同编 rc=0；MSI 重打含真实双 exe+Qt Widgets+模型 | MSI 真机安装/运行 PARTIAL |
+
+**MVP 同步模型（诚实声明）**：worker 以全速预识别整段媒体并打绝对时间戳，主进程 CaptionController 按播放头挑选覆盖当前时刻的 final 段叠加显示；真实中文准确率与"播放头跟随抽音"实时同步留待真机调优（沙箱无法验证播放）。实时逐字 partial（用户硬要求、不可降级）在引擎层已由 Zipformer2-CTC 真机 rc=0 证明可用（见 BLOCKER-2）。
 
 ## Last Agent Summary
 
@@ -122,3 +137,16 @@
 - `src/player/CMakeLists.txt` 给 `player_app` 加 `/MANIFEST:NO`（沙箱 cvtres 受限 TEMP 链接 workaround）。
 - 提交 dcc06a8 并推送 origin/main（38da5b1..dcc06a8）。诚实标注：本 MSI 为打包机制打通的**验证壳版**，player_app 仍是 libmpv 链接验证壳，非完整 GUI 播放器；待 P2/P5/P7 产品本体成型后重跑即出正式包。
 - 已知环境坑补充：git-bash 单独 Bash 调用不保留上一调用的 INCLUDE/LIB/PATH 环境变量，ninja 编译必须在该命令内同设 MSVC 环境（与 P0 探针编译一致）；`cmd //c` 在本环境被安全策略禁止且 MSYS 路径转换会让 `set` 失效，统一用 git-bash + 内联 export 法。
+
+## 本会话补充（2026-08-28，P4/IPC 主进程侧 + P6 字幕叠加 + P7 UI 集成 + 重打真实 MSI）
+
+接上一轮（P2/P4 核心 + P4/IPC worker 侧已编完），本轮把产品真正打通为端到端 MVP：
+- **主进程侧 WorkerSupervisor**（`src/player/WorkerSupervisor.h/.cpp`，QLocalSocket 客户端）：启动 `caption_worker.exe --servername <uuid> --models <dir>`，发送 Hello/OpenMedia，接收 Ready/MediaOpened/CaptionPartial/CaptionFinal/Error/Heartbeat，转 `rcp::CaptionSegment` 经 `captionSegment(seg,isPartial)` / `sessionStarted` / `ready` / `workerError` 信号回报；含连接重试（每 100ms，最多 ~5s）。
+- **CaptionController**（`src/captions/CaptionController.h/.cpp`，编入 rcp_core）：维护 final 时间线 + 最新 partial，按播放头 ms 取 active 段，驱动 CaptionStateMachine 显示态，输出 mpv `osd-overlay` 的 ASS events；`finals()` 供 SRT 导出。
+- **MpvPlayer** 新增 `showSubtitleOverlay`/`clearSubtitleOverlay`（mpv `osd-overlay add/remove ass-events`）。
+- **worker IpcServer** 支持 `setModelsRoot`；`main` 新增 `--models` 选项（默认 `.tools/models`）。
+- **MainWindow** 集成：打开媒体即启动 worker；`positionChanged` 驱动叠加层；新增「字幕:开/关」与「导出SRT」按钮；`mediaEnded` 停止识别。
+- **全量编译**：`ninja player_app caption_worker` rc=0（player_app 266KB / caption_worker 191KB）。
+- **重打真实 MSI**：`out/bundle/runtime` 拷入新双 exe + `windeployqt` 收齐 Qt6 Widgets/OpenGL/Network + platforms；`ninja package_msi` 产出 `RealtimeCaptionPlayer-0.1.0.msi`（≈677MB，OLE 校验通过），含真实播放器+worker+原生 DLL+四套模型+Qt6 全套。
+- 提交 `088a79d` 并推送 `28364b0..088a79d`。
+- **诚实标注 PARTIAL**：沙箱无显示器/GPU/语料，以下仍待用户本机回填——(1) mpv 真实渲染出图与字幕叠加可见性；(2) 真实中文语音 ASR 准确率（Zipformer2-CTC partial + SenseVoice 终稿）；(3) worker 全速预识别 vs 播放头跟随抽音 的实时同步打磨；(4) MSI 真机安装与一键运行。

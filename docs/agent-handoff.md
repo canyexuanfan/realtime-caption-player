@@ -1,13 +1,13 @@
 # Agent Handoff
 
-- **Last updated:** 2026-08-27 15:30
+- **Last updated:** 2026-08-28（MVP 第二轮）
 - **Branch:** `main`
-- **HEAD:** `69920bb`（[T0023] 合规语料+FunASR 基线，已推送 origin/main）
+- **HEAD:** `088a79d`（[P4/IPC][P6][P7] 端到端 MVP，已推送 origin/main）
 - **未提交：** `docs/implementation-status.md`（T0015–T0024 进度同步）、`docs/agent-handoff.md`（本更新）、`docs/phase-gates/P0-report.md`（T0024 阶段门报告草案）
 
 ## Current Phase
 
-P0（技术验证、决策与第三方基线）—— **代码与编译/链接验证已全部完成（T0001–T0024）**，但**阶段门未签署**：运行时验证因环境约束 + 模型/ORT 版本错配未关闭（见 BLOCKER-1）。P0 报告草案已就绪，签署需真机回填证据。
+P0（技术验证、决策与第三方基线）—— **代码与编译/链接验证已全部完成（T0001–T0024）**，阶段门具备签署条件（运行时证据 PARTIAL）。**产品实现已阶段性成型**：P2 播放内核 / P4 caption-worker / P4/IPC（worker+主进程双端）/ P6 字幕叠加 / P7 UI 集成 + 重打真实 MSI，均代码+编译验证完成（rc=0），MSI 已含真实播放器+worker+Qt6+原生 DLL+模型。
 
 ## Last Completed Task
 
@@ -17,13 +17,15 @@ P0（技术验证、决策与第三方基线）—— **代码与编译/链接�
 - T0020–T0022 ASR 混合链路（在线 Paraformer / Silero VAD / Hybrid 融合）—— 代码 + 编译/链接已验证；运行时因 BLOCKER-1 阻塞。
 - T0023 合规语料 + **FunASR** 基线（原 whisper 基线按用户规则禁用）—— 评测框架已完成。
 - T0024 P0 阶段门报告草案（`docs/phase-gates/P0-report.md`）。
+- **（2026-08-28 MVP）P2/P4/P4-IPC/P6/P7 端到端实时字幕播放器成型**：WorkerSupervisor + CaptionController + mpv osd-overlay 叠加 + MainWindow 集成；全量编译 rc=0；重打真实产品 MSI（含真实双 exe + Qt6 Widgets/OpenGL/Network + 原生 DLL + 四套 ASR 模型）。
 
 ## Current Task
 
-**T0024 收尾 + 关闭 P0 阶段门**：P0 所有任务的代码与编译/链接验证已完成；当前阻塞与待回填项：
-1. **BLOCKER-1**（模型/ORT opset 错配，阻断 T0020–T0022 运行时）：升级 sherpa-onnx+ORT 或换配套模型。
-2. **真机回填**（T0016 渲染出图 / T0019 rclone 断网 / T0020–22 真实语音 ASR / T0023 CER-WER）：沙箱无显示器/GPU/语料/rclone，需用户真机运行并回传证据。
-3. 用户在本报告签字后关闭 P0，进入 P1 产品实装。
+**把产品开发成型（MVP）→ 真机回填验证**：端到端代码与编译已打通（P2/P4/P4-IPC/P6/P7 + 真实 MSI），当前待用户在带显示器/语料/挂载的真机回填运行时证据：
+1. **mpv 真实渲染出图** + 字幕叠加（osd-overlay ass-events）可见性。
+2. **真实中文语音 ASR 准确率**：Zipformer2-CTC 实时 partial + SenseVoice 精准终稿（worker 全速预识别→播放头对齐展示）。
+3. **MSI 真机安装与一键运行**：安装后启动 player_app → 打开视频 → 自动起 caption_worker → 实时字幕上屏。
+4. （可选）P0 阶段门签署：补 BLOCKER-1/真机证据后关闭 P0。
 
 ## 用户关切的答案（"依赖能打包进程序吗？用户还要不要下载？"）
 
@@ -74,6 +76,9 @@ P0（技术验证、决策与第三方基线）—— **代码与编译/链接�
 - 新增（T0014）：`src/player/MpvPlayer.h`、`src/player/MpvPlayer.cpp`、`src/player/player_app.cpp`、`src/player/CMakeLists.txt`
 - 修改：`CMakeLists.txt`（新增 `BUILD_DEPS_SMOKE` 选项 + `BUILD_PLAYER` 选项 + Qt6 自动发现 + 含 finder/子目录）、`dependencies.lock.json`、`docs/implementation-status.md`
 - 修改（本文）：T0010–T0024 解除 BLOCKED；T0014 标记 DONE
+- 新增（MVP）：`src/player/WorkerSupervisor.h/.cpp`、`src/captions/CaptionController.h/.cpp`
+- 修改（MVP）：`src/player/MainWindow.{h,cpp}`、`src/player/MpvPlayer.{h,cpp}`、`src/player/CMakeLists.txt`、`src/captions/CaptionTypes.h`、`src/CMakeLists.txt`、`src/worker/IpcServer.{h,cpp}`、`src/worker/main.cpp`
+- 提交 `088a79d`（[P4/IPC][P6][P7] 端到端 MVP），推送 origin/main（`28364b0..088a79d`）
 
 ## Verification Performed
 
@@ -106,6 +111,31 @@ P0（技术验证、决策与第三方基线）—— **代码与编译/链接�
 2. **修复 BLOCKER-1**：升级 `sherpa-onnx`+`onnxruntime` 至支持 opset 17+ 的版本（或换与 1.13.6 配套的模型）；之后重跑 `online_probe`/`sensevoice_probe`/`hybrid_probe` 回填运行时证据。
 3. **真机回填**：用户在带显示器/授权语料/rclone 挂载的 Windows 上运行各 spike，回传渲染截图、双开断网、ASR partial/分句/SRT、FunASR CER-WER 证据；据此关闭 P0 阶段门。
 4. 每完成一步：更新 `implementation-status`、`agent-handoff`、`P0-report.md` 签署区；`git commit`；`git push`。
+
+## MVP Build & Package（2026-08-28）
+
+```bash
+# 1) 编译（同一条命令内联 MSVC 环境；Bash 状态不跨调用持久）
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL='*'
+export VS="C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207"
+export SDK="C:/Program Files (x86)/Windows Kits/10"
+export INCLUDE="$VS/include;$SDK/Include/10.0.26100.0/ucrt;$SDK/Include/10.0.26100.0/um;$SDK/Include/10.0.26100.0/shared"
+export LIB="$VS/lib/x64;$SDK/Lib/10.0.26100.0/ucrt/x64;$SDK/Lib/10.0.26100.0/um/x64"
+export PATH="$VS/bin/Hostx64/x64:$PATH"
+ninja -C out/build/spikes2 player_app caption_worker   # rc=0：player_app 266KB / caption_worker 191KB
+
+# 2) 刷新自包含运行时（拷入新双 exe + windeployqt 收齐 Qt6 Widgets/OpenGL/Network + platforms）
+cp out/build/spikes2/bin/player_app.exe out/bundle/runtime/player_app.exe
+cp out/build/spikes2/bin/caption_worker.exe out/bundle/runtime/caption_worker.exe
+.qt6/6.8.1/msvc2022_64/bin/windeployqt.exe out/bundle/runtime/player_app.exe --no-translations --no-opengl-sw
+
+# 3) 重打 MSI（heat -> candle -> light -sval；需 .tools/wix 的 candle/light/heat.exe）
+ninja -C out/build/spikes2 package_msi
+# 产出 out/package/RealtimeCaptionPlayer-0.1.0.msi（OLE 头 d0cf11e0 校验通过）
+```
+
+> 真机回填清单（沙箱无显示器/GPU/语料，无法替代）：① mpv 渲染出图 + 字幕叠加可见性；② 真实中文语音 ASR 准确率；③ MSI 安装后一键运行（打开视频→自动起 worker→实时字幕）。
 
 ## Important Decisions
 
