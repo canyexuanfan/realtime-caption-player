@@ -5,8 +5,9 @@
 //   2. 建立 OnlineRecognizer + OnlineStream，喂入合成音频（16kHz 单声道），跑 accept+decode+get-result 流。
 //   3. 打印中间 partial 文本，证明流式 partial 链路接通。
 //
-// 用法：online_probe.exe [paraformer_dir]
-//   paraformer_dir 默认 .tools/models/paraformer
+// 用法：online_probe.exe [paraformer_dir] [encoder_basename]
+//   paraformer_dir    默认 .tools/models/paraformer
+//   encoder_basename  默认 encoder.int8.onnx（可传 encoder.onnx 复测 fp32）
 //
 // 链接目标：rcp::sherpa-onnx -> sherpa-onnx-c-api.dll
 
@@ -22,7 +23,8 @@ int main(int argc, char** argv) {
     setvbuf(stdout, NULL, _IONBF, 0);  // 无缓冲：崩溃前也能看到定位输出
     std::printf("online_probe: start\n");
     std::string dir = (argc > 1) ? argv[1] : ".tools/models/paraformer";
-    std::string enc = dir + "/encoder.int8.onnx";
+    std::string enc_base = (argc > 2) ? argv[2] : "encoder.int8.onnx";
+    std::string enc = dir + "/" + enc_base;
     std::string dec = dir + "/decoder.onnx";
     std::string tok = dir + "/tokens.txt";
 
@@ -39,7 +41,7 @@ int main(int argc, char** argv) {
 
     const SherpaOnnxOnlineRecognizer* rec = SherpaOnnxCreateOnlineRecognizer(&config);
     if (!rec) { std::printf("online_probe: create recognizer FAILED (模型路径/权重错误?)\n"); return 1; }
-    std::printf("online_probe: recognizer created (paraformer int8)\n");
+    std::printf("online_probe: recognizer created (paraformer encoder=%s)\n", enc_base.c_str());
 
     const SherpaOnnxOnlineStream* stream = SherpaOnnxCreateOnlineStream(rec);
     std::printf("online_probe: stream created\n");

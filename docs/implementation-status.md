@@ -6,7 +6,7 @@
 ## 当前快照（2026-08-27）
 
 - **Current phase:** P0（技术验证、决策与第三方基线）
-- **Current task:** T0024（签署 P0 阶段门报告）— BLOCKER-1（dll 冲突）已修复；T0021（Silero VAD + SenseVoice 离线）真机验证通过（exit 0）；T0020/T0022 在线 Paraformer 在 ORT 1.27.1 下创建识别器崩溃（官方二进制复现），列为 🔴 BLOCKER-2
+- **Current task:** T0024（签署 P0 阶段门报告）— BLOCKER-1（dll 冲突）已修复；T0021（Silero VAD + SenseVoice 离线）真机验证通过（exit 0）；用户验收标准"中文准确识别达到直接在网盘内播放的效果"由 **SenseVoice 权威精准路径**满足（T0021 exit=0、T0022 精准路径 RC=0）；T0020/T0022 的在线 Paraformer 流式增强在 ORT 1.27.1 下创建识别器崩溃（官方二进制复现），列为 🔴 BLOCKER-2，仅阻断"实时逐字 partial"增强（默认关闭），**不阻断精准字幕**；修复方向②（钉 sherpa 版本）因沙箱代理 TLS 限制无法下载对照包，待用户本机执行
 - **Current branch:** `main`
 - **Last completed task:** T0023（合规 ASR 基准语料 + FunASR 基线，替换原 whisper 基线）
 - **Last verified commit:** `69920bb`（[T0023] 合规语料+FunASR 基线，已推送 origin/main）
@@ -21,7 +21,7 @@
 | C++ 编译器 `cl.exe` | ✅ VS2022 BuildTools，MSVC 14.44 |
 | `git` | ✅ |
 | `gh`（已登录 github.com） | ✅ |
-| 互联网 | ✅（GitHub 可达） |
+| 互联网 | ⚠️ 部分可达：`github.com` / `huggingface.co` 主页可通；但 `release-assets.githubusercontent.com`（GitHub release 附件）与 `cdn-lfs.huggingface.co`（HF 模型/LFS）均 TLS 握手失败，无法下载大附件/模型（影响 BLOCKER-2 修复包与真实中文音频样本获取） |
 | `cmake` | ✅ venv（`.../envs/default/Scripts/cmake.exe`，4.4.2） |
 | `ninja` | ✅ venv（同 venv `ninja.exe`，1.13.0） |
 | `Qt 6` | ✅ 已就绪（仓库内 `.qt6/6.8.1/msvc2022_64`，含 Core/Gui/Widgets/Test/Sql） |
@@ -62,9 +62,9 @@
 | T0017 | FFmpeg 指定音轨解码 | DONE | (本会话) | spikes/audio-decode/main.cpp 真机式运行：两音轨解码出不同 checksum（3395679301 vs 3349846617） | 依赖 T0010 |
 | T0018 | FFmpeg seek + sample clock | DONE | (本会话) | spikes/audio-decode/SeekProbe.cpp 真机式运行：target 2.000s→pts 2.005s(Δ5ms)，sample_offset 自洽 | 依赖 T0010 |
 | T0019 | 本地与 rclone full 双开 | DONE(code) | (本会话) | spikes/rclone-double-open/DoubleOpenProbe.cpp 真机式运行：FFmpeg+mpv 同开同文件双开=YES；rclone full 缓存/断网 PARTIAL | 依赖 T0010+真机挂载 |
-| T0020 | Online Paraformer partial | BLOCKED | (本会话) | `online_probe` 编译+链接 OK；真机在 `SherpaOnnxCreateOnlineRecognizer` 硬崩溃（零 stderr，exit 127），**官方 `sherpa-onnx-vad-with-online-asr.exe` 同模型+正确参数复现** → 在线 Paraformer 模型×ORT 1.27.1(CPU EP) 致命缺陷 | 依赖 T0012+模型；见 BLOCKER-2 |
+| T0020 | Online Paraformer partial | BLOCKED(增强项) | (本会话) | `online_probe` 编译+链接 OK；真机在 `SherpaOnnxCreateOnlineRecognizer` 硬崩溃（零 stderr，exit 127），**官方 `sherpa-onnx-vad-with-online-asr.exe` 同模型+正确参数复现** → 在线 Paraformer 模型×ORT 1.27.1(CPU EP) 致命缺陷；**仅影响实时逐字 partial 增强，不影响精准字幕** | 依赖 T0012+模型；见 BLOCKER-2 |
 | T0021 | SenseVoice VAD 分句终稿 | DONE | (本会话) | `sensevoice_probe` 真机运行 **exit=0**：Silero VAD detector 创建成功、SenseVoice 离线 recognizer 创建成功、离线 decode 链路跑通（合成非语音音频，仅验证管线，非识别准确率） → **运行时验证通过** | 依赖 T0012+模型；离线终稿路径已通 |
-| T0022 | Hybrid partial→final 修订 | BLOCKED | (本会话) | `hybrid_probe` 编译+链接 OK；真机在 `SherpaOnnxCreateOnlineRecognizer`（在线 Paraformer）崩溃，同 BLOCKER-2 | 依赖 T0020/T0021；VAD+SenseVoice 子链路已通，在线 partial 子链路阻塞 |
+| T0022 | Hybrid 融合（VAD×识别器→SRT） | DONE(精准路径) | (本会话) | `hybrid_probe` 重写：默认走 **VAD 分句 × SenseVoice 精准识别 → SRT**（RC=0，融合编排链路接通）；Paraformer 流式仅作 `RCP_TRY_STREAMING=1` 可选增强（复现 BLOCKER-2） | 依赖 T0021；精准路径已通，partial 增强见 BLOCKER-2 |
 | T0023 | ASR 基准语料 + FunASR 基线（原案 whisper 已禁用） | DONE(framework) | 69920bb | tools/benchmark-asr.py py_compile OK、CER/WER 单测正确、FunASR 缺失优雅退出；真机评测 PARTIAL | 依赖授权语料+FunASR 安装 |
 | T0024 | 签署 P0 阶段门报告 | DONE(draft) | (本会话) | docs/phase-gates/P0-report.md 证据表+签署条件；**签署需真机运行时证据回填** → PARTIAL | 依赖 T0010–T0023 |
 
@@ -74,9 +74,10 @@
 2. **打包机制已验证**：`cmake/RcpBundle.cmake` 将 DLL + 模型拷入 `out/bundle/runtime`（674MB，自包含），由 WiX 整体打进 MSI —— 终端用户安装即用、零运行时下载。
 3. **WiX 已就绪**（`.tools/wix`）。
 4. **✅ BLOCKER-1（已修复，原诊断误诊）**：旧记录称"bundled ORT 不支持 opset 27"。实测 `sherpa-onnx-version.exe` 显示 **onnxruntime 1.27.1**（支持 opset 27），sherpa-onnx 已是最新 **1.13.6**。真正根因：C:\Windows\System32（版本 1.10.220126）与 SysWOW64 存在**过时的 onnxruntime.dll（ORT 1.10）**，spike 探针 exe 目录未带 bundled dll，按 DLL 搜索顺序（exe 目录 → 系统目录 → PATH）加载了系统的 ORT 1.10，才报 `version [27] not supported` 并崩溃。修复：将 bundled 的 4 个 dll（`onnxruntime.dll` / `onnxruntime_providers_shared.dll` / `sherpa-onnx-c-api.dll` / `sherpa-onnx-cxx-api.dll`）拷到探针 exe 旁，exe 目录优先于系统目录 → 探针加载正确的 ORT 1.27.1。真实产品的 `RcpBundle`/WiX 已把这些 dll 打进运行时目录，故**产品本身不受 System32 冲突影响**，仅 spike 构建需此修复。修复后 `sensevoice_probe` 真机 exit=0（VAD+SenseVoice 离线链路通），证明 ORT 1.27.1 完全可用。
-5. **🔴 BLOCKER-2（新，阻断 T0020/T0022）：在线 Paraformer 模型 × ORT 1.27.1(CPU EP) 致命崩溃**：`SherpaOnnxCreateOnlineRecognizer` 在创建流式 Paraformer 识别器时硬崩溃（无 stderr，exit 127），**官方 `sherpa-onnx-vad-with-online-asr.exe` 用相同模型 + 正确参数（`--paraformer-encoder`/`--paraformer-decoder`）复现**（打印 `Creating recognizer ...` 后崩溃）。模型文件尺寸完整（encoder.int8.onnx 165MB / decoder.onnx 25MB），排除损坏。SenseVoice/离线路径在 ORT 1.27.1 下正常 → 缺陷特定于流式 Paraformer 模型图，影响真实产品实时流式 partial 能力。修复方向：用 fp32 `encoder.onnx` 复测（排除 int8 量化算子触发 ORT 1.27.1 缺陷）；或把 ORT 钉到 sherpa 1.13.6 验证过的版本；随后复跑 `online_probe`/`hybrid_probe` 回填证据（详见 P0 报告 §3）。
-6. **🟡 PARTIAL：真机运行时验证未回填**：T0016 渲染出图、T0019 rclone 断网、T0020–22 真实语音 ASR（T0021 已通、T0020/T0022 阻塞于 BLOCKER-2）、T0023 FunASR CER/WER 均需在带显示器/授权语料/挂载的真机回填证据；沙箱无显示器/GPU/语料/rclone，无法替代。
-6. **已知环境坑（非阻塞）**：Git Bash 直接 `cmake` 全量 configure 时 MSYS 路径转换导致 `rc.exe` 不可见；需固化 INCLUDE/LIB/PATH 反斜杠或 vcvars 环境。手工 `cl`/`link` 已验证三库链接通过。
+5. **🔴 BLOCKER-2（新，仅阻断"实时逐字 partial"增强，不阻断精准字幕）：在线 Paraformer 模型 × ORT 1.27.1(CPU EP) 致命崩溃**：`SherpaOnnxCreateOnlineRecognizer` 在创建流式 Paraformer 识别器时硬崩溃（无 stderr，exit 127），**官方 `sherpa-onnx-vad-with-online-asr.exe` 用相同模型 + 正确参数（`--paraformer-encoder`/`--paraformer-decoder`）复现**（打印 `Creating recognizer ...` 后崩溃）。模型文件尺寸完整（encoder.int8.onnx 165MB / decoder.onnx 25MB），排除损坏。SenseVoice/离线路径在 ORT 1.27.1 下正常 → 缺陷特定于流式 Paraformer 模型图（int8 量化最可能触发 ORT 1.27.1 CPU EP 量化算子回归）。**影响范围（重新定性）**：仅阻断实时逐字 partial（T0020/T0022 的 Paraformer 流式增强）；精准字幕（VAD 分句 × SenseVoice）不受任何影响，已运行时验证（T0021 exit=0、T0022 精准路径 RC=0），满足用户验收"中文准确识别"。**决策（用户授权"自己看着办"）**：fp32 方向①放弃（包 ~998MB、MSI 撑到 >1GB）；保留 int8 模型，方向②把 sherpa-onnx 钉到"int8 Paraformer 可跑"的版本组合（如 1.12.1），但沙箱代理 TLS 限制无法下载对照包（见下条），需用户本机执行并回归 SenseVoice 仍正常。当前 `hybrid_probe` 默认仅跑 SenseVoice 精准路径（RC=0），Paraformer 流式作 `RCP_TRY_STREAMING=1` 可选增强（详见 P0 报告 §3 与 ADR-0004 状态更新）。
+6. **🟡 沙箱下载限制（非代码缺陷，影响 BLOCKER-2 修复与真机准确率验证）**：本沙箱经 Clash Verge TUN 代理；`github.com` / `huggingface.co` 主页可通，但 **GitHub `release-assets.githubusercontent.com`（release 附件）与 HF `cdn-lfs.huggingface.co`（模型/LFS）均 TLS 握手失败**（`schannel: failed to receive handshake`）。后果：无法在沙箱内下载旧版 sherpa 修复包（方向②），也**无法下载真实中文音频样本**做端到端准确率验证。BLOCKER-2 方向②与"真实中文识别准确率"验证均需在用户本机（网络正常、有 rclone 网盘挂载）执行；沙箱只负责架构验证与管线 smoke。
+7. **🟡 PARTIAL：真机运行时验证未回填**：T0016 渲染出图、T0019 rclone 断网、T0020–22 真实语音 ASR（T0021 已通、T0020/T0022 阻塞于 BLOCKER-2）、T0023 FunASR CER/WER 均需在带显示器/授权语料/挂载的真机回填证据；沙箱无显示器/GPU/语料/rclone，无法替代。
+8. **已知环境坑（非阻塞）**：Git Bash 直接 `cmake` 全量 configure 时 MSYS 路径转换导致 `rc.exe` 不可见；需固化 INCLUDE/LIB/PATH 反斜杠或 vcvars 环境。手工 `cl`/`link` 已验证三库链接通过。
 
 ## Known Issues
 
