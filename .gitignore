@@ -1,0 +1,67 @@
+# ---- Build outputs ----
+.qt6/
+out/
+build/
+build-*/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake-install-*/
+.vs/
+.idea/
+*.user
+*.suo
+*.vcxproj.user
+compile_commands.json
+
+# ---- Downloaded / local toolchain (never committed) ----
+.tools/
+.venv/
+venv/
+node_modules/
+
+# ---- Qt / dependency caches ----
+*.qm
+__pycache__/
+
+# ---- Large binary artifacts: models, media fixtures, caches (not in git) ----
+*.onnx
+*.onnx.gz
+*.bin
+*.mlmodel
+*.pt
+*.tflite
+models/
+cache/
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.flv
+*.ts
+*.m2ts
+*.webm
+*.wmv
+*.mpg
+*.mpeg
+*.m4v
+*.ogv
+*.wav
+*.mp3
+*.flac
+*.opus
+*.aac
+*.eac3
+*.ac3
+tests/fixtures/media/
+
+# ---- Logs / temp ----
+*.log
+*.tmp
+*.bak
+*.swp
+Thumbs.db
+Desktop.ini
+
+# ---- Editor / OS ----
+*.DS_Store
