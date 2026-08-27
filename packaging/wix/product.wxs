@@ -20,6 +20,12 @@
     <MajorUpgrade DowngradeErrorMessage="A newer version of RealtimeCaptionPlayer is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
+    <!-- WixUI_InstallDir：显示许可协议 → 目录选择 → 确认安装 → 进度条 -->
+    <UIRef Id="WixUI_InstallDir" />
+    <Property Id="WixAppFolder" Value="ProgramFilesFolder" />
+    <!-- 跳过许可证对话框（MVP 暂不展示 EULA），直接从目录选择开始 -->
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
     <Feature Id="Complete" Title="RealtimeCaptionPlayer" Level="1">
       <ComponentGroupRef Id="RcpRuntimeComponents" />
       <ComponentRef Id="StartMenuShortcut" />
