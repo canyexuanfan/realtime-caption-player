@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "bindings": {
+    "playback.toggle_pause": "Space",
+    "playback.seek_backward_5s": "Left",
+    "playback.seek_forward_5s": "Right",
+    "playback.speed_down": "[",
+    "playback.speed_up": "]",
+    "caption.toggle": "Ctrl+Shift+C",
+    "caption.export_srt": "Ctrl+Shift+S",
+    "window.fullscreen": "F11"
+  }
+}
