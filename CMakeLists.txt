@@ -32,6 +32,11 @@ endif()
 # ---- Qt ----
 # Qt 6 is required. Version is recorded in dependencies.lock.json.
 # Install via: pwsh ./tools/bootstrap.ps1  (or aqtinstall 6.8.1 win64 qtbase)
+# 工作空间自带 .qt6/<ver>/msvc2022_64；若它存在则自动加入 CMAKE_PREFIX_PATH，
+# 使 find_package(Qt6) 在干净环境/沙箱中也能解析（无需全局 Qt 安装或手动传 -DCMAKE_PREFIX_PATH）。
+if(EXISTS "${CMAKE_SOURCE_DIR}/.qt6/6.8.1/msvc2022_64")
+  list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/.qt6/6.8.1/msvc2022_64")
+endif()
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Network Sql Test)
 
 set(CMAKE_AUTOMOC ON)
@@ -53,10 +58,18 @@ endif()
 
 # ---- Native dependency integration (T0010-T0012) ----
 # Prebuilt libs live in <source>/.tools/{ffmpeg,mpv,sherpa-onnx}.
-# Enable BUILD_DEPS_SMOKE to compile a link smoke test proving they resolve.
-if(BUILD_DEPS_SMOKE)
+# rcp::ffmpeg / rcp::mpv / rcp::sherpa-onnx 由 cmake/FindRcpNativeDeps.cmake 定义；
+# 在 BUILD_DEPS_SMOKE 或 BUILD_PLAYER 时都需要。
+if(BUILD_DEPS_SMOKE OR BUILD_PLAYER)
   include(cmake/FindRcpNativeDeps.cmake)
+endif()
+
+if(BUILD_DEPS_SMOKE)
   add_subdirectory(tools/deps_smoke)
+endif()
+
+if(BUILD_PLAYER)
+  add_subdirectory(src/player)
 endif()
 
 # ---- Packaging (P8, requires WiX) ----

@@ -6,10 +6,10 @@
 ## 当前快照（2026-08-27）
 
 - **Current phase:** P0（技术验证、决策与第三方基线）
-- **Current task:** T0010–T0013 已完成（原生库下载+锁定+链接验证）；T0014+ 依赖已解除（可推进 playback/worker/ASR 实现）
+- **Current task:** T0015（mpv 事件桥/属性观察）— T0014 已完成（libmpv 渲染验证程序，真实 cmake/Ninja 构建链接 mpv-2.dll 通过）
 - **Current branch:** `main`
-- **Last completed task:** T0013（模型 manifest；paraformer/sensevoice/silero 已下载并打进运行时）
-- **Last verified commit:** `d8a34a0`（[T0009] 真实构建 + 21 测试 PASS）；本会话新增：原生库下载/锁定 + 打包验证（待提交）
+- **Last completed task:** T0014（libmpv 渲染验证程序：rcp_player 静态库 + player_app 可执行，真实 cmake/Ninja 构建链接 mpv-2.dll 通过）
+- **Last verified commit:** `d8a34a0`（[T0009] 真实构建 + 21 测试 PASS）；本会话：`ea0588b`/`a75bb1f`（T0010-T0013 + 文档）已推送；T0014（libmpv 渲染验证）构建验证通过（待提交推送）
 - **Last phase gate:** 无（P0 demo 依赖已就绪；实现任务待推进）
 - **Last update:** 2026-08-27
 
@@ -56,7 +56,7 @@
 | T0011 | 下载并锁定 libmpv | DONE | (本会话) | `.tools/mpv` 含 mpv-2.dll + mpv.lib(现场生成) + 头文件；手工 cl/link deps_smoke 链接 exit=0 | dependencies.lock.json, `.tools/mpv/` | 官方 v0.41.0 msvc 包只含 CLI；改从 zhongfly/mpv-winbuild 取 mpv-dev 开发库并生成 MSVC 导入库 |
 | T0012 | 下载并锁定 sherpa-onnx | DONE | (本会话) | `.tools/sherpa-onnx` 含 sherpa-onnx-c-api.dll + onnxruntime；链接验证通过 | dependencies.lock.json, `.tools/sherpa-onnx/` | Apache-2.0 |
 | T0013 | 模型 component manifest | DONE | (本会话) | paraformer/sensevoice/silero 已下载并打进 `out/bundle/runtime/models`；lock 记录路径 | dependencies.lock.json, `.tools/models/` | ct-transformer 可选未下载 |
-| T0014 | libmpv 渲染验证程序 | TODO | — | — | — | 依赖 T0011（libmpv 已锁定） |
+| T0014 | libmpv 渲染验证程序 | DONE | (本会话) | src/player/{MpvPlayer.h,MpvPlayer.cpp,player_app.cpp,CMakeLists.txt}；BUILD_PLAYER=ON 下真实构建，player_app 链接 mpv-2.dll 通过 | 依赖 T0011（libmpv 已锁定）；render_gl.h 宏重定向已 `#undef` 处理；mpv_destroy 替换缺失的 mpv_detach_destroy |
 | T0015 | mpv 事件桥/属性观察 | TODO | — | — | — | 依赖 T0011（已锁定） |
 | T0016 | ASS overlay + 带字幕截图 | TODO | — | — | — | 依赖 T0011 + T0014 |
 | T0017 | FFmpeg 指定音轨解码 | TODO | — | — | — | 依赖 T0010（已锁定） |
@@ -109,4 +109,4 @@
   **终端用户安装即用、零运行时下载**（直接回应「每次用户下载这么久很影响体验」）。
 - 更新 dependencies.lock.json（原生库/模型全部标 installed、新增 bundled_runtime 段）与本文档状态。
 
-下一步：提交本会话的原生库/打包/文档成果到私有远程；随后从 T0014 起推进 libmpv 播放内核实现（依赖已就绪）。
+下一步：提交本会话 T0014（libmpv 渲染验证程序）成果到私有远程；随后从 T0015 起推进 mpv 事件桥/属性观察（依赖 T0011，已锁定）。
