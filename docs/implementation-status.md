@@ -9,7 +9,7 @@
 - **Current task:** T0008（依赖锁 schema）/ T0009（固定 Qt 与构建工具环境，后台安装中）
 - **Current branch:** `main`
 - **Last completed task:** T0007（rclone full 决策）
-- **Last verified commit:** 见下方“本批次提交”
+- **Last verified commit:** 5626342（T0007 最新 foundation 提交；T0008/T0009 待构建验证）“本批次提交”
 - **Last phase gate:** 无（P0 阶段门未过；P0 demo 任务 BLOCKED 于原生库）
 - **Last update:** 2026-08-27
 
@@ -22,14 +22,14 @@
 | `git` | ✅ |
 | `gh`（已登录 github.com） | ✅ |
 | 互联网 | ✅（GitHub 可达） |
-| `cmake` | ⏳ 后台安装（pip cmake） |
-| `ninja` | ⏳ 后台安装 |
-| `Qt 6` | ⏳ 后台安装（aqtinstall 6.8.1 win64 qtbase） |
+| `cmake` | ✅ venv（`C:/Users/<你的用户名>/.workbuddy/binaries/python/envs/default/Scripts/cmake.exe`） |
+| `ninja` | ✅ venv（同 venv `ninja.exe`） |
+| `Qt 6` | ⏳ 安装中（后台 task 9gbUIU；aqtinstall 6.8.1 win64_msvc2022_64 仅 qtbase） |
 | `libmpv` / `FFmpeg` / `sherpa-onnx` | ❌ 未构建/未锁定（BLOCKED 于原生依赖） |
 | `WiX Toolset` | ❌ 未安装（BLOCKED） |
 | ASR 模型权重 | ❌ 未下载（BLOCKED，需合法来源与体积） |
 
-> 说明：本会话已具备 C++ 编译器与 git/gh/网络。正在安装 `cmake`+`ninja`+`Qt 6.8.1`，
+> 说明：本会话已具备 C++ 编译器、git/gh/网络，以及 venv 内已就绪的 cmake+ninja。正在安装 `Qt 6.8.1`（task 9gbUIU，仅 qtbase），
 > 以便对**不依赖 libmpv/FFmpeg/sherpa 的纯逻辑模块**做真实编译与 QtTest。
 > 依赖上述原生库的模块（P2 播放内核、P4 worker ASR、P8 MSI）在库就绪前标记为 BLOCKED，**不伪造构建/测试通过**。
 
@@ -37,13 +37,13 @@
 
 | Task | 标题 | Status | Commit | Verification | Evidence | Notes |
 |---|---|---|---|---|---|---|
-| T0001 | PRD/技术方案/TODO 纳入仓库 | DONE | 见本批次 [T0001] | 三文件可打开；git diff --check | docs/product/PRD.md, docs/architecture/技术实现方案.md, docs/development-todo.md | — |
-| T0002 | ADR 模板 | DONE | 见本批次 [T0002] | 模板可生成完整 ADR | docs/adr/ADR-template.md, docs/adr/README.md | — |
-| T0003 | GPL 分发决定 | DONE | 见本批次 [T0003] | LICENSE 与 ADR 一致；NOTICE 占位 | LICENSE, NOTICE, docs/adr/ADR-0001-gpl-distribution.md | — |
-| T0004 | Qt Widgets 边界 | DONE | 见本批次 [T0004] | ADR 含被否决方案 | docs/adr/ADR-0002-qt-widgets.md | — |
-| T0005 | worker 分进程 | DONE | 见本批次 [T0005] | ADR 含双开代价/IPC 不传 PCM | docs/adr/ADR-0003-caption-worker-process.md | — |
-| T0006 | Paraformer+SenseVoice | DONE | 见本批次 [T0006] | ADR 明确 SenseVoice≠streaming partial | docs/adr/ADR-0004-paraformer-sensevoice.md | — |
-| T0007 | rclone full 修正 | DONE | 见本批次 [T0007] | ADR 禁止 writes 作为读缓存 | docs/adr/ADR-0005-rclone-full.md | — |
+| T0001 | PRD/技术方案/TODO 纳入仓库 | DONE | 016b3c7 | 三文件可打开；git diff --check | docs/product/PRD.md, docs/architecture/技术实现方案.md, docs/development-todo.md | — |
+| T0002 | ADR 模板 | DONE | 124ca9c | 模板可生成完整 ADR | docs/adr/ADR-template.md, docs/adr/README.md | — |
+| T0003 | GPL 分发决定 | DONE | 07d4247 | LICENSE 与 ADR 一致；NOTICE 占位 | LICENSE, NOTICE, docs/adr/ADR-0001-gpl-distribution.md | — |
+| T0004 | Qt Widgets 边界 | DONE | 951ee1c | ADR 含被否决方案 | docs/adr/ADR-0002-qt-widgets.md | — |
+| T0005 | worker 分进程 | DONE | 558662f | ADR 含双开代价/IPC 不传 PCM | docs/adr/ADR-0003-caption-worker-process.md | — |
+| T0006 | Paraformer+SenseVoice | DONE | 79cb563 | ADR 明确 SenseVoice≠streaming partial | docs/adr/ADR-0004-paraformer-sensevoice.md, docs/adr/ADR-0006-offline-models.md | — |
+| T0007 | rclone full 修正 | DONE | 5626342 | ADR 禁止 writes 作为读缓存 | docs/adr/ADR-0005-rclone-full.md, docs/user/rclone.md | — |
 | T0008 | 依赖锁 schema | IN_PROGRESS | — | schema 可解析；示例项合规 | dependencies.lock.json（待写） | 本批次 foundation-code 完成 |
 | T0009 | 固定 Qt 与构建工具环境 | IN_PROGRESS | — | cmake/Qt 版本固定并写入 lock | 待工具链安装确认后写入 | 后台安装 cmake+Qt 6.8.1 中 |
 | T0010 | 自建并锁定 FFmpeg | BLOCKED | — | — | — | 原生库未构建/未锁定；需源码与构建环境 |
@@ -67,7 +67,7 @@
 1. **原生依赖缺失**：libmpv / FFmpeg / sherpa-onnx 未构建、未锁定、未下载；模型权重未获取。
    影响 T0010–T0024（P0 全部 demo 与后续阶段）。
    处理：工具链就绪后按 T0010–T0013 自建并写 lock；模型按 ADR-0006 离线分发。
-2. **Qt/cmake 安装中**：后台任务（task 70qabc）安装 cmake+ninja+Qt 6.8.1；完成后解锁纯逻辑模块真实编译/测试。
+2. **Qt 安装中**：cmake+ninja 已在 venv 就绪；后台任务（task 9gbUIU）安装 Qt 6.8.1 仅 qtbase，完成后解锁纯逻辑模块真实编译/测试。
 3. **WiX 未安装**：MSI 打包（P8）BLOCKED，待安装。
 
 ## Known Issues
