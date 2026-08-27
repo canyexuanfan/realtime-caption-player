@@ -19,6 +19,7 @@ option(BUILD_TESTS "Build unit/integration tests" ON)
 option(BUILD_PLAYER "Build the player application" OFF)
 option(BUILD_WORKER "Build the caption-worker application" OFF)
 option(BUILD_DEPS_SMOKE "Build native-dependency link smoke test (FFmpeg/mpv/sherpa-onnx)" OFF)
+option(BUILD_SPIKES "Build spike probes (T0015-T0023)" OFF)
 
 # ---- Compiler strictness (MSVC) ----
 if(MSVC)
@@ -60,7 +61,7 @@ endif()
 # Prebuilt libs live in <source>/.tools/{ffmpeg,mpv,sherpa-onnx}.
 # rcp::ffmpeg / rcp::mpv / rcp::sherpa-onnx 由 cmake/FindRcpNativeDeps.cmake 定义；
 # 在 BUILD_DEPS_SMOKE 或 BUILD_PLAYER 时都需要。
-if(BUILD_DEPS_SMOKE OR BUILD_PLAYER)
+if(BUILD_DEPS_SMOKE OR BUILD_PLAYER OR BUILD_SPIKES)
   include(cmake/FindRcpNativeDeps.cmake)
 endif()
 
@@ -72,9 +73,13 @@ if(BUILD_PLAYER)
   add_subdirectory(src/player)
 endif()
 
+if(BUILD_SPIKES)
+  add_subdirectory(spikes)
+endif()
+
 # ---- Packaging (P8, requires WiX) ----
 # CPack / WiX configuration is added when the installer phase begins.
 # include(packaging/wix/wix.cmake)  # enabled in P8
 
 message(STATUS "RealtimeCaptionPlayer ${PROJECT_VERSION}")
-message(STATUS "BUILD_TESTS=${BUILD_TESTS} BUILD_PLAYER=${BUILD_PLAYER} BUILD_WORKER=${BUILD_WORKER}")
+message(STATUS "BUILD_TESTS=${BUILD_TESTS} BUILD_PLAYER=${BUILD_PLAYER} BUILD_WORKER=${BUILD_WORKER} BUILD_SPIKES=${BUILD_SPIKES}")
