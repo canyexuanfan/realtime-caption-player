@@ -1,0 +1,29 @@
+Realtime Caption Player / 实时字幕播放器
+Copyright (C) 2026  RealtimeCaptionPlayer contributors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License v3.0 or later as published by the
+Free Software Foundation. See LICENSE for the full license text.
+
+This product includes or depends on the following third-party components. Exact
+versions, source commit/tag, source-archive SHA-256, binary-artifact SHA-256,
+build flags and license texts are tracked in `dependencies.lock.json`,
+`packaging/licenses/` and `packaging/third-party-notices/`. The lists below are
+placeholders to be finalized during the dependency-lock task (T0008/T0010-T0013).
+
+Third-party components (planned / to be verified):
+- Qt 6 (Widgets, GUI/OpenGL, Network, SQL, Test)        — LGPL-3.0 / GPL-3.0  (dynamic linking; relinking notice retained)
+- mpv / libmpv                                          — GPL-2.0-or-later (player built as GPL-3.0-or-later aggregate)
+- FFmpeg (libavformat/libavcodec/libavutil/libswresample) — LGPL-2.1-or-later / GPL-2.0 (configure-flag dependent; recorded in build-metadata)
+- sherpa-onnx (VAD, Online Paraformer, SenseVoice, CT-Transformer punctuation) — Apache-2.0 (NOTICE retained)
+- Silero VAD model                                      — MIT (model weights; verify at lock time)
+- Paraformer / SenseVoice / CT-Transformer model weights — Apache-2.0 (verify at lock time)
+- WiX Toolset (packaging only)                          — MS-RL
+- CMake (build tool only)                               — BSD-3-Clause
+- Googletest / QtTest (tests only)                      — BSD-3-Clause / Qt license
+
+Model files, large binary artifacts and user media are NOT distributed via this
+source repository; they are delivered through the offline installer and verified
+by SHA-256 recorded in `dependencies.lock.json` and model manifests.
+
+No telemetry, no cloud ASR, no network business calls are performed by the MVP.
