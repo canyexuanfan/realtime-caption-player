@@ -1,6 +1,6 @@
 ' EnsureAppSubfolder.vbs — WiX CustomAction
 ' 用户在 InstallDirDlg 点 Change 选目录后，自动追加 \RealtimeCaptionPlayer 子文件夹。
-' 由 product.wxs 的 Publish(InstallDirDlg/Next → DoAction EnsureAppSubfolder) 触发。
+' 触发时机：BrowseDlg/OK（选完目录返回时）、InstallDirDlg 初始化（每次打开）、InstallDirDlg/Next（安全兜底）。
 Function EnsureAppSubfolder()
   On Error Resume Next
 
@@ -27,10 +27,12 @@ Function EnsureAppSubfolder()
     sPath = sPath & "\"
   End If
 
+  ' 同时写回两个属性：WIXUI_INSTALLDIR 控制对话框显示，INSTALLFOLDER 控制实际安装路径
+  Session.Property("WIXUI_INSTALLDIR") = sPath
   Session.Property("INSTALLFOLDER") = sPath
 
   EnsureAppSubfolder = 1   ' 成功，继续安装
   If Err.Number <> 0 Then
-    EnsureAppSubfileder = 3  ' 错误，跳过（不应发生）
+    EnsureAppSubfolder = 3  ' 错误，跳过（不应发生）
   End If
 End Function

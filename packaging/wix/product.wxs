@@ -33,10 +33,17 @@
                   Execute="immediate" />
 
     <UI>
-      <!-- 在目录选择对话框的 Next 按钮上挂载：点 Next 时先修正路径再继续 -->
+      <!-- ① 浏览对话框选完目录点 OK 时：立即追加子文件夹，回到目录页时显示已修正的路径 -->
+      <Publish Dialog="BrowseDlg" Control="OK" Event="DoAction"
+               Value="EnsureAppSubfolder" Order="999">1</Publish>
+      <!-- ② Next 按钮：安全兜底（确保最终安装路径正确） -->
       <Publish Dialog="InstallDirDlg" Control="Next" Event="DoAction"
                Value="EnsureAppSubfolder" Order="3">1</Publish>
     </UI>
+
+    <!-- ③ 安装早期预置：把 INSTALLFOLDER（含子文件夹）同步到 WIXUI_INSTALLDIR，
+         覆盖上次安装残留的错误路径记忆，使目录选择页首次打开即显示正确路径 -->
+    <SetProperty Id="WIXUI_INSTALLDIR" Value="[INSTALLFOLDER]" Before="CostInitialize" Sequence="execute" />
 
     <Feature Id="Complete" Title="RealtimeCaptionPlayer" Level="1">
       <ComponentGroupRef Id="RcpRuntimeComponents" />
