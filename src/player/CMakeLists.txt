@@ -12,10 +12,13 @@ add_library(rcp_player STATIC
     MpvRenderWidget.h
     MainWindow.cpp
     MainWindow.h
+    WorkerSupervisor.cpp
+    WorkerSupervisor.h
 )
 
 target_include_directories(rcp_player PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/src
 )
 
 target_link_libraries(rcp_player PUBLIC
@@ -25,6 +28,7 @@ target_link_libraries(rcp_player PUBLIC
     Qt6::Gui
     Qt6::Widgets
     Qt6::OpenGLWidgets
+    Qt6::Network
     opengl32
 )
 

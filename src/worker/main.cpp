@@ -15,6 +15,7 @@
 #include "asr/AsrEngine.h"
 #include "captions/SrtExporter.h"
 #include "captions/CaptionTypes.h"
+#include "worker/IpcServer.h"
 
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
@@ -27,7 +28,22 @@ int main(int argc, char** argv) {
     parser.addOption(QCommandLineOption(QStringList{"vad"}, "silero vad dir", "dir", ".tools/models/silero"));
     parser.addOption(QCommandLineOption(QStringList{"sv"}, "sensevoice dir", "dir", ".tools/models/sensevoice"));
     parser.addOption(QCommandLineOption(QStringList{"o", "out"}, "output srt path", "path", "out.srt"));
+    parser.addOption(QCommandLineOption(QStringList{"s", "servername"}, "IPC server socket name (service mode)", "name"));
+    parser.addOption(QCommandLineOption(QStringList{"m", "models"}, "models root dir (zipformer-ctc/silero/sensevoice)", "dir", ".tools/models"));
     parser.process(app);
+
+    // IPC 服务模式：作为后台进程监听 QLocalServer，由主播放器进程连接并下发命令。
+    const QString serverName = parser.value("servername");
+    if (!serverName.isEmpty()) {
+        rcp::worker::IpcServer srv;
+        srv.setModelsRoot(parser.value("models"));
+        if (!srv.listen(serverName)) {
+            std::fprintf(stderr, "caption-worker: listen failed: %s\n", qPrintable(serverName));
+            return 1;
+        }
+        std::printf("caption-worker: IPC server listening on %s\n", qPrintable(serverName));
+        return app.exec();
+    }
 
     const QString file = parser.value("file");
     if (file.isEmpty()) {

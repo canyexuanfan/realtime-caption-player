@@ -2,6 +2,7 @@
 
 #include <QString>
 #include <utility>
+#include <QMetaType>
 
 namespace rcp {
 
@@ -54,3 +55,5 @@ struct CaptionLine {
 };
 
 } // namespace rcp
+
+Q_DECLARE_METATYPE(rcp::CaptionSegment)

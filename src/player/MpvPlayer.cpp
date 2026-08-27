@@ -164,6 +164,25 @@ void MpvPlayer::setAudioTrack(int aid) {
     mpv_set_property(m_handle, "aid", MPV_FORMAT_INT64, &id);
 }
 
+void MpvPlayer::showSubtitleOverlay(const QString& assEvents) {
+    if (!m_handle) return;
+    const QByteArray id = "rcp-live";
+    const QByteArray data = assEvents.toUtf8();
+    const char* args[] = {
+        "osd-overlay", "add", id.constData(), "ass-events", data.constData(), nullptr
+    };
+    mpv_command(m_handle, args);
+}
+
+void MpvPlayer::clearSubtitleOverlay() {
+    if (!m_handle) return;
+    const QByteArray id = "rcp-live";
+    const char* args[] = {
+        "osd-overlay", "remove", id.constData(), nullptr
+    };
+    mpv_command(m_handle, args);
+}
+
 void MpvPlayer::wakeupCallback(void* ctx) {
     auto* self = static_cast<MpvPlayer*>(ctx);
     // mpv 唤醒可能在非 Qt 线程；用 QueuedConnection 把事件排泄抛回主线程。

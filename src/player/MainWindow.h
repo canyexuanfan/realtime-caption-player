@@ -1,7 +1,8 @@
 // src/player/MainWindow.h
-// 基础播放器主窗口：视频渲染区 + 传输控制栏（打开/播放暂停/停止/进度/
-// 音量/倍速/静音）。本阶段仅打通"能打开视频并播放渲染"的播放内核；
-// 字幕叠加与 worker 进程在后续里程碑接入。
+// 主播放窗口：视频渲染区 + 传输控制栏 + 实时字幕链路。
+// 字幕链路：打开媒体 -> 启动后台 caption_worker (WorkerSupervisor) ->
+// 接收逐句事件 -> CaptionController 按播放头对齐 -> mpv osd-overlay 叠加；
+// 并提供字幕开关与 SRT 导出。
 #pragma once
 
 #include <QMainWindow>
@@ -12,6 +13,8 @@ class QSlider;
 class QPushButton;
 class QLabel;
 class QComboBox;
+namespace rcp::player { class WorkerSupervisor; }
+namespace rcp::captions { class CaptionController; }
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -33,6 +36,8 @@ private slots:
     void onSeekReleased();
     void onMediaLoaded();
     void onMediaEnded();
+    void onExportSrt();
+    void onToggleCaption();
 
 protected:
     void dragEnterEvent(QDragEnterEvent* event) override;
@@ -41,9 +46,13 @@ protected:
 private:
     void setupUi();
     QString formatTime(double seconds) const;
+    void startCaptioningFor(const QString& path);
 
     MpvPlayer* m_player = nullptr;
     MpvRenderWidget* m_video = nullptr;
+    rcp::captions::CaptionController* m_captionCtl = nullptr;
+    rcp::player::WorkerSupervisor* m_worker = nullptr;
+    bool m_captionOn = true;
 
     QSlider* m_seek = nullptr;
     QPushButton* m_playPauseBtn = nullptr;
@@ -51,6 +60,8 @@ private:
     QComboBox* m_speedCombo = nullptr;
     QSlider* m_volume = nullptr;
     QPushButton* m_muteBtn = nullptr;
+    QPushButton* m_captionBtn = nullptr;
+    QPushButton* m_exportBtn = nullptr;
 
     double m_duration = 0.0;
     bool m_seeking = false;

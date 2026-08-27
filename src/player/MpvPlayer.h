@@ -69,6 +69,10 @@ public:
     // ---- 音轨 ----
     void setAudioTrack(int aid);       // mpv 音频轨 id（aid 属性）
 
+    // ---- 字幕叠加（mpv osd-overlay, ASS 事件）----
+    void showSubtitleOverlay(const QString& assEvents);  // assEvents: mpv ass-events 格式文本
+    void clearSubtitleOverlay();
+
     // ---- 查询 ----
     double duration() const { return m_duration; }
     double timePosition() const { return m_timePos; }

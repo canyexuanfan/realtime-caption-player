@@ -18,6 +18,7 @@ set(RCP_IPC_SOURCES
 set(RCP_CAPTION_SOURCES
     captions/AssEscaper.cpp
     captions/CaptionStateMachine.cpp
+    captions/CaptionController.cpp
     captions/SrtExporter.cpp
 )
 

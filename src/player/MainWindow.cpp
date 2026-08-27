@@ -2,8 +2,13 @@
 #include "MainWindow.h"
 #include "MpvPlayer.h"
 #include "MpvRenderWidget.h"
+#include "WorkerSupervisor.h"
+#include "captions/CaptionController.h"
+#include "captions/SrtExporter.h"
+#include "captions/CaptionTypes.h"
 
 #include <QApplication>
+#include <QCoreApplication>
 #include <QFileDialog>
 #include <QToolBar>
 #include <QSlider>
@@ -19,6 +24,8 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QStyle>
+#include <QFileInfo>
+#include <QFile>
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     m_player = new MpvPlayer(this);
@@ -32,13 +39,49 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         m_player->initialize();
     }
 
+    m_captionCtl = new rcp::captions::CaptionController(this);
+    m_worker = new rcp::player::WorkerSupervisor(this);
+
     setupUi();
 
-    // 信号接线
+    // 播放内核信号
     connect(m_player, &MpvPlayer::positionChanged, this, &MainWindow::onPositionChanged);
     connect(m_player, &MpvPlayer::durationChanged, this, &MainWindow::onDurationChanged);
     connect(m_player, &MpvPlayer::mediaLoaded, this, &MainWindow::onMediaLoaded);
     connect(m_player, &MpvPlayer::mediaEnded, this, &MainWindow::onMediaEnded);
+
+    // ---- 字幕链路：worker 事件 -> 控制器 -> mpv 叠加层 ----
+    connect(m_worker, &rcp::player::WorkerSupervisor::sessionStarted,
+            m_captionCtl, &rcp::captions::CaptionController::reset);
+    connect(m_worker, &rcp::player::WorkerSupervisor::captionSegment,
+            this, [this](const rcp::CaptionSegment& seg, bool isPartial) {
+                if (isPartial)
+                    m_captionCtl->onPartial(seg, seg.generation);
+                else
+                    m_captionCtl->onFinal(seg, seg.generation);
+            });
+    connect(m_worker, &rcp::player::WorkerSupervisor::ready, this, [this] {
+        statusBar()->showMessage(tr("字幕识别已就绪"));
+    });
+    connect(m_worker, &rcp::player::WorkerSupervisor::workerError, this,
+            [this](const QString& m) {
+                statusBar()->showMessage(tr("字幕错误：%1").arg(m));
+            });
+    connect(m_worker, &rcp::player::WorkerSupervisor::workerFinished, this, [this] {
+        statusBar()->showMessage(tr("字幕识别进程已退出"));
+    });
+    connect(m_captionCtl, &rcp::captions::CaptionController::overlayChanged, this,
+            [this](const QString& ass) {
+                if (m_captionOn && !ass.isEmpty())
+                    m_player->showSubtitleOverlay(ass);
+                else
+                    m_player->clearSubtitleOverlay();
+            });
+    // 播放头驱动叠加层对齐
+    connect(m_player, &MpvPlayer::positionChanged, m_captionCtl,
+            [this](double s) {
+                m_captionCtl->setPlayheadMs(static_cast<long long>(s * 1000.0));
+            });
 
     setAcceptDrops(true);
     resize(960, 600);
@@ -83,6 +126,9 @@ void MainWindow::setupUi() {
     m_volume->setValue(100);
     m_muteBtn = new QPushButton(tr("静音"), bar);
 
+    m_captionBtn = new QPushButton(tr("字幕:开"), bar);
+    m_exportBtn = new QPushButton(tr("导出SRT"), bar);
+
     hbox->addWidget(openBtn);
     hbox->addWidget(m_playPauseBtn);
     hbox->addWidget(stopBtn);
@@ -93,6 +139,8 @@ void MainWindow::setupUi() {
     hbox->addWidget(new QLabel(tr("音量"), bar));
     hbox->addWidget(m_volume);
     hbox->addWidget(m_muteBtn);
+    hbox->addWidget(m_captionBtn);
+    hbox->addWidget(m_exportBtn);
 
     vbox->addWidget(bar);
 
@@ -111,6 +159,8 @@ void MainWindow::setupUi() {
     });
     connect(m_seek, &QSlider::sliderMoved, this, &MainWindow::onSeekSlider);
     connect(m_seek, &QSlider::sliderReleased, this, &MainWindow::onSeekReleased);
+    connect(m_captionBtn, &QPushButton::clicked, this, &MainWindow::onToggleCaption);
+    connect(m_exportBtn, &QPushButton::clicked, this, &MainWindow::onExportSrt);
 }
 
 void MainWindow::openFile(const QString& path) {
@@ -118,9 +168,25 @@ void MainWindow::openFile(const QString& path) {
     if (m_player->loadFile(path)) {
         m_player->play();
         statusBar()->showMessage(tr("正在播放：%1").arg(path));
+        startCaptioningFor(path);
     } else {
         statusBar()->showMessage(tr("加载失败：%1").arg(path));
     }
+}
+
+void MainWindow::startCaptioningFor(const QString& path) {
+    const QString workerExe = QCoreApplication::applicationDirPath()
+        + QStringLiteral("/caption_worker.exe");
+    const QString modelsRoot = QCoreApplication::applicationDirPath()
+        + QStringLiteral("/.tools/models");
+
+    if (m_worker->isRunning()) m_worker->shutdown();
+
+    if (!QFile::exists(workerExe)) {
+        statusBar()->showMessage(tr("未找到 caption_worker.exe，跳过字幕识别"));
+        return;
+    }
+    m_worker->start(workerExe, QFileInfo(path).absoluteFilePath(), modelsRoot);
 }
 
 void MainWindow::onOpen() {
@@ -137,6 +203,7 @@ void MainWindow::onPlayPause() {
 
 void MainWindow::onStop() {
     if (!m_player) return;
+    m_worker->stop();
     m_player->stop();
 }
 
@@ -184,6 +251,33 @@ void MainWindow::onMediaLoaded() {
 void MainWindow::onMediaEnded() {
     m_playPauseBtn->setIcon(style()->standardIcon(QStyle::SP_MediaPlay));
     m_playPauseBtn->setText(tr("播放"));
+    m_worker->stop();
+    m_player->clearSubtitleOverlay();
+}
+
+void MainWindow::onExportSrt() {
+    const QString path = QFileDialog::getSaveFileName(
+        this, tr("导出字幕 SRT"), QString(), tr("SubRip (*.srt)"));
+    if (path.isEmpty()) return;
+    const QVector<rcp::CaptionSegment> fins = m_captionCtl->finals();
+    QList<rcp::CaptionSegment> list;
+    list.reserve(fins.size());
+    for (const auto& s : fins) list.append(s);
+    const auto res = rcp::captions::SrtExporter::writeSrt(path, list);
+    if (res.isError())
+        statusBar()->showMessage(tr("SRT 导出失败"));
+    else
+        statusBar()->showMessage(tr("SRT 已导出：%1").arg(path));
+}
+
+void MainWindow::onToggleCaption() {
+    m_captionOn = !m_captionOn;
+    m_captionBtn->setText(m_captionOn ? tr("字幕:开") : tr("字幕:关"));
+    if (!m_captionOn) {
+        m_player->clearSubtitleOverlay();
+    } else {
+        m_captionCtl->setPlayheadMs(static_cast<long long>(m_player->timePosition() * 1000.0));
+    }
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent* event) {

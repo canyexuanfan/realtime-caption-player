@@ -1,6 +1,14 @@
 # src/worker/CMakeLists.txt
 # P4: caption-worker 可执行进程（文件模式；后续接 IPC server）。
-add_executable(caption_worker main.cpp)
+add_executable(caption_worker
+    main.cpp
+    IpcServer.cpp
+    IpcServer.h
+)
+
+target_include_directories(caption_worker PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+)
 
 target_link_libraries(caption_worker PRIVATE
     rcp_audio
