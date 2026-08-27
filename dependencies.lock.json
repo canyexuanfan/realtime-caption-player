@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "generated": "2026-08-27",
+  "note": "依赖锁文件。原生库（libmpv/FFmpeg/sherpa-onnx）的 source_archive_sha256 / binary_artifact_sha256 / commit 在 T0010-T0013 自建并锁定后补全。当前环境未构建这些原生库（见 docs/implementation-status.md）。",
+  "toolchain": {
+    "compiler": "MSVC (VS2022 BuildTools) 14.16/14.29/14.44",
+    "cmake": { "version": "4.4.2", "source": "venv pip cmake (C:/Users/<你的用户名>/.workbuddy/binaries/python/envs/default)", "license": "BSD-3-Clause", "status": "installed" },
+    "ninja": { "version": "1.13.0", "source": "venv pip ninja", "license": "Apache-2.0", "status": "installed" },
+    "qt": {
+      "version": "6.8.1",
+      "source": "aqt install-qt windows desktop 6.8.1 win64_msvc2022_64 --outputdir <QT_ROOT> (qtbase 为默认包，禁止 -m qtbase)",
+      "license": "LGPLv3/GPLv3 (dynamic linking)",
+      "status": "installing"
+    }
+  },
+  "dependencies": [
+    {
+      "name": "qt",
+      "version": "6.8.1",
+      "purpose": "Widgets/GUI/OpenGL/Network/Sql/Test",
+      "license": "LGPLv3/GPLv3",
+      "license_file": "packaging/licenses/qt-LGPLv3.txt",
+      "status": "installing",
+      "build_flags_file": "third_party/build-metadata/qt.txt",
+      "note": "技术实现方案建议 6.11.2 为基线；本环境使用实际可获取的 6.8.1，差异在锁中记录。"
+    },
+    {
+      "name": "mpv",
+      "version": "0.41.0",
+      "source_tag": "v0.41.0",
+      "purpose": "解码/渲染/字幕轨/音轨/滤镜/倍速/HDR/截图（libmpv）",
+      "license": "GPL-2.0-or-later",
+      "client_header_license": "MIT-0 (libmpv/client.h)",
+      "status": "planned (T0011)",
+      "build_flags_file": "third_party/build-metadata/mpv.txt",
+      "note": "聚合 GPL-3.0-or-later 分发；client.h MIT-0 允许链接。"
+    },
+    {
+      "name": "ffmpeg",
+      "version": "9.0.1",
+      "purpose": "worker 音频解码与重采样（libavformat/libavcodec/libavutil/libswresample）",
+      "license": "LGPL-2.1-or-later (默认配置) / GPL-2.0",
+      "status": "planned (T0010)",
+      "build_flags_file": "third_party/build-metadata/ffmpeg.txt",
+      "note": "以 LGPL 配置构建并记录完整 configure flags。"
+    },
+    {
+      "name": "sherpa-onnx",
+      "version": "1.13.6",
+      "purpose": "VAD / Online Paraformer / SenseVoice / CT-Transformer 标点",
+      "license": "Apache-2.0",
+      "license_file": "packaging/third-party-notices/sherpa-onnx-NOTICE",
+      "status": "planned (T0012)",
+      "build_flags_file": "third_party/build-metadata/sherpa-onnx.txt",
+      "note": "保留 NOTICE；ONNX Runtime (MIT) 随其分发。"
+    },
+    {
+      "name": "silero-vad",
+      "version": "v1",
+      "purpose": "VAD 模型权重",
+      "license": "MIT (weights)",
+      "status": "planned (T0013)",
+      "note": "模型 manifest 记录 hash。"
+    },
+    {
+      "name": "paraformer-zh-en-int8",
+      "version": "bilingual-zh-en",
+      "purpose": "Online Paraformer 流式 partial",
+      "license": "Apache-2.0 (weights)",
+      "status": "planned (T0013)"
+    },
+    {
+      "name": "sensevoice-zh-en-ja-ko-yue-int8",
+      "version": "2024-07-17",
+      "purpose": "SenseVoice 分句终稿",
+      "license": "Apache-2.0 (weights)",
+      "status": "planned (T0013)"
+    },
+    {
+      "name": "ct-transformer-zh-en-int8",
+      "version": "v1",
+      "purpose": "标点",
+      "license": "Apache-2.0 (weights)",
+      "status": "planned (T0013)"
+    },
+    {
+      "name": "rclone",
+      "version": "latest-stable",
+      "purpose": "网盘挂载（仅诊断，不捆绑）",
+      "license": "MIT",
+      "status": "external (user-side)",
+      "note": "不在分发内；仅提供配置建议。"
+    },
+    {
+      "name": "wix",
+      "version": "v3.11/v5",
+      "purpose": "MSI 打包（仅工具）",
+      "license": "MS-RL",
+      "status": "missing (P8 BLOCKED)"
+    },
+    {
+      "name": "cmake",
+      "version": "4.4.2",
+      "purpose": "构建编排",
+      "license": "BSD-3-Clause",
+      "status": "installed"
+    }
+  ]
+}
