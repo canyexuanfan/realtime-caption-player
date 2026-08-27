@@ -19,6 +19,8 @@ extern "C" {
 }
 
 int main(int argc, char** argv) {
+    setvbuf(stdout, NULL, _IONBF, 0);  // 无缓冲：崩溃前也能看到定位输出
+    std::printf("online_probe: start\n");
     std::string dir = (argc > 1) ? argv[1] : ".tools/models/paraformer";
     std::string enc = dir + "/encoder.int8.onnx";
     std::string dec = dir + "/decoder.onnx";

@@ -19,6 +19,8 @@ extern "C" {
 }
 
 int main(int argc, char** argv) {
+    setvbuf(stdout, NULL, _IONBF, 0);  // 无缓冲：崩溃前也能看到定位输出
+    std::printf("hybrid_probe: start\n");
     std::string pf_dir = (argc > 1) ? argv[1] : ".tools/models/paraformer";
     std::string vad_dir = (argc > 2) ? argv[2] : ".tools/models/silero";
     std::string enc = pf_dir + "/encoder.int8.onnx";
@@ -49,9 +51,17 @@ int main(int argc, char** argv) {
     vad_cfg.silero_vad.min_silence_duration = 0.5f;
     vad_cfg.silero_vad.min_speech_duration = 0.25f;
     vad_cfg.silero_vad.max_speech_duration = 20.0f;
+    vad_cfg.silero_vad.window_size = 512;  // 必须 512/1024/1536；漏设=0 会导致 VAD 加载/推理异常
     vad_cfg.sample_rate = 16000;
     vad_cfg.num_threads = 1;
     vad_cfg.provider = "cpu";
+    // ten_vad 必须给空字符串而非 NULL（memset 后是 NULL），否则 dll 内 std::string(NULL) 触发未定义行为
+    vad_cfg.ten_vad.model = "";
+    vad_cfg.ten_vad.threshold = 0.5f;
+    vad_cfg.ten_vad.min_silence_duration = 0.5f;
+    vad_cfg.ten_vad.min_speech_duration = 0.25f;
+    vad_cfg.ten_vad.max_speech_duration = 20.0f;
+    vad_cfg.ten_vad.window_size = 256;
     const SherpaOnnxVoiceActivityDetector* vad = SherpaOnnxCreateVoiceActivityDetector(&vad_cfg, 30.0f);
     if (!vad) { std::printf("hybrid_probe: VAD FAILED\n"); return 1; }
 
