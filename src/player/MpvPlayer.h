@@ -1,7 +1,7 @@
 // src/player/MpvPlayer.h
-// libmpv 客户端封装（T0014：libmpv 渲染验证程序）。
-// 仅依赖 libmpv 客户端/渲染 API + Qt（QString）。不引入 GUI 工具包，
-// 便于在沙箱中以"编译 + 链接"确认 libmpv 可嵌入。
+// libmpv 客户端封装（播放内核）。提供加载/播放/暂停/停止/seek/音量/倍速/
+// 音轨选择，并通过 mpv 属性观察桥接播放进度、时长、暂停态、播放结束等事件。
+// 事件通过 Qt 信号暴露，主线程用 processEvents() 排泄 mpv 事件队列。
 #pragma once
 
 #include <mpv/client.h>
@@ -14,10 +14,13 @@
 #undef mpv_render_context_create
 
 #include <QString>
+#include <QObject>
+#include <functional>
 
-class MpvPlayer {
+class MpvPlayer : public QObject {
+    Q_OBJECT
 public:
-    MpvPlayer() = default;
+    explicit MpvPlayer(QObject* parent = nullptr);
     ~MpvPlayer();
 
     MpvPlayer(const MpvPlayer&) = delete;
@@ -30,22 +33,71 @@ public:
     bool create();
 
     // 设置字符串选项（如 "vo"="libmpv"）。需在 initialize() 之前调用。
-    int setOption(const QString& name, const QString& value);
+    bool setOption(const QString& name, const QString& value);
 
-    // 初始化播放核心（创建句柄后、加载媒体前调用）。
-    int initialize();
+    // 初始化播放核心（创建句柄后、加载媒体前调用）。会注册属性观察与唤醒回调。
+    bool initialize();
 
     // 异步加载媒体文件（loadfile 命令）。
-    int loadFile(const QString& path, bool replace = true);
+    bool loadFile(const QString& path, bool replace = true);
 
-    // 创建 OpenGL 渲染上下文。
-    // 需要上层提供真实 GL 上下文（get_proc_address + glCtx），沙箱无显示设备故不调用。
+    // 创建 OpenGL 渲染上下文。需要上层提供真实 GL 上下文（get_proc_address + glCtx）。
+    // 沙箱无显示设备故不调用，真实渲染在目标 Windows 会话验证。
     int createRenderContext(mpv_render_context** outCtx,
-                            void* (*getProcAddr)(void* ctx, const char* name),
-                            void* glCtx);
+                             void* (*getProcAddr)(void* ctx, const char* name),
+                             void* glCtx);
 
     mpv_handle* handle() const { return m_handle; }
+    bool isValid() const { return m_handle != nullptr; }
+
+    // ---- 播放控制 ----
+    void play();
+    void pause();
+    void togglePause();
+    bool isPaused() const { return m_paused; }
+    void stop();                       // 停止并卸载当前媒体
+    void seek(double seconds, bool relative = false);
+
+    // ---- 音频/速度 ----
+    void setVolume(int vol);           // 0..100
+    int volume() const { return m_volume; }
+    void setMuted(bool muted);
+    bool muted() const { return m_muted; }
+    void setSpeed(double speed);       // e.g. 1.0, 1.25, 0.5
+    double speed() const { return m_speed; }
+
+    // ---- 音轨 ----
+    void setAudioTrack(int aid);       // mpv 音频轨 id（aid 属性）
+
+    // ---- 查询 ----
+    double duration() const { return m_duration; }
+    double timePosition() const { return m_timePos; }
+
+signals:
+    void durationChanged(double seconds);
+    void positionChanged(double seconds);
+    void pauseStateChanged(bool paused);
+    void mediaLoaded();
+    void mediaEnded();
+    void playbackError(const QString& message);
+    void eventAvailable();            // mpv 唤醒：主线程应调用 processEvents()
+
+public slots:
+    // 排泄 mpv 事件队列（由 eventAvailable() 触发，必须在主线程调用）。
+    void processEvents();
 
 private:
+    static void wakeupCallback(void* ctx);
+    void handleEvent(mpv_event* event);
+    void applyInitialProperties();
+
     mpv_handle* m_handle = nullptr;
+
+    bool    m_paused = false;
+    int     m_volume = 100;
+    bool    m_muted  = false;
+    double  m_speed  = 1.0;
+    double  m_duration = 0.0;
+    double  m_timePos  = 0.0;
+    bool    m_loaded   = false;
 };
