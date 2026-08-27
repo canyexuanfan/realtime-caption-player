@@ -1,22 +1,29 @@
 # Agent Handoff
 
-- **Last updated:** 2026-08-27 13:39
+- **Last updated:** 2026-08-27 15:30
 - **Branch:** `main`
-- **HEAD:** `a75bb1f`（[docs] 校正 agent-handoff）/ `ea0588b`（[T0010-T0013] 原生依赖）
-- **未提交：** `CMakeLists.txt`（Qt6 自动发现）、`docs/implementation-status.md`（T0014 DONE）、`src/player/`（T0014 播放封装，待提交）
+- **HEAD:** `69920bb`（[T0023] 合规语料+FunASR 基线，已推送 origin/main）
+- **未提交：** `docs/implementation-status.md`（T0015–T0024 进度同步）、`docs/agent-handoff.md`（本更新）、`docs/phase-gates/P0-report.md`（T0024 阶段门报告草案）
 
 ## Current Phase
 
-P0（技术验证、决策与第三方基线）—— **已完成**。进入 P1：原生模块实装（libmpv 播放内核 T0014+）。
+P0（技术验证、决策与第三方基线）—— **代码与编译/链接验证已全部完成（T0001–T0024）**，但**阶段门未签署**：运行时验证因环境约束 + 模型/ORT 版本错配未关闭（见 BLOCKER-1）。P0 报告草案已就绪，签署需真机回填证据。
 
 ## Last Completed Task
 
-T0010–T0013 —— 原生依赖（FFmpeg / libmpv / sherpa-onnx 预编译库 + ASR 模型权重）全部落地、可链接、可自包含打包。**已通过真实 cmake/Ninja 构建验证。**
-T0014 —— libmpv 播放内核最小可链接封装（`src/player/MpvPlayer.{h,cpp}` + `player_app.cpp`）。**已通过 `BUILD_PLAYER=ON` 真实 cmake/Ninja 构建（BUILD_EXIT=0），`player_app.exe` 导入 `mpv-2.dll`。**
+- T0010–T0013 原生依赖（FFmpeg/libmpv/sherpa-onnx + ASR 模型）落地、可链接、可自包含打包（真实 cmake/Ninja 验证）。
+- T0014 `src/player/` libmpv 封装（`BUILD_PLAYER=ON` 真实构建，导入 mpv-2.dll）。
+- T0015–T0019 探针（mpv 事件桥 / ASS overlay / 音轨解码 / seek / rclone 双开）—— 代码 + 编译/链接 + 部分真机式运行已验证。
+- T0020–T0022 ASR 混合链路（在线 Paraformer / Silero VAD / Hybrid 融合）—— 代码 + 编译/链接已验证；运行时因 BLOCKER-1 阻塞。
+- T0023 合规语料 + **FunASR** 基线（原 whisper 基线按用户规则禁用）—— 评测框架已完成。
+- T0024 P0 阶段门报告草案（`docs/phase-gates/P0-report.md`）。
 
 ## Current Task
 
-**T0015（验证 mpv 事件桥和属性观察）—— 待推进。** T0014 已证明 libmpv 客户端+渲染 API 可嵌入链接（含 `createRenderContext` 符号引用）；T0015 需建立事件循环桥（`mpv_observe_property` / `mpv_event` 分发）与属性观察（如 `time-pos` / `duration` / `pause` 等），接到 Qt 信号；沙箱无显示设备，以链接成功 + 真实会话手动验证为判据。
+**T0024 收尾 + 关闭 P0 阶段门**：P0 所有任务的代码与编译/链接验证已完成；当前阻塞与待回填项：
+1. **BLOCKER-1**（模型/ORT opset 错配，阻断 T0020–T0022 运行时）：升级 sherpa-onnx+ORT 或换配套模型。
+2. **真机回填**（T0016 渲染出图 / T0019 rclone 断网 / T0020–22 真实语音 ASR / T0023 CER-WER）：沙箱无显示器/GPU/语料/rclone，需用户真机运行并回传证据。
+3. 用户在本报告签字后关闭 P0，进入 P1 产品实装。
 
 ## 用户关切的答案（"依赖能打包进程序吗？用户还要不要下载？"）
 
@@ -90,14 +97,15 @@ T0014 —— libmpv 播放内核最小可链接封装（`src/player/MpvPlayer.{h
 - **`render_gl.h` 宏重定向 `mpv_render_context_create`**：该头把符号重定义为运行期函数指针（需 `mpv_render_context_create_fn` 取址）。静态链接 `mpv.lib` 时要 `#undef mpv_render_context_create` 以保留 `render.h` 的真正导出符号，否则链接报未解析。
 - **沙箱构建必须用 `Ninja` generator**（CMakePresets 默认 VS2022 generator 在沙箱崩溃）；Release + 显式 MSVC 环境，且需 `MSYS_NO_PATHCONV=1` + `MSYS2_ARG_CONV_EXCL='*'` 绕过 MSYS 路径改写与 `rc.exe` 找不到的问题。
 - **`dumpbin` 在 Git-Bash 下 PATH 需用 `:` 分隔的 Unix 风格路径**（用 `;` 的 Windows 风格 PATH 在 bash 中不生效）。
-- 真实模型基准（T0023）需合法语料与模型下载，暂不可行（属后续 P 阶段）。
+- **T0023 基线工具用 FunASR（非 whisper）**：用户长期规则禁用 Whisper；`benchmark-asr.py` 以 FunASR 为对照，`manifest.json` 中 `whisper_baseline=DISABLED_BY_POLICY`。
+- **BLOCKER-1（模型/ORT opset 错配）**：`.tools/models/` 的 Paraformer/SenseVoice/Silero 用 opset 27，bundled sherpa-onnx 1.13.6 的 ORT 不支持，加载报 `version [27] not supported` 崩溃；非代码缺陷，需升级 sherpa-onnx+ORT 或换配套模型。
 
 ## Next Exact Action
 
-1. **提交 T0014 成果**：`git add CMakeLists.txt docs/implementation-status.md docs/agent-handoff.md src/player/` → `[T0014] libmpv 播放内核最小可链接封装（src/player + BUILD_PLAYER）` → `git push`。
-2. 推进 **T0015（验证 mpv 事件桥和属性观察）**：建立 Qt 侧事件循环桥与属性观察（监听 `mpv_set_wakeup_callback` + `mpv_wait_event`，分发 `mpv_event`；`mpv_observe_property` 跟踪 `time-pos`/`duration`/`pause`/`track-list` 等，转 Qt 信号）。T0016（ASS overlay + 带字幕截图，依赖 T0014+T0015）紧随其后。
-3. 每完成一个任务：更新 TODO、`implementation-status`、`agent-handoff`；`git commit -m "..."`；`git push`。
-4. 安装 WiX 以解除 P8 MSI 打包 BLOCKED（依赖现已被 `RcpBundle.cmake` 收集，打包阶段只需 WiX 工具链）。
+1. **提交 T0015–T0024 成果**：`git add docs/implementation-status.md docs/agent-handoff.md docs/phase-gates/P0-report.md` → `[T0024] P0 阶段门报告 + 进度同步` → `git push`。
+2. **修复 BLOCKER-1**：升级 `sherpa-onnx`+`onnxruntime` 至支持 opset 17+ 的版本（或换与 1.13.6 配套的模型）；之后重跑 `online_probe`/`sensevoice_probe`/`hybrid_probe` 回填运行时证据。
+3. **真机回填**：用户在带显示器/授权语料/rclone 挂载的 Windows 上运行各 spike，回传渲染截图、双开断网、ASR partial/分句/SRT、FunASR CER-WER 证据；据此关闭 P0 阶段门。
+4. 每完成一步：更新 `implementation-status`、`agent-handoff`、`P0-report.md` 签署区；`git commit`；`git push`。
 
 ## Important Decisions
 

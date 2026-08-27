@@ -6,11 +6,11 @@
 ## 当前快照（2026-08-27）
 
 - **Current phase:** P0（技术验证、决策与第三方基线）
-- **Current task:** T0015（mpv 事件桥/属性观察）— T0014 已完成（libmpv 渲染验证程序，真实 cmake/Ninja 构建链接 mpv-2.dll 通过）
+- **Current task:** T0024（签署 P0 阶段门报告）— T0015–T0023 代码与编译/链接验证已全部完成；运行时验证因环境约束 + 模型/ORT 版本错配未关闭
 - **Current branch:** `main`
-- **Last completed task:** T0014（libmpv 渲染验证程序：rcp_player 静态库 + player_app 可执行，真实 cmake/Ninja 构建链接 mpv-2.dll 通过）
-- **Last verified commit:** `d8a34a0`（[T0009] 真实构建 + 21 测试 PASS）；本会话：`ea0588b`/`a75bb1f`（T0010-T0013 + 文档）已推送；T0014（libmpv 渲染验证）构建验证通过（待提交推送）
-- **Last phase gate:** 无（P0 demo 依赖已就绪；实现任务待推进）
+- **Last completed task:** T0023（合规 ASR 基准语料 + FunASR 基线，替换原 whisper 基线）
+- **Last verified commit:** `69920bb`（[T0023] 合规语料+FunASR 基线，已推送 origin/main）
+- **Last phase gate:** P0 报告草案 `docs/phase-gates/P0-report.md` 已就绪（签署待真机运行时证据回填）
 - **Last update:** 2026-08-27
 
 ## 环境事实（诚实记录）
@@ -56,24 +56,26 @@
 | T0011 | 下载并锁定 libmpv | DONE | (本会话) | `.tools/mpv` 含 mpv-2.dll + mpv.lib(现场生成) + 头文件；手工 cl/link deps_smoke 链接 exit=0 | dependencies.lock.json, `.tools/mpv/` | 官方 v0.41.0 msvc 包只含 CLI；改从 zhongfly/mpv-winbuild 取 mpv-dev 开发库并生成 MSVC 导入库 |
 | T0012 | 下载并锁定 sherpa-onnx | DONE | (本会话) | `.tools/sherpa-onnx` 含 sherpa-onnx-c-api.dll + onnxruntime；链接验证通过 | dependencies.lock.json, `.tools/sherpa-onnx/` | Apache-2.0 |
 | T0013 | 模型 component manifest | DONE | (本会话) | paraformer/sensevoice/silero 已下载并打进 `out/bundle/runtime/models`；lock 记录路径 | dependencies.lock.json, `.tools/models/` | ct-transformer 可选未下载 |
-| T0014 | libmpv 渲染验证程序 | DONE | (本会话) | src/player/{MpvPlayer.h,MpvPlayer.cpp,player_app.cpp,CMakeLists.txt}；BUILD_PLAYER=ON 下真实构建，player_app 链接 mpv-2.dll 通过 | 依赖 T0011（libmpv 已锁定）；render_gl.h 宏重定向已 `#undef` 处理；mpv_destroy 替换缺失的 mpv_detach_destroy |
-| T0015 | mpv 事件桥/属性观察 | TODO | — | — | — | 依赖 T0011（已锁定） |
-| T0016 | ASS overlay + 带字幕截图 | TODO | — | — | — | 依赖 T0011 + T0014 |
-| T0017 | FFmpeg 指定音轨解码 | TODO | — | — | — | 依赖 T0010（已锁定） |
-| T0018 | FFmpeg seek + sample clock | TODO | — | — | — | 依赖 T0010（已锁定） |
-| T0019 | 本地与 rclone full 双开 | TODO | — | — | — | 依赖 T0010 + 网络/挂载 |
-| T0020 | Online Paraformer partial | TODO | — | — | — | 依赖 T0012 + 模型（已就绪） |
-| T0021 | SenseVoice VAD 分句终稿 | TODO | — | — | — | 依赖 T0012 + 模型（已就绪） |
-| T0022 | Hybrid partial→final 修订 | TODO | — | — | — | 依赖 T0020/T0021 |
-| T0023 | ASR 基准语料 + whisper 基线 | TODO | — | — | — | 依赖模型（已就绪）+ 合法语料 |
-| T0024 | 签署 P0 阶段门报告 | TODO | — | — | — | 依赖 T0010–T0023 全部 PASS |
+| T0014 | libmpv 渲染验证程序 | DONE | 49f1a09 | src/player/{MpvPlayer.h,MpvPlayer.cpp,player_app.cpp,CMakeLists.txt}；BUILD_PLAYER=ON 真实构建，player_app 链接 mpv-2.dll 通过 | 依赖 T0011；mpv_destroy 替换缺失的 mpv_detach_destroy |
+| T0015 | mpv 事件桥/属性观察 | DONE | (本会话) | spikes/mpv-render/MpvEventProbe.cpp；BUILD_SPIKES=ON 真实构建，导入 mpv-2.dll | 依赖 T0011 |
+| T0016 | ASS overlay + 带字幕截图 | DONE(code) | (本会话) | spikes/mpv-render/OverlayProbe.cpp 构建+链接 OK；headless 运行 RUN_EXIT=0；**渲染出图需真机** → PARTIAL | 依赖 T0011+T0014；render 上下文需 GL 表面 |
+| T0017 | FFmpeg 指定音轨解码 | DONE | (本会话) | spikes/audio-decode/main.cpp 真机式运行：两音轨解码出不同 checksum（3395679301 vs 3349846617） | 依赖 T0010 |
+| T0018 | FFmpeg seek + sample clock | DONE | (本会话) | spikes/audio-decode/SeekProbe.cpp 真机式运行：target 2.000s→pts 2.005s(Δ5ms)，sample_offset 自洽 | 依赖 T0010 |
+| T0019 | 本地与 rclone full 双开 | DONE(code) | (本会话) | spikes/rclone-double-open/DoubleOpenProbe.cpp 真机式运行：FFmpeg+mpv 同开同文件双开=YES；rclone full 缓存/断网 PARTIAL | 依赖 T0010+真机挂载 |
+| T0020 | Online Paraformer partial | DONE(code) | (本会话) | spikes/asr-hybrid/OnlineProbe.cpp 编译+链接 OK；**运行时因模型/ORT opset 错配阻塞** → PARTIAL | 依赖 T0012+模型；见 BLOCKER-1 |
+| T0021 | SenseVoice VAD 分句终稿 | DONE(code) | (本会话) | spikes/asr-hybrid/SenseVoiceProbe.cpp 编译+链接 OK；API 调用正确（VAD detector/离线 Accept/SenseVoice 离线）；**运行时同 BLOCKER-1** → PARTIAL | 依赖 T0012+模型 |
+| T0022 | Hybrid partial→final 修订 | DONE(code) | (本会话) | spikes/asr-hybrid/HybridProbe.cpp 编译+链接 OK；**运行时同 BLOCKER-1** → PARTIAL | 依赖 T0020/T0021 |
+| T0023 | ASR 基准语料 + FunASR 基线（原案 whisper 已禁用） | DONE(framework) | 69920bb | tools/benchmark-asr.py py_compile OK、CER/WER 单测正确、FunASR 缺失优雅退出；真机评测 PARTIAL | 依赖授权语料+FunASR 安装 |
+| T0024 | 签署 P0 阶段门报告 | DONE(draft) | (本会话) | docs/phase-gates/P0-report.md 证据表+签署条件；**签署需真机运行时证据回填** → PARTIAL | 依赖 T0010–T0023 |
 
 ## Current Blockers
 
-1. **原生依赖已就绪**：libmpv / FFmpeg / sherpa-onnx 已下载并锁定于 `.tools/`，ASR 模型（paraformer/sensevoice/silero）已下载并打进自包含运行时。T0010–T0013 已完成；T0014+ 已解除 BLOCK，可推进实现。
+1. **原生依赖已就绪**：libmpv / FFmpeg / sherpa-onnx 已下载并锁定于 `.tools/`，ASR 模型（paraformer/sensevoice/silero）已下载并打进自包含运行时。T0010–T0013 已完成；T0014–T0024 代码与编译/链接验证已全部完成。
 2. **打包机制已验证**：`cmake/RcpBundle.cmake` 将 DLL + 模型拷入 `out/bundle/runtime`（674MB，自包含），由 WiX 整体打进 MSI —— 终端用户安装即用、零运行时下载。
 3. **WiX 已就绪**（`.tools/wix`）。
-4. **已知环境坑（非阻塞）**：经 Git Bash 直接 `cmake` 全量 configure 时，因 MSYS 路径转换导致 `rc.exe` 资源编译器不可见而失败；需在真实 vcvars 开发者环境（或固化 INCLUDE/LIB/PATH 反斜杠）下做全量构建。手工 `cl`/`link` 已验证三库链接通过，依赖本身无问题。
+4. **🔴 BLOCKER-1：模型与 onnxruntime 版本错配（阻断 T0020–T0022 运行时）**：`.tools/models/` 内 Paraformer/SenseVoice/Silero 使用 opset 27，bundled sherpa-onnx 1.13.6 的 ORT 不支持，加载报 `version [27] not supported` 并崩溃。非代码缺陷。修复：升级 sherpa-onnx+ORT，或换配套模型（opset ≤ 该 ORT 支持）。
+5. **🟡 PARTIAL：真机运行时验证未回填**：T0016 渲染出图、T0019 rclone 断网、T0020–22 真实语音 ASR、T0023 FunASR CER/WER 均需在带显示器/授权语料/挂载的真机回填证据；沙箱无显示器/GPU/语料/rclone，无法替代。
+6. **已知环境坑（非阻塞）**：Git Bash 直接 `cmake` 全量 configure 时 MSYS 路径转换导致 `rc.exe` 不可见；需固化 INCLUDE/LIB/PATH 反斜杠或 vcvars 环境。手工 `cl`/`link` 已验证三库链接通过。
 
 ## Known Issues
 
