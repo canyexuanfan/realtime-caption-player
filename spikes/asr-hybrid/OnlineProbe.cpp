@@ -1,13 +1,12 @@
-// OnlineProbe — T0020 探针：Online Paraformer partial 识别（sherpa-onnx C-API）。
+// OnlineProbe — T0020 探针：Online Zipformer2-CTC 流式 partial 识别（实时逐字）。
 //
-// 目的（编译/链接级验证 + 管线 smoke；真正语音识别正确性需真机音频）：
-//   1. 加载 .tools/models/paraformer/ 的 int8 Paraformer 模型（encoder.int8.onnx + decoder.onnx + tokens.txt）。
-//   2. 建立 OnlineRecognizer + OnlineStream，喂入合成音频（16kHz 单声道），跑 accept+decode+get-result 流。
-//   3. 打印中间 partial 文本，证明流式 partial 链路接通。
+// 取代原崩溃的 int8 双语 Paraformer（BLOCKER-2 根因：该 2023-02 Paraformer 模型图
+// 与 ORT 流式路径不兼容——1.13.6/ORT1.27.1 与 1.12.1/旧 ORT 均崩，官方二进制复现）。
+// Zipformer2-CTC 是现代 ORT-1.27 兼容架构，单文件 model.int8.onnx + tokens.txt。
 //
-// 用法：online_probe.exe [paraformer_dir] [encoder_basename]
-//   paraformer_dir    默认 .tools/models/paraformer
-//   encoder_basename  默认 encoder.int8.onnx（可传 encoder.onnx 复测 fp32）
+// 用法：online_probe.exe [zipformer_ctc_dir] [model_basename]
+//   zipformer_ctc_dir 默认 .tools/models/zipformer-ctc
+//   model_basename    默认 model.int8.onnx（可传 model.onnx 复测 fp32）
 //
 // 链接目标：rcp::sherpa-onnx -> sherpa-onnx-c-api.dll
 
@@ -21,19 +20,17 @@ extern "C" {
 
 int main(int argc, char** argv) {
     setvbuf(stdout, NULL, _IONBF, 0);  // 无缓冲：崩溃前也能看到定位输出
-    std::printf("online_probe: start\n");
-    std::string dir = (argc > 1) ? argv[1] : ".tools/models/paraformer";
-    std::string enc_base = (argc > 2) ? argv[2] : "encoder.int8.onnx";
-    std::string enc = dir + "/" + enc_base;
-    std::string dec = dir + "/decoder.onnx";
+    std::printf("online_probe: start (zipformer2-ctc streaming partial)\n");
+    std::string dir = (argc > 1) ? argv[1] : ".tools/models/zipformer-ctc";
+    std::string model_base = (argc > 2) ? argv[2] : "model.int8.onnx";
+    std::string model = dir + "/" + model_base;
     std::string tok = dir + "/tokens.txt";
 
     SherpaOnnxOnlineRecognizerConfig config;
     memset(&config, 0, sizeof(config));
     config.feat_config.sample_rate = 16000;
     config.feat_config.feature_dim = 80;
-    config.model_config.paraformer.encoder = enc.c_str();
-    config.model_config.paraformer.decoder = dec.c_str();
+    config.model_config.zipformer2_ctc.model = model.c_str();
     config.model_config.tokens = tok.c_str();
     config.model_config.provider = "cpu";
     config.model_config.num_threads = 1;
@@ -41,12 +38,13 @@ int main(int argc, char** argv) {
 
     const SherpaOnnxOnlineRecognizer* rec = SherpaOnnxCreateOnlineRecognizer(&config);
     if (!rec) { std::printf("online_probe: create recognizer FAILED (模型路径/权重错误?)\n"); return 1; }
-    std::printf("online_probe: recognizer created (paraformer encoder=%s)\n", enc_base.c_str());
+    std::printf("online_probe: recognizer created (zipformer2_ctc model=%s)\n", model_base.c_str());
 
     const SherpaOnnxOnlineStream* stream = SherpaOnnxCreateOnlineStream(rec);
     std::printf("online_probe: stream created\n");
 
-    // 合成 3 秒 16kHz 单声道音频（220Hz 正弦），分块喂入。真机应替换为真实语音 PCM。
+    // 合成 3 秒 16kHz 单声道音频（220Hz 正弦），分块喂入，演示逐块 partial。
+    // 真机应替换为真实语音 PCM。
     const int32_t sr = 16000;
     const int32_t total = sr * 3;
     const int32_t chunk = 3200; // 0.2s

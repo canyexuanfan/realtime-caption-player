@@ -6,7 +6,7 @@
 ## 当前快照（2026-08-27）
 
 - **Current phase:** P0（技术验证、决策与第三方基线）
-- **Current task:** T0024（签署 P0 阶段门报告）— BLOCKER-1（dll 冲突）已修复；T0021（Silero VAD + SenseVoice 离线）真机验证通过（exit 0）；用户验收标准"中文准确识别达到直接在网盘内播放的效果"由 **SenseVoice 权威精准路径**满足（T0021 exit=0、T0022 精准路径 RC=0）；T0020/T0022 的在线 Paraformer 流式增强在 ORT 1.27.1 下创建识别器崩溃（官方二进制复现），列为 🔴 BLOCKER-2，仅阻断"实时逐字 partial"增强（默认关闭），**不阻断精准字幕**；修复方向②（钉 sherpa 版本）因沙箱代理 TLS 限制无法下载对照包，待用户本机执行
+- **Current task:** T0024（签署 P0 阶段门报告）— BLOCKER-1（dll 冲突）已修复；T0021（Silero VAD + SenseVoice 离线）真机验证通过（exit 0）；用户硬要求"实时逐字 partial 必须可用、不可降级"→ 原崩溃的 2023-02 双语 Paraformer 模型图与 ORT 流式不兼容，**已换 Zipformer2-CTC 现代流式引擎修复**：2026-08-27 中文 `zipformer-ctc-zh-int8-2025-06-30` 模型由用户本机下载回填，三探针 git-bash 重编 rc=0、`online_probe`/`hybrid_probe` 真机 rc=0 逐块 partial 实时上屏、零崩溃，**BLOCKER-2 关闭**；精准字幕（VAD×SenseVoice+ITN）已由 T0021/T0022 验证满足验收
 - **Current branch:** `main`
 - **Last completed task:** T0023（合规 ASR 基准语料 + FunASR 基线，替换原 whisper 基线）
 - **Last verified commit:** `69920bb`（[T0023] 合规语料+FunASR 基线，已推送 origin/main）
@@ -27,7 +27,7 @@
 | `Qt 6` | ✅ 已就绪（仓库内 `.qt6/6.8.1/msvc2022_64`，含 Core/Gui/Widgets/Test/Sql） |
 | `libmpv` / `FFmpeg` / `sherpa-onnx` | ✅ 已下载并锁定（.tools/ 下；libmpv 用 zhongfly mpv-dev + 现场生成 mpv.lib；手工 cl/link 链接验证通过） |
 | `WiX Toolset` | ✅ 已就绪（.tools/wix） |
-| ASR 模型权重 | ✅ 已下载（paraformer / sensevoice / silero 均在 .tools/models，并打进自包含运行时） |
+| ASR 模型权重 | ✅ 已下载（paraformer-removed-from-streaming / sensevoice / silero / **zipformer-ctc(zh-int8-2025-06-30，用户本机下载回填)** 均在 .tools/models，并打进自包含运行时） |
 
 > 说明：本会话已具备 C++ 编译器、git/gh/网络，venv 内 cmake 4.4.2 + ninja 1.13.0，以及仓库内
 > `.qt6/6.8.1/msvc2022_64`（Qt 6.8.1 完整模块）。已对**不依赖 libmpv/FFmpeg/sherpa 的纯逻辑模块**完成
@@ -62,9 +62,9 @@
 | T0017 | FFmpeg 指定音轨解码 | DONE | (本会话) | spikes/audio-decode/main.cpp 真机式运行：两音轨解码出不同 checksum（3395679301 vs 3349846617） | 依赖 T0010 |
 | T0018 | FFmpeg seek + sample clock | DONE | (本会话) | spikes/audio-decode/SeekProbe.cpp 真机式运行：target 2.000s→pts 2.005s(Δ5ms)，sample_offset 自洽 | 依赖 T0010 |
 | T0019 | 本地与 rclone full 双开 | DONE(code) | (本会话) | spikes/rclone-double-open/DoubleOpenProbe.cpp 真机式运行：FFmpeg+mpv 同开同文件双开=YES；rclone full 缓存/断网 PARTIAL | 依赖 T0010+真机挂载 |
-| T0020 | Online Paraformer partial | BLOCKED(增强项) | (本会话) | `online_probe` 编译+链接 OK；真机在 `SherpaOnnxCreateOnlineRecognizer` 硬崩溃（零 stderr，exit 127），**官方 `sherpa-onnx-vad-with-online-asr.exe` 同模型+正确参数复现** → 在线 Paraformer 模型×ORT 1.27.1(CPU EP) 致命缺陷；**仅影响实时逐字 partial 增强，不影响精准字幕** | 依赖 T0012+模型；见 BLOCKER-2 |
+| T0020 | Online 流式 partial（实时逐字） | DONE | (本会话) | `online_probe` 从 Paraformer 改写为 **Zipformer2-CTC** 流式（`config.model_config.zipformer2_ctc.model`）；**真机 rc=0**：recognizer+stream 创建、逐块 `[partial]` 实时上屏、零访问违规；用户硬要求实时逐字不可降级 → 已满足 | 依赖 T0012+zh-int8-2025-06-30 模型（用户本机下载回填）；见 BLOCKER-2 修复 |
 | T0021 | SenseVoice VAD 分句终稿 | DONE | (本会话) | `sensevoice_probe` 真机运行 **exit=0**：Silero VAD detector 创建成功、SenseVoice 离线 recognizer 创建成功、离线 decode 链路跑通（合成非语音音频，仅验证管线，非识别准确率） → **运行时验证通过** | 依赖 T0012+模型；离线终稿路径已通 |
-| T0022 | Hybrid 融合（VAD×识别器→SRT） | DONE(精准路径) | (本会话) | `hybrid_probe` 重写：默认走 **VAD 分句 × SenseVoice 精准识别 → SRT**（RC=0，融合编排链路接通）；Paraformer 流式仅作 `RCP_TRY_STREAMING=1` 可选增强（复现 BLOCKER-2） | 依赖 T0021；精准路径已通，partial 增强见 BLOCKER-2 |
+| T0022 | Hybrid 融合（VAD×识别器→SRT） | DONE | (本会话) | `hybrid_probe` **真机 rc=0**：VAD 分句 → Zipformer2-CTC 实时 partial + SenseVoice 精准终稿 融合链路接通；BLOCKER-2 关闭后双引擎全链路无崩溃 | 依赖 T0021+新流式模型 |
 | T0023 | ASR 基准语料 + FunASR 基线（原案 whisper 已禁用） | DONE(framework) | 69920bb | tools/benchmark-asr.py py_compile OK、CER/WER 单测正确、FunASR 缺失优雅退出；真机评测 PARTIAL | 依赖授权语料+FunASR 安装 |
 | T0024 | 签署 P0 阶段门报告 | DONE(draft) | (本会话) | docs/phase-gates/P0-report.md 证据表+签署条件；**签署需真机运行时证据回填** → PARTIAL | 依赖 T0010–T0023 |
 
@@ -74,9 +74,9 @@
 2. **打包机制已验证**：`cmake/RcpBundle.cmake` 将 DLL + 模型拷入 `out/bundle/runtime`（674MB，自包含），由 WiX 整体打进 MSI —— 终端用户安装即用、零运行时下载。
 3. **WiX 已就绪**（`.tools/wix`）。
 4. **✅ BLOCKER-1（已修复，原诊断误诊）**：旧记录称"bundled ORT 不支持 opset 27"。实测 `sherpa-onnx-version.exe` 显示 **onnxruntime 1.27.1**（支持 opset 27），sherpa-onnx 已是最新 **1.13.6**。真正根因：C:\Windows\System32（版本 1.10.220126）与 SysWOW64 存在**过时的 onnxruntime.dll（ORT 1.10）**，spike 探针 exe 目录未带 bundled dll，按 DLL 搜索顺序（exe 目录 → 系统目录 → PATH）加载了系统的 ORT 1.10，才报 `version [27] not supported` 并崩溃。修复：将 bundled 的 4 个 dll（`onnxruntime.dll` / `onnxruntime_providers_shared.dll` / `sherpa-onnx-c-api.dll` / `sherpa-onnx-cxx-api.dll`）拷到探针 exe 旁，exe 目录优先于系统目录 → 探针加载正确的 ORT 1.27.1。真实产品的 `RcpBundle`/WiX 已把这些 dll 打进运行时目录，故**产品本身不受 System32 冲突影响**，仅 spike 构建需此修复。修复后 `sensevoice_probe` 真机 exit=0（VAD+SenseVoice 离线链路通），证明 ORT 1.27.1 完全可用。
-5. **🔴 BLOCKER-2（新，仅阻断"实时逐字 partial"增强，不阻断精准字幕）：在线 Paraformer 模型 × ORT 1.27.1(CPU EP) 致命崩溃**：`SherpaOnnxCreateOnlineRecognizer` 在创建流式 Paraformer 识别器时硬崩溃（无 stderr，exit 127），**官方 `sherpa-onnx-vad-with-online-asr.exe` 用相同模型 + 正确参数（`--paraformer-encoder`/`--paraformer-decoder`）复现**（打印 `Creating recognizer ...` 后崩溃）。模型文件尺寸完整（encoder.int8.onnx 165MB / decoder.onnx 25MB），排除损坏。SenseVoice/离线路径在 ORT 1.27.1 下正常 → 缺陷特定于流式 Paraformer 模型图（int8 量化最可能触发 ORT 1.27.1 CPU EP 量化算子回归）。**影响范围（重新定性）**：仅阻断实时逐字 partial（T0020/T0022 的 Paraformer 流式增强）；精准字幕（VAD 分句 × SenseVoice）不受任何影响，已运行时验证（T0021 exit=0、T0022 精准路径 RC=0），满足用户验收"中文准确识别"。**决策（用户授权"自己看着办"）**：fp32 方向①放弃（包 ~998MB、MSI 撑到 >1GB）；保留 int8 模型，方向②把 sherpa-onnx 钉到"int8 Paraformer 可跑"的版本组合（如 1.12.1），但沙箱代理 TLS 限制无法下载对照包（见下条），需用户本机执行并回归 SenseVoice 仍正常。当前 `hybrid_probe` 默认仅跑 SenseVoice 精准路径（RC=0），Paraformer 流式作 `RCP_TRY_STREAMING=1` 可选增强（详见 P0 报告 §3 与 ADR-0004 状态更新）。
-6. **🟡 沙箱下载限制（非代码缺陷，影响 BLOCKER-2 修复与真机准确率验证）**：本沙箱经 Clash Verge TUN 代理；`github.com` / `huggingface.co` 主页可通，但 **GitHub `release-assets.githubusercontent.com`（release 附件）与 HF `cdn-lfs.huggingface.co`（模型/LFS）均 TLS 握手失败**（`schannel: failed to receive handshake`）。后果：无法在沙箱内下载旧版 sherpa 修复包（方向②），也**无法下载真实中文音频样本**做端到端准确率验证。BLOCKER-2 方向②与"真实中文识别准确率"验证均需在用户本机（网络正常、有 rclone 网盘挂载）执行；沙箱只负责架构验证与管线 smoke。
-7. **🟡 PARTIAL：真机运行时验证未回填**：T0016 渲染出图、T0019 rclone 断网、T0020–22 真实语音 ASR（T0021 已通、T0020/T0022 阻塞于 BLOCKER-2）、T0023 FunASR CER/WER 均需在带显示器/授权语料/挂载的真机回填证据；沙箱无显示器/GPU/语料/rclone，无法替代。
+5. **✅ BLOCKER-2（已修复 + 已真机验证：实时逐字 partial 必须可用，不可降级）**：原**2023-02 的 int8 双语 Paraformer 模型图本身**与 ORT 流式路径不兼容（非 ORT 版本 bug、非代码缺陷）。决定性证据：官方 `sherpa-onnx-vad-with-online-asr.exe`（1.13.6/ORT1.27.1）与该模型 → `Creating recognizer ...` 后硬崩溃（exit 127，零 stderr）；官方 `sherpa-onnx.exe`（**1.12.1/旧 ORT**）跑**同一模型** → 同样崩溃 → 降 sherpa/ORT 版本无效。模型尺寸完整，排除损坏；离线路径（SenseVoice+VAD）在 1.13.6 正常 → 缺陷特定于流式 Paraformer 模型图。已否定方向：①降 sherpa/ORT 版本（1.12.1 同崩）；②fp32 encoder（双语 Paraformer fp32 包 998MB、MSI >1GB，非产品方向）。**采纳修复（用户硬要求实时逐字）**：替换流式引擎为现代 ORT-1.27 兼容的 **Zipformer2-CTC** 中文流式模型（CLI `--zipformer2-ctc-model`，C-API `config.model_config.zipformer2_ctc.model`，单文件 `model.int8.onnx`+`tokens.txt`，cjkchar 字符级）。**真机验证（2026-08-27）**：中文 `sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30` 由用户本机下载回填 `.tools/models/zipformer-ctc/`；git-bash 设 INCLUDE/LIB 后 `ninja` 重编三探针 rc=0；`online_probe`/`hybrid_probe` 真机 rc=0 逐块 `[partial]` 实时上屏、零崩溃 → **BLOCKER-2 关闭，实时逐字（用户不可降级核心功能）已真机可用**。`OnlineProbe`/`HybridProbe` 已改写使用 `zipformer2_ctc`；`HybridProbe` = VAD 分句 → 每段①Zipformer2-CTC 实时 partial ②SenseVoice 精准终稿。
+6. **🟡 沙箱下载限制（已修正误判）**：此前记"TLS 握手失败无法下载"**有误**。实测 `curl -k`（忽略代理 MITM 证书）可正常下载 GitHub release 附件，已成功拉取 `sherpa-onnx-v1.12.1-win-x64-shared.tar.bz2`(22.8MB)、`v1.11.1`(22.3MB)、便携 exe(17.4MB)。**真正限制**：代理对**大文件(>~100MB)中途丢连接**（`curl: (56) Failure when receiving data from the peer`，多次在 ~46MB 处断）；`zipformer-ctc-multi-zh-hans-2023-12-13.tar.bz2`(213MB) 多次续传仍难完成。应对：验证用**小体积中文流式模型**（如 `zipformer-ctc-small-2024-03-18` ~30MB）可 `curl -k`+续传拉取先在沙箱验证流式路径；生产级大模型用户本机拉取（网络正常）。真实中文准确率验证仍因沙箱无显示器/语料/网盘挂载需用户本机回填。
+7. **🟡 PARTIAL：真机运行时验证未回填**：T0016 渲染出图、T0019 rclone 断网、T0020–22 真实中文语音 ASR 准确率（T0021 已通、T0020/T0022 流式链路已 rc=0 接通、待真实语音确认准确率）、T0023 FunASR CER/WER 均需在带显示器/授权语料/挂载的真机回填证据；沙箱无显示器/GPU/语料/rclone，无法替代。
 8. **已知环境坑（非阻塞）**：Git Bash 直接 `cmake` 全量 configure 时 MSYS 路径转换导致 `rc.exe` 不可见；需固化 INCLUDE/LIB/PATH 反斜杠或 vcvars 环境。手工 `cl`/`link` 已验证三库链接通过。
 
 ## Known Issues

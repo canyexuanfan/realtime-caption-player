@@ -70,10 +70,21 @@
     {
       "name": "paraformer-zh-en-int8",
       "version": "bilingual-zh-en",
-      "purpose": "Online Paraformer 流式 partial",
+      "purpose": "（历史）Online Paraformer 流式 partial —— 已退出流式链路",
+      "license": "Apache-2.0 (weights)",
+      "status": "installed (superseded; NOT used in runtime)",
+      "model_path": ".tools/models/paraformer/{encoder.int8.onnx(165MB), decoder.onnx(25MB), tokens.txt}",
+      "note": "BLOCKER-2 根因：该 2023-02 双语 Paraformer 模型图与 ORT 流式路径不兼容（1.13.6/ORT1.27.1 与 1.12.1/旧 ORT 均硬崩溃 exit 127，降版/换 fp32 均无效）。已由 zipformer2-ctc-zh-int8 取代作实时逐字引擎；本模型仅保留作参考，不再进入 bundle 运行时。"
+    },
+    {
+      "name": "zipformer2-ctc-zh-int8",
+      "version": "2025-06-30",
+      "purpose": "Online 实时逐字 partial 流式引擎（BLOCKER-2 修复后采用）",
       "license": "Apache-2.0 (weights)",
       "status": "installed",
-      "model_path": ".tools/models/paraformer/{encoder.int8.onnx(165MB), decoder.onnx(25MB), tokens.txt}"
+      "model_path": ".tools/models/zipformer-ctc/{model.int8.onnx(162MB), tokens.txt}",
+      "download": "用户本机（IDM）下载 sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30.tar.bz2(122MB) 回填；沙箱代理限速~70KB/s 且大文件易断连",
+      "note": "现代 ORT-1.27 兼容架构（CLI --zipformer2-ctc-model，C-API config.model_config.zipformer2_ctc.model，cjkchar 字符级，单文件）。与 SenseVoice 双引擎：实时 partial=zipformer2-ctc，精准终稿=SenseVoice+ITN。2026-08-27 真机 rc=0 验证可用。"
     },
     {
       "name": "sensevoice-zh-en-ja-ko-yue-int8",
@@ -125,7 +136,7 @@
         "sherpa-onnx-c-api.dll", "sherpa-onnx-cxx-api.dll"
       ],
       "models": [
-        "models/paraformer/{encoder.int8.onnx, decoder.onnx, tokens.txt}",
+        "models/zipformer-ctc/{model.int8.onnx, tokens.txt}",
         "models/sensevoice/{model.int8.onnx, tokens.txt}",
         "models/silero/silero_vad.onnx"
       ]
