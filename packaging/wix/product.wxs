@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <!--
+    RealtimeCaptionPlayer 安装包主 wxs（WiX v3）。
+    运行时目录（含 ffmpeg/mpv/sherpa DLL + ASR 模型 + player_app.exe + Qt6）由
+    cmake/RcpBundle.cmake 生成到 out/bundle/runtime，再用 heat 走 -var var.RuntimeSource
+    harvest 成 files.wxs（组件组 RcpRuntimeComponents，安装到 INSTALLFOLDER）。
+    本文件负责 Product/Package 元数据、目录骨架、开始菜单/桌面快捷方式。
+  -->
+  <Product
+      Id="*"
+      Name="RealtimeCaptionPlayer"
+      Language="1033"
+      Version="0.1.0"
+      Manufacturer="Rcp"
+      UpgradeCode="6E6B4C1A-2F3A-4B8C-9D1E-5A7B2C3D4E5F">
+
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of RealtimeCaptionPlayer is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="Complete" Title="RealtimeCaptionPlayer" Level="1">
+      <ComponentGroupRef Id="RcpRuntimeComponents" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="RealtimeCaptionPlayer" />
+      </Directory>
+
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="RealtimeCaptionPlayer">
+          <Component Id="StartMenuShortcut" Guid="*">
+            <Shortcut Id="StartMenuShortcutId"
+                      Name="RealtimeCaptionPlayer"
+                      Description="Local-first offline realtime captioning player"
+                      Target="[INSTALLFOLDER]player_app.exe"
+                      WorkingDirectory="INSTALLFOLDER" />
+            <RemoveFolder Id="RemoveApplicationProgramsFolder"
+                          Directory="ApplicationProgramsFolder" On="uninstall" />
+            <RegistryValue Root="HKCU"
+                           Key="Software\Rcp\RealtimeCaptionPlayer" Name="installed"
+                           Type="integer" Value="1" KeyPath="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+
+      <Directory Id="DesktopFolder" />
+    </Directory>
+
+    <Component Id="DesktopShortcut" Guid="*" Directory="DesktopFolder">
+      <Shortcut Id="DesktopShortcutId"
+                Name="RealtimeCaptionPlayer"
+                Description="Local-first offline realtime captioning player"
+                Target="[INSTALLFOLDER]player_app.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU"
+                     Key="Software\Rcp\RealtimeCaptionPlayer" Name="desktop"
+                     Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+  </Product>
+</Wix>

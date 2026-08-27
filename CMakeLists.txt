@@ -79,7 +79,8 @@ endif()
 
 # ---- Packaging (P8, requires WiX) ----
 # CPack / WiX configuration is added when the installer phase begins.
-# include(packaging/wix/wix.cmake)  # enabled in P8
+# P8 启用：把 out/bundle/runtime 自包含运行时打进 MSI（需先运行 RcpBundle 生成运行时）。
+include(packaging/wix/wix.cmake)
 
 message(STATUS "RealtimeCaptionPlayer ${PROJECT_VERSION}")
 message(STATUS "BUILD_TESTS=${BUILD_TESTS} BUILD_PLAYER=${BUILD_PLAYER} BUILD_WORKER=${BUILD_WORKER} BUILD_SPIKES=${BUILD_SPIKES}")

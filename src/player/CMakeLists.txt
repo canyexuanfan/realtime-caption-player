@@ -28,3 +28,6 @@ set_target_properties(player_app PROPERTIES
     WIN32_EXECUTABLE OFF
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
+# 沙箱链接限制：禁用 manifest 嵌入(/MANIFEST:NO)，避免 cvtres 在受限 TEMP 下
+# 写临时文件报 CVT1108/LNK1123。验证壳无需 manifest；正式发布可恢复嵌入。
+target_link_options(player_app PRIVATE "/MANIFEST:NO")
