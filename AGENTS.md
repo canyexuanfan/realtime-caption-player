@@ -57,8 +57,10 @@ P9  全量 QA、安全、性能、合规、Release
 
 ## 当前环境事实（首次接管时记录）
 
-- OS：Windows（win32）。编译器：`cl.exe`（VS2022 BuildTools，MSVC 14.16/14.29/14.44）可用。
-- `cmake` / `Qt` / `libmpv` / `FFmpeg` / `sherpa-onnx` / `WiX` 缺失；正在后台安装 `cmake`+`ninja`+`Qt 6.8.1`。
+- OS：Windows（win32）。编译器：`cl.exe`（VS2022 BuildTools，MSVC 14.44 为主）可用。
+- `cmake`(4.4.2) / `ninja`(1.13.0) / `Qt 6.8.1`（仓库内 `.qt6/6.8.1/msvc2022_64`，含 Core/Gui/Widgets/Test/Sql）已就绪。
+- `libmpv` / `FFmpeg` / `sherpa-onnx` / `WiX` 缺失（BLOCKED）；原生库就绪前依赖它们的模块不实装、不伪造通过。
+- 沙箱构建必须用 `Ninja` generator（CMakePresets 默认 VS2022 generator 在 `project()` 阶段崩溃），详见 `docs/implementation-status.md` → Known Issues。
 - `git` / `gh`（已登录 github.com）/ 互联网 可用。
 - PowerShell 内联 stdout 在本会话不显示，需写入文件后 Read；Git Bash 输出正常。
 

@@ -6,10 +6,10 @@
 ## 当前快照（2026-08-27）
 
 - **Current phase:** P0（技术验证、决策与第三方基线）
-- **Current task:** T0008（依赖锁 schema）/ T0009（固定 Qt 与构建工具环境，后台安装中）
+- **Current task:** T0010（自建并锁定 FFmpeg，**BLOCKED** 于原生依赖）/ T0011–T0024 同理 BLOCKED
 - **Current branch:** `main`
-- **Last completed task:** T0007（rclone full 决策）
-- **Last verified commit:** 5626342（T0007 最新 foundation 提交；T0008/T0009 待构建验证）“本批次提交”
+- **Last completed task:** T0009（纯逻辑核心模块 + 构建系统 + 21 项单元测试全绿）
+- **Last verified commit:** `d8a34a0`（[T0009] 真实构建 + 21 测试 PASS）；资产提交 `69736c5`
 - **Last phase gate:** 无（P0 阶段门未过；P0 demo 任务 BLOCKED 于原生库）
 - **Last update:** 2026-08-27
 
@@ -18,20 +18,25 @@
 | 项 | 状态 |
 |---|---|
 | OS | Windows（win32） |
-| C++ 编译器 `cl.exe` | ✅ VS2022 BuildTools，MSVC 14.16/14.29/14.44 |
+| C++ 编译器 `cl.exe` | ✅ VS2022 BuildTools，MSVC 14.44（14.16/14.29 亦在） |
 | `git` | ✅ |
 | `gh`（已登录 github.com） | ✅ |
 | 互联网 | ✅（GitHub 可达） |
-| `cmake` | ✅ venv（`C:/Users/<你的用户名>/.workbuddy/binaries/python/envs/default/Scripts/cmake.exe`） |
-| `ninja` | ✅ venv（同 venv `ninja.exe`） |
-| `Qt 6` | ⏳ 安装中（后台 task 9gbUIU；aqtinstall 6.8.1 win64_msvc2022_64 仅 qtbase） |
+| `cmake` | ✅ venv（`.../envs/default/Scripts/cmake.exe`，4.4.2） |
+| `ninja` | ✅ venv（同 venv `ninja.exe`，1.13.0） |
+| `Qt 6` | ✅ 已就绪（仓库内 `.qt6/6.8.1/msvc2022_64`，含 Core/Gui/Widgets/Test/Sql；runtime 用 Release DLL） |
 | `libmpv` / `FFmpeg` / `sherpa-onnx` | ❌ 未构建/未锁定（BLOCKED 于原生依赖） |
 | `WiX Toolset` | ❌ 未安装（BLOCKED） |
 | ASR 模型权重 | ❌ 未下载（BLOCKED，需合法来源与体积） |
 
-> 说明：本会话已具备 C++ 编译器、git/gh/网络，以及 venv 内已就绪的 cmake+ninja。正在安装 `Qt 6.8.1`（task 9gbUIU，仅 qtbase），
-> 以便对**不依赖 libmpv/FFmpeg/sherpa 的纯逻辑模块**做真实编译与 QtTest。
-> 依赖上述原生库的模块（P2 播放内核、P4 worker ASR、P8 MSI）在库就绪前标记为 BLOCKED，**不伪造构建/测试通过**。
+> 说明：本会话已具备 C++ 编译器、git/gh/网络，venv 内 cmake 4.4.2 + ninja 1.13.0，以及仓库内
+> `.qt6/6.8.1/msvc2022_64`（Qt 6.8.1 完整模块）。已对**不依赖 libmpv/FFmpeg/sherpa 的纯逻辑模块**完成
+> 真实编译与 21 项 QtTest（全 PASS）。依赖上述原生库的模块（P2 播放内核、P4 worker ASR、P8 MSI）在库就绪前
+> 标记为 BLOCKED，**不伪造构建/测试通过**。
+>
+> **沙箱构建须知**：本沙箱中 `Visual Studio 17 2022` generator（CMakePresets 默认）在 `project()` 查询
+> `VCTargetsPath` 时崩溃（Access violation，已知 MSBuild 沙箱问题），故实际构建改用 `Ninja` generator 直调
+> `cl.exe`。标准开发机仍可用 CMakePresets。
 
 ## Task Status（P0：T0001–T0024）
 
@@ -44,8 +49,8 @@
 | T0005 | worker 分进程 | DONE | 558662f | ADR 含双开代价/IPC 不传 PCM | docs/adr/ADR-0003-caption-worker-process.md | — |
 | T0006 | Paraformer+SenseVoice | DONE | 79cb563 | ADR 明确 SenseVoice≠streaming partial | docs/adr/ADR-0004-paraformer-sensevoice.md, docs/adr/ADR-0006-offline-models.md | — |
 | T0007 | rclone full 修正 | DONE | 5626342 | ADR 禁止 writes 作为读缓存 | docs/adr/ADR-0005-rclone-full.md, docs/user/rclone.md | — |
-| T0008 | 依赖锁 schema | IN_PROGRESS | — | schema 可解析；示例项合规 | dependencies.lock.json（待写） | 本批次 foundation-code 完成 |
-| T0009 | 固定 Qt 与构建工具环境 | IN_PROGRESS | — | cmake/Qt 版本固定并写入 lock | 待工具链安装确认后写入 | 后台安装 cmake+Qt 6.8.1 中 |
+| T0008 | 依赖锁 schema | DONE | 73a7e81 | schema 可解析；工具链/第三方项合规 | dependencies.lock.json | 原生库字段预留，待 T0010–T0013 补全 |
+| T0009 | 固定 Qt 与构建工具环境 | DONE | d8a34a0 | 真实构建 + 21 项 QtTest 全 PASS（9.20s） | src/ tests/ CMakeLists.txt（commit d8a34a0） | 沙箱需 Ninja（见 Known Issues）；原生库模块仍 BLOCKED |
 | T0010 | 自建并锁定 FFmpeg | BLOCKED | — | — | — | 原生库未构建/未锁定；需源码与构建环境 |
 | T0011 | 自建并锁定 libmpv | BLOCKED | — | — | — | 同上 |
 | T0012 | 自建并锁定 sherpa-onnx | BLOCKED | — | — | — | 同上 |
@@ -66,26 +71,37 @@
 
 1. **原生依赖缺失**：libmpv / FFmpeg / sherpa-onnx 未构建、未锁定、未下载；模型权重未获取。
    影响 T0010–T0024（P0 全部 demo 与后续阶段）。
-   处理：工具链就绪后按 T0010–T0013 自建并写 lock；模型按 ADR-0006 离线分发。
-2. **Qt 安装中**：cmake+ninja 已在 venv 就绪；后台任务（task 9gbUIU）安装 Qt 6.8.1 仅 qtbase，完成后解锁纯逻辑模块真实编译/测试。
+   处理：在具备源码与构建环境后按 T0010–T0013 自建并写 lock；模型按 ADR-0006 离线分发。
+2. **Qt 已就绪**（仓库内 `.qt6/6.8.1/msvc2022_64`）——纯逻辑模块已因此完成真实编译/测试。
 3. **WiX 未安装**：MSI 打包（P8）BLOCKED，待安装。
 
 ## Known Issues
 
-- 仓库初始仅有文档（资料包），无源码、无 Git 历史。已 `git init` 于 `main`。
+- **沙箱构建限制**：CMakePresets 默认 `Visual Studio 17 2022` generator 在本沙箱 `project()` 阶段崩溃
+  （Access violation，已知 MSBuild 沙箱问题）；必须使用 `Ninja` generator 直调 `cl.exe` 才能构建。
+  构建命令（单条内联全部 MSVC 环境，Bash 状态不跨调用持久）：
+  `cmake -G Ninja -B <build> -S <src> -DBUILD_TESTS=ON -DBUILD_PLAYER=OFF -DBUILD_WORKER=OFF -DCMAKE_BUILD_TYPE=Release ...`
+  后 `cmake --build <build>`。
+  此外 Debug CRT 在本机缺失（仅 14.16，无 14.44 的 Debug 运行时），且 Git Bash 的 MSYS 加载器会篡改中文 PATH
+  导致运行时找不到 Qt6Core.dll，故统一用 **Release** 构建并把 `Qt6Core.dll/Qt6Test.dll/Qt6Gui.dll` 复制到
+  ASCII 构建目录的 `tests/` 下紧邻测试 EXE 再跑 `ctest`。
+- 上一会话将全部源码写成未提交状态（文档中"T-核心提交"并不存在）；本会话已首次真实构建并将
+  `src/`+`tests/`+构建系统提交（d8a34a0）。
 - PowerShell 内联 stdout 在本会话不显示，需写文件后 Read；Git Bash 输出正常。
 - `03_Detailed_Development_TODO.md` 状态表示例含占位 `abc1234`，实际所有任务均为「未完成」，已据此重置认知。
 
 ## Phase Status
 
-- P0：进行中（文档/ADR/基础已 DONE；demo 因原生库 BLOCKED）。
+- P0：进行中（文档/ADR/基础 DONE；纯逻辑模块 + 单元测试 DONE；demo 因原生库 BLOCKED）。
 - P1–P9：未开始（依赖 P0 通过）。
 
 ## Last Agent Summary
 
-当前 Agent 完成：仓库初始化（git/main）、目录骨架、LICENSE(真实 GPL-3.0)、NOTICE、.gitignore、
-AGENTS.md、docs 结构（product/architecture/adr/phase-gates/...）、6 份 P0 ADR（T0002–T0007）、
-开源调研（reference/，见 T-研究）、核心纯逻辑模块骨架与单元测试（见 T-核心）。
-后台安装 cmake+Qt 6.8.1 以解锁纯逻辑真实编译。
-下一步：工具链就绪后运行 `cmake --preset windows-msvc-debug && build && ctest` 验证纯逻辑模块，
-随后推进 T0008/T0009 并完成依赖锁与构建环境固定。
+本会话（DevAgent 续跑）完成：
+- 修复全部 15 处编译错误 + 2 处真实逻辑缺陷（Timecode::formatClock 零填充、BoundedQueue 取消死锁），
+  首次真实构建 `rcp_core` 静态库 + 21 个 QtTest，**ctest 21/21 PASS（9.20s）**。
+- 将此前未提交的实现（src/、tests/、CMakeLists.txt、resources、migrations、tools、docs/development）与配置
+  （dependencies.lock.json、CMakePresets.json）及原始设计资产（04/05/06）提交：73a7e81(T0008)、d8a34a0(T0009)、69736c5(assets)。
+- 标记 T0008/T0009 为 DONE。**P0 demo 任务（T0010–T0024）仍 BLOCKED 于缺失的原生库（libmpv/FFmpeg/sherpa-onnx）与模型权重、WiX 未安装。**
+下一步：在具备原生库源码与构建环境（及合法模型权重、WiX）后推进 T0010–T0013；
+在此之前不伪造任何构建/测试通过，持续维护本状态文件与 agent-handoff。
