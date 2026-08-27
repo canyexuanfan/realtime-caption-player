@@ -32,7 +32,7 @@
 > 说明：本会话已具备 C++ 编译器、git/gh/网络，venv 内 cmake 4.4.2 + ninja 1.13.0，以及仓库内
 > `.qt6/6.8.1/msvc2022_64`（Qt 6.8.1 完整模块）。已对**不依赖 libmpv/FFmpeg/sherpa 的纯逻辑模块**完成
 > 真实编译与 21 项 QtTest（全 PASS）。原生库（libmpv/FFmpeg/sherpa-onnx）与 ASR 模型现已下载并锁定于
-> `.tools/`，`cmake/RcpBundle.cmake` 可将其与模型打进自包含运行时（`out/bundle/runtime`，674MB，零用户下载）。
+> `.tools/`，`cmake/RcpBundle.cmake` 可将其与模型打进自包含运行时（`out/bundle/runtime`，~994MB，含 zipformer-ctc 新模型，零用户下载）。
 > 依赖这些库的模块（P2 播放内核、P4 worker ASR、P8 MSI）已解除 BLOCK，可推进实现；实现完成前不伪造构建/测试通过。
 >
 > **沙箱构建须知**：本沙箱中 `Visual Studio 17 2022` generator（CMakePresets 默认）在 `project()` 查询
@@ -71,7 +71,7 @@
 ## Current Blockers
 
 1. **原生依赖已就绪**：libmpv / FFmpeg / sherpa-onnx 已下载并锁定于 `.tools/`，ASR 模型（paraformer/sensevoice/silero）已下载并打进自包含运行时。T0010–T0013 已完成；T0014–T0024 代码与编译/链接验证已全部完成。
-2. **打包机制已验证**：`cmake/RcpBundle.cmake` 将 DLL + 模型拷入 `out/bundle/runtime`（674MB，自包含），由 WiX 整体打进 MSI —— 终端用户安装即用、零运行时下载。
+2. **打包机制已验证**：`cmake/RcpBundle.cmake` 将 DLL + 模型拷入 `out/bundle/runtime`（~994MB，自包含，含 zipformer-ctc 新模型），由 WiX 整体打进 MSI —— 终端用户安装即用、零运行时下载。
 3. **WiX 已就绪**（`.tools/wix`）。
 4. **✅ BLOCKER-1（已修复，原诊断误诊）**：旧记录称"bundled ORT 不支持 opset 27"。实测 `sherpa-onnx-version.exe` 显示 **onnxruntime 1.27.1**（支持 opset 27），sherpa-onnx 已是最新 **1.13.6**。真正根因：C:\Windows\System32（版本 1.10.220126）与 SysWOW64 存在**过时的 onnxruntime.dll（ORT 1.10）**，spike 探针 exe 目录未带 bundled dll，按 DLL 搜索顺序（exe 目录 → 系统目录 → PATH）加载了系统的 ORT 1.10，才报 `version [27] not supported` 并崩溃。修复：将 bundled 的 4 个 dll（`onnxruntime.dll` / `onnxruntime_providers_shared.dll` / `sherpa-onnx-c-api.dll` / `sherpa-onnx-cxx-api.dll`）拷到探针 exe 旁，exe 目录优先于系统目录 → 探针加载正确的 ORT 1.27.1。真实产品的 `RcpBundle`/WiX 已把这些 dll 打进运行时目录，故**产品本身不受 System32 冲突影响**，仅 spike 构建需此修复。修复后 `sensevoice_probe` 真机 exit=0（VAD+SenseVoice 离线链路通），证明 ORT 1.27.1 完全可用。
 5. **✅ BLOCKER-2（已修复 + 已真机验证：实时逐字 partial 必须可用，不可降级）**：原**2023-02 的 int8 双语 Paraformer 模型图本身**与 ORT 流式路径不兼容（非 ORT 版本 bug、非代码缺陷）。决定性证据：官方 `sherpa-onnx-vad-with-online-asr.exe`（1.13.6/ORT1.27.1）与该模型 → `Creating recognizer ...` 后硬崩溃（exit 127，零 stderr）；官方 `sherpa-onnx.exe`（**1.12.1/旧 ORT**）跑**同一模型** → 同样崩溃 → 降 sherpa/ORT 版本无效。模型尺寸完整，排除损坏；离线路径（SenseVoice+VAD）在 1.13.6 正常 → 缺陷特定于流式 Paraformer 模型图。已否定方向：①降 sherpa/ORT 版本（1.12.1 同崩）；②fp32 encoder（双语 Paraformer fp32 包 998MB、MSI >1GB，非产品方向）。**采纳修复（用户硬要求实时逐字）**：替换流式引擎为现代 ORT-1.27 兼容的 **Zipformer2-CTC** 中文流式模型（CLI `--zipformer2-ctc-model`，C-API `config.model_config.zipformer2_ctc.model`，单文件 `model.int8.onnx`+`tokens.txt`，cjkchar 字符级）。**真机验证（2026-08-27）**：中文 `sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30` 由用户本机下载回填 `.tools/models/zipformer-ctc/`；git-bash 设 INCLUDE/LIB 后 `ninja` 重编三探针 rc=0；`online_probe`/`hybrid_probe` 真机 rc=0 逐块 `[partial]` 实时上屏、零崩溃 → **BLOCKER-2 关闭，实时逐字（用户不可降级核心功能）已真机可用**。`OnlineProbe`/`HybridProbe` 已改写使用 `zipformer2_ctc`；`HybridProbe` = VAD 分句 → 每段①Zipformer2-CTC 实时 partial ②SenseVoice 精准终稿。
@@ -98,6 +98,7 @@
 
 - P0：进行中（文档/ADR/基础 DONE；纯逻辑模块 + 单元测试 DONE；原生库+模型已下载锁定 DONE；T0014+ 实现待推进）。
 - P1–P9：P1/P2 依赖的原生库已就绪，可启动。
+- **P8：打包流水线已打通（验证壳版，2026-08-28）** —— CMakeLists 启用 `include(packaging/wix/wix.cmake)`；实测 `ninja package_msi` 生成 `out/package/RealtimeCaptionPlayer-0.1.0.msi`（≈666MB，OLE 安装包校验通过）。内容 = `player_app.exe` + ffmpeg/mpv/sherpa DLL + zipformer-ctc/sensevoice/silero 模型 + Qt6Core，安装到 `ProgramFiles64Folder\RealtimeCaptionPlayer` 并建开始菜单/桌面快捷方式。⚠️ 诚实标注：player_app 当前是 libmpv 链接验证壳（非完整 GUI 播放器），故本 MSI 为「打包机制打通的验证壳版」，非可玩产品；真实产品成型后重跑 `windeployqt` + `package_msi` 即一键出正式包。沙箱内 `light` 需 `-sval` 跳过不可用的 Windows Installer ICE 校验。
 
 ## Last Agent Summary
 
@@ -114,3 +115,10 @@
 - 更新 dependencies.lock.json（原生库/模型全部标 installed、新增 bundled_runtime 段）与本文档状态。
 
 下一步：提交本会话 T0014（libmpv 渲染验证程序）成果到私有远程；随后从 T0015 起推进 mpv 事件桥/属性观察（依赖 T0011，已锁定）。
+
+## 本会话补充（2026-08-28，P8 打包流水线打通）
+- 用户本机下载中文 `zipformer-ctc-zh-int8-2025-06-30` 模型回填 `.tools/models/zipformer-ctc/`；`RcpBundle` 重建 `out/bundle/runtime`（~994MB，含新模型），并 `windeployqt` 收 Qt6Core 到运行时。
+- 启用 `packaging/wix/wix.cmake`：`heat` 采集运行时(`-ag` 稳定 GUID) → `candle` 编译 → `light -sval`(沙箱跳过 ICE) 链接，实测产出 `out/package/RealtimeCaptionPlayer-0.1.0.msi`（≈666MB，OLE 头 `d0cf11e0` 校验通过，zipformer-ctc 已进包）。
+- `src/player/CMakeLists.txt` 给 `player_app` 加 `/MANIFEST:NO`（沙箱 cvtres 受限 TEMP 链接 workaround）。
+- 提交 dcc06a8 并推送 origin/main（38da5b1..dcc06a8）。诚实标注：本 MSI 为打包机制打通的**验证壳版**，player_app 仍是 libmpv 链接验证壳，非完整 GUI 播放器；待 P2/P5/P7 产品本体成型后重跑即出正式包。
+- 已知环境坑补充：git-bash 单独 Bash 调用不保留上一调用的 INCLUDE/LIB/PATH 环境变量，ninja 编译必须在该命令内同设 MSVC 环境（与 P0 探针编译一致）；`cmd //c` 在本环境被安全策略禁止且 MSYS 路径转换会让 `set` 失效，统一用 git-bash + 内联 export 法。
