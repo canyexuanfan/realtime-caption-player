@@ -37,6 +37,7 @@ function(rcp_package_wix)
             -out "${PKG_DEST}/files.wxs"
     COMMAND "${WIX_CANDLE}" -nologo -ext WixUIExtension
             "-dRuntimeSource=${PKG_RUNTIME}"
+            "-dSourceDirPath=${CMAKE_SOURCE_DIR}/packaging/wix"
             "${CMAKE_SOURCE_DIR}/packaging/wix/product.wxs"
             "${PKG_DEST}/files.wxs"
             -out "${PKG_DEST}/"

@@ -22,9 +22,21 @@
 
     <!-- WixUI_InstallDir：显示许可协议 → 目录选择 → 确认安装 → 进度条 -->
     <UIRef Id="WixUI_InstallDir" />
-    <Property Id="WixAppFolder" Value="ProgramFilesFolder" />
     <!-- 跳过许可证对话框（MVP 暂不展示 EULA），直接从目录选择开始 -->
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
+    <!-- 用户点 Change 选目录后，自动追加 \RealtimeCaptionPlayer 子文件夹 -->
+    <Binary Id="EnsureAppSubfolder_vbs" SourceFile="$(var.SourceDirPath)/EnsureAppSubfolder.vbs" />
+    <CustomAction Id="EnsureAppSubfolder"
+                  BinaryKey="EnsureAppSubfolder_vbs"
+                  VBScriptCall="EnsureAppSubfolder"
+                  Execute="immediate" />
+
+    <UI>
+      <!-- 在目录选择对话框的 Next 按钮上挂载：点 Next 时先修正路径再继续 -->
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="DoAction"
+               Value="EnsureAppSubfolder" Order="3">1</Publish>
+    </UI>
 
     <Feature Id="Complete" Title="RealtimeCaptionPlayer" Level="1">
       <ComponentGroupRef Id="RcpRuntimeComponents" />
