@@ -18,6 +18,7 @@ endif()
 option(BUILD_TESTS "Build unit/integration tests" ON)
 option(BUILD_PLAYER "Build the player application" OFF)
 option(BUILD_WORKER "Build the caption-worker application" OFF)
+option(BUILD_DEPS_SMOKE "Build native-dependency link smoke test (FFmpeg/mpv/sherpa-onnx)" OFF)
 
 # ---- Compiler strictness (MSVC) ----
 if(MSVC)
@@ -48,6 +49,14 @@ add_subdirectory(migrations)
 if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+endif()
+
+# ---- Native dependency integration (T0010-T0012) ----
+# Prebuilt libs live in <source>/.tools/{ffmpeg,mpv,sherpa-onnx}.
+# Enable BUILD_DEPS_SMOKE to compile a link smoke test proving they resolve.
+if(BUILD_DEPS_SMOKE)
+  include(cmake/FindRcpNativeDeps.cmake)
+  add_subdirectory(tools/deps_smoke)
 endif()
 
 # ---- Packaging (P8, requires WiX) ----

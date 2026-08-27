@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
   "generated": "2026-08-27",
-  "note": "依赖锁文件。原生库（libmpv/FFmpeg/sherpa-onnx）的 source_archive_sha256 / binary_artifact_sha256 / commit 在 T0010-T0013 自建并锁定后补全。当前环境未构建这些原生库（见 docs/implementation-status.md）。",
+  "note": "依赖锁文件。原生库（libmpv/FFmpeg/sherpa-onnx）与 ASR 模型均已下载并置于 <workspace>/.tools/ 下（开发者侧一次性获取，非用户侧）。cmake/RcpBundle.cmake 把 .tools 内的 DLL 与 models/ 拷入 out/bundle/runtime，由 WiX 整体打进 MSI —— 终端用户安装即用、零运行时下载。",
   "toolchain": {
-    "compiler": "MSVC (VS2022 BuildTools) 14.16/14.29/14.44",
+    "compiler": "MSVC (VS2022 BuildTools) 14.44",
     "cmake": { "version": "4.4.2", "source": "venv pip cmake (C:/Users/<你的用户名>/.workbuddy/binaries/python/envs/default)", "license": "BSD-3-Clause", "status": "installed" },
     "ninja": { "version": "1.13.0", "source": "venv pip ninja", "license": "Apache-2.0", "status": "installed" },
     "qt": {
       "version": "6.8.1",
-      "source": "aqt install-qt windows desktop 6.8.1 win64_msvc2022_64 --outputdir <QT_ROOT> (qtbase 为默认包，禁止 -m qtbase)",
+      "source": "aqt install-qt windows desktop 6.8.1 win64_msvc2022_64 --outputdir <QT_ROOT>",
       "license": "LGPLv3/GPLv3 (dynamic linking)",
-      "status": "installing"
+      "status": "installed"
     }
   },
   "dependencies": [
@@ -20,46 +20,51 @@
       "purpose": "Widgets/GUI/OpenGL/Network/Sql/Test",
       "license": "LGPLv3/GPLv3",
       "license_file": "packaging/licenses/qt-LGPLv3.txt",
-      "status": "installing",
-      "build_flags_file": "third_party/build-metadata/qt.txt",
-      "note": "技术实现方案建议 6.11.2 为基线；本环境使用实际可获取的 6.8.1，差异在锁中记录。"
+      "status": "installed",
+      "build_flags_file": "third_party/build-metadata/qt.txt"
     },
     {
       "name": "mpv",
-      "version": "0.41.0",
-      "source_tag": "v0.41.0",
+      "version": "runtime=0.41.0 / libmpv=zhongfly-git-20260826",
+      "source_tag": "v0.41.0 (CLI) + zhongfly/mpv-winbuild mpv-dev-x86_64-20260826",
       "purpose": "解码/渲染/字幕轨/音轨/滤镜/倍速/HDR/截图（libmpv）",
       "license": "GPL-2.0-or-later",
       "client_header_license": "MIT-0 (libmpv/client.h)",
-      "status": "planned (T0011)",
+      "status": "installed",
       "build_flags_file": "third_party/build-metadata/mpv.txt",
-      "note": "聚合 GPL-3.0-or-later 分发；client.h MIT-0 允许链接。"
+      "artifacts": {
+        "runtime_exe": ".tools/mpv/mpv.exe (v0.41.0 CLI, GPL)",
+        "libmpv_dll": ".tools/mpv/bin/mpv-2.dll (119MB, 来自 zhongfly mpv-dev 构建, 静态链接 ffmpeg/C++ 运行时, 仅依赖系统 DLL + vulkan-1.dll)",
+        "import_lib": ".tools/mpv/lib/mpv.lib (由 mpv-2.dll 经 dumpbin /exports + lib.exe 现场生成的 MSVC 导入库；MinGW 原包只给 libmpv.dll.a, MSVC link.exe 无法使用)",
+        "headers": ".tools/mpv/include/mpv/{client,render,render_gl,stream_cb}.h"
+      },
+      "note": "官方 mpv v0.41.0 release 的 msvc zip 只含 mpv.exe(CLI播放器)，不含 libmpv 开发库；故从 zhongfly/mpv-winbuild 取 mpv-dev 包补齐 libmpv-2.dll + 头文件，并用 MSVC 工具链生成 mpv.lib。libmpv 客户端 API 跨 0.x 稳定，新版 dev 包可正常链接。"
     },
     {
       "name": "ffmpeg",
-      "version": "9.0.1",
-      "purpose": "worker 音频解码与重采样（libavformat/libavcodec/libavutil/libswresample）",
+      "version": "9.0.1 (libavformat-63/avcodec-63/avutil-61/swresample-7/swscale-10)",
+      "purpose": "worker 音频解码与重采样",
       "license": "LGPL-2.1-or-later (默认配置) / GPL-2.0",
-      "status": "planned (T0010)",
-      "build_flags_file": "third_party/build-metadata/ffmpeg.txt",
-      "note": "以 LGPL 配置构建并记录完整 configure flags。"
+      "status": "installed",
+      "build_flags_file": "third_party/build-metadata/ffmpeg.txt"
     },
     {
       "name": "sherpa-onnx",
-      "version": "1.13.6",
+      "version": "1.13.6 (sherpa-onnx-c-api.dll + onnxruntime)",
       "purpose": "VAD / Online Paraformer / SenseVoice / CT-Transformer 标点",
       "license": "Apache-2.0",
       "license_file": "packaging/third-party-notices/sherpa-onnx-NOTICE",
-      "status": "planned (T0012)",
+      "status": "installed",
       "build_flags_file": "third_party/build-metadata/sherpa-onnx.txt",
-      "note": "保留 NOTICE；ONNX Runtime (MIT) 随其分发。"
+      "note": "ONNX Runtime (MIT) 随其分发。"
     },
     {
       "name": "silero-vad",
       "version": "v1",
       "purpose": "VAD 模型权重",
       "license": "MIT (weights)",
-      "status": "planned (T0013)",
+      "status": "installed",
+      "model_path": ".tools/models/silero/silero_vad.onnx (629KB)",
       "note": "模型 manifest 记录 hash。"
     },
     {
@@ -67,36 +72,38 @@
       "version": "bilingual-zh-en",
       "purpose": "Online Paraformer 流式 partial",
       "license": "Apache-2.0 (weights)",
-      "status": "planned (T0013)"
+      "status": "installed",
+      "model_path": ".tools/models/paraformer/{encoder.int8.onnx(165MB), decoder.onnx(25MB), tokens.txt}"
     },
     {
       "name": "sensevoice-zh-en-ja-ko-yue-int8",
       "version": "2024-07-17",
       "purpose": "SenseVoice 分句终稿",
       "license": "Apache-2.0 (weights)",
-      "status": "planned (T0013)"
+      "status": "installed",
+      "model_path": ".tools/models/sensevoice/{model.int8.onnx(239MB), tokens.txt}"
     },
     {
       "name": "ct-transformer-zh-en-int8",
       "version": "v1",
-      "purpose": "标点",
+      "purpose": "标点（可选）",
       "license": "Apache-2.0 (weights)",
-      "status": "planned (T0013)"
+      "status": "optional (not downloaded; non-blocking)"
     },
     {
       "name": "rclone",
       "version": "latest-stable",
       "purpose": "网盘挂载（仅诊断，不捆绑）",
       "license": "MIT",
-      "status": "external (user-side)",
-      "note": "不在分发内；仅提供配置建议。"
+      "status": "external (user-side)"
     },
     {
       "name": "wix",
       "version": "v3.11/v5",
       "purpose": "MSI 打包（仅工具）",
       "license": "MS-RL",
-      "status": "missing (P8 BLOCKED)"
+      "status": "installed",
+      "note": ".tools/wix 已就绪。"
     },
     {
       "name": "cmake",
@@ -105,5 +112,25 @@
       "license": "BSD-3-Clause",
       "status": "installed"
     }
-  ]
+  ],
+  "bundled_runtime": {
+    "dir": "out/bundle/runtime",
+    "generator": "cmake -P cmake/run_bundle.cmake (调用 cmake/RcpBundle.cmake::rcp_copy_native_runtime)",
+    "contents": {
+      "dlls": [
+        "avcodec-63.dll", "avdevice-63.dll", "avfilter-12.dll", "avformat-63.dll",
+        "avutil-61.dll", "swresample-7.dll", "swscale-10.dll",
+        "mpv-2.dll", "vulkan-1.dll",
+        "onnxruntime.dll", "onnxruntime_providers_shared.dll",
+        "sherpa-onnx-c-api.dll", "sherpa-onnx-cxx-api.dll"
+      ],
+      "models": [
+        "models/paraformer/{encoder.int8.onnx, decoder.onnx, tokens.txt}",
+        "models/sensevoice/{model.int8.onnx, tokens.txt}",
+        "models/silero/silero_vad.onnx"
+      ]
+    },
+    "total_size": "674 MB",
+    "verified": "2026-08-27: 手工 cl/link 验证 mpv.lib+ffmpeg+sherpa-onnx 三套库均可链接进 deps_smoke（link exit=0）；bundle 仅拷贝 *.dll 与模型，跳过 *.lib/*.def/*.part/*.bad。"
+  }
 }
