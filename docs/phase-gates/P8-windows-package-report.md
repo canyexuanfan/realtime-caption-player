@@ -90,3 +90,10 @@ BrowseDlg OK 点后冻结：SetTargetPath 参数未按 MSDN 规则为间接属�
 导致路径校验失败并封锁该控件全部 ControlEvent（含 EndDialog）。已改为
 `[WIXUI_INSTALLDIR]`（InstallDirDlg Next 与 BrowseDlg OK 两处），ControlEvent 表
 复检通过；MSI 重打，manifest 哈希同步更新。详见 questions/Wix安装器错误排查指南.md。
+
+### 补记 3（同日）：2732 + Install 序列缺失修复 + 自动子文件夹
+自定义 InstallUISequence 缺少标准动作（CostInitialize/CostFinalize/ExecuteAction）
+→ 目录管理器未初始化，BrowseDlg OK 报 2732；且 Install 按钮实际不会开始安装。
+已按官方结构交错排布标准动作与对话框；同时实现用户需求的"Browse OK 后自动追加
+\RealtimeCaptionPlayer\ 子文件夹"（SetTargetPath 后接 SetProperty Publish）。
+InstallUISequence 与 ControlEvent 双表复检通过；MSI 重打，manifest 已同步。

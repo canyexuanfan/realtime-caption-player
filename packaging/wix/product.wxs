@@ -105,8 +105,14 @@
                  Property="WIXUI_INSTALLDIR" Sunken="yes" Indirect="yes" TabSkip="no" />
         <Control Id="OK" Type="PushButton" X="241" Y="243" Width="56" Height="17">
           <Text>OK</Text>
+          <!-- 1) SetTargetPath：把所选路径写入 INSTALLFOLDER（方括号=间接属性规则）。
+               2) SetProperty：自动追加程序名子文件夹（用户所选目录\RealtimeCaptionPlayer\）。
+                  Condition 列写 "INSTALLFOLDER"：非空（浏览选中了路径）才追加。
+               3) EndDialog Return：子对话框必须 Return 关闭。 -->
           <Publish Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="1">1</Publish>
-          <Publish Event="EndDialog" Value="Return" Order="2">1</Publish>
+          <Publish Property="INSTALLFOLDER"
+                   Value="[INSTALLFOLDER]RealtimeCaptionPlayer\" Order="2">1</Publish>
+          <Publish Event="EndDialog" Value="Return" Order="3">1</Publish>
         </Control>
         <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17">
           <Text>Cancel</Text>
@@ -164,10 +170,15 @@
       </Dialog>
 
       <InstallUISequence>
+        <!-- 标准 UI 序列（对齐官方 WiX 结构）：对话框与标准动作交错。
+             缺少 CostInitialize/CostFinalize 时目录管理器不初始化，
+             SetTargetPath 点击即 Error 2732 "Directory Manager not supplied"；
+             缺少 ExecuteAction 时点 Install（EndDialog Return）不会真正开始安装。
+             NewDialog 导航会在对话框之间顺次执行这些标准动作。 -->
+        <Show Dialog="ExitDialog" OnExit="success" />
         <Show Dialog="WelcomeDlg" Before="CostInitialize" />
-        <Show Dialog="InstallDirDlg" After="WelcomeDlg" />
-        <Show Dialog="VerifyReadyDlg" After="InstallDirDlg" />
-        <Show Dialog="ExitDialog" After="VerifyReadyDlg" />
+        <Show Dialog="InstallDirDlg" After="CostFinalize" />
+        <Show Dialog="VerifyReadyDlg" Before="ExecuteAction" />
       </InstallUISequence>
     </UI>
 

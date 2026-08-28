@@ -111,3 +111,42 @@ EndDialog Return 一起失效 → 表现为点 OK 后对话框死住（用户实
 若用户选择了不可写的路径，MSDN 规定 MSI 会封锁 OK 控件后续事件（防错误安装），
 此时 Cancel 按钮仍可用（封锁按控件粒度）。此为 Windows Installer 原生行为，
 标准安装器同样如此。
+
+## 追加（第三轮用户反馈）：Error 2732 "Directory Manager not supplied"
+
+### ❌ 根因：自定义 InstallUISequence 只排了对话框、没排标准动作
+原序列只有四条 Show（Welcome/InstallDir/VerifyReady/Exit 相对次序），
+**CostInitialize / FileCost / CostFinalize / ExecuteAction 全部缺席**。
+目录管理器在 CostInitialize 才初始化；BrowseDlg OK 的 SetTargetPath 在没有
+目录管理器的情况下执行 → Error 2732。
+（连带隐患：VerifyReadyDlg 的 Install = EndDialog Return 后序列无 ExecuteAction，
+点 Install 可能根本不会开始安装。）
+
+### ✅ 修复：对话框与标准动作交错排布（官方 WiX 同构）
+```xml
+<InstallUISequence>
+  <Show Dialog="ExitDialog" OnExit="success" />
+  <Show Dialog="WelcomeDlg" Before="CostInitialize" />
+  <Show Dialog="InstallDirDlg" After="CostFinalize" />
+  <Show Dialog="VerifyReadyDlg" Before="ExecuteAction" />
+</InstallUISequence>
+```
+NewDialog 导航会顺次执行对话框之间的序列动作：Welcome→Next 触发
+CostInitialize/FileCost/CostFinalize → 目录页出现（目录管理器就绪）；Install →
+EndDialog Return 后执行 ExecuteAction 真正安装 → 成功后 OnExit=success 弹 ExitDialog。
+
+### ✅ 同时落实"选择目录后自动追加程序名子文件夹"
+BrowseDlg OK 三连（ControlEvent 表实测）：
+```
+OK | SetTargetPath | [WIXUI_INSTALLDIR]      | Order 1  # 所选路径写入 INSTALLFOLDER
+OK | [INSTALLFOLDER] | [INSTALLFOLDER]RealtimeCaptionPlayer\ | Order 2  # 追加子文件夹
+OK | EndDialog | Return                      | Order 3  # 回到目录页
+```
+WiX3 语法注意：设属性的 Publish 用 `Property=` + `Value=` 属性（无 Event 属性，
+元素文本为条件）——写成 `Argument=` 会报 CNDL0004。
+
+### 验证
+InstallUISequence 实测表：SetINSTALLFOLDER(798) → WelcomeDlg(799) → CostInitialize(800)
+→ FileCost(900) → CostFinalize(1000) → InstallDirDlg(1001) → VerifyReadyDlg(1299)
+→ ExecuteAction(1300)；ControlEvent 表如上。静默安装链路（/qn 跳过 UI 序列）不受影响。
+完整交互链由用户重装复验。
