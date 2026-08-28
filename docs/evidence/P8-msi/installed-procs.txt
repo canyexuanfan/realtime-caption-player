@@ -1,0 +1,12 @@
+﻿
+
+Id   : 13520
+Name : caption_worker
+Path : F:\rcp-app-test\caption_worker.exe
+
+Id   : 40280
+Name : player_app
+Path : F:\rcp-app-test\player_app.exe
+
+
+

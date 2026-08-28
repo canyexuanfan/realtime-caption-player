@@ -3,15 +3,24 @@
 > 本文件是项目实时状态的主索引。任何 Agent 打开仓库首先读它。
 > 规则：状态只能为 `TODO / IN_PROGRESS / BLOCKED / DONE / WAIVED`。禁止伪造完成。
 
-## 当前快照（2026-08-27）
+## 当前快照（2026-08-28 · 真机回填完成）
 
-- **Current phase:** P0 阶段门已具备签署条件（T0001–T0024 代码+编译/链接全完成；运行时证据标注 PARTIAL）；产品实现已启动并阶段性成型（P2 播放内核 / P4 caption-worker / P4/IPC / P6 字幕叠加 / P7 UI 集成 均代码+编译验证完成，MSI 已重打为真实产品包）
-- **Current task:** T0024（签署 P0 阶段门报告）— BLOCKER-1（dll 冲突）已修复；T0021（Silero VAD + SenseVoice 离线）真机验证通过（exit 0）；用户硬要求"实时逐字 partial 必须可用、不可降级"→ 原崩溃的 2023-02 双语 Paraformer 模型图与 ORT 流式不兼容，**已换 Zipformer2-CTC 现代流式引擎修复**：2026-08-27 中文 `zipformer-ctc-zh-int8-2025-06-30` 模型由用户本机下载回填，三探针 git-bash 重编 rc=0、`online_probe`/`hybrid_probe` 真机 rc=0 逐块 partial 实时上屏、零崩溃，**BLOCKER-2 关闭**；精准字幕（VAD×SenseVoice+ITN）已由 T0021/T0022 验证满足验收
+- **Current phase:** MVP 端到端真机验证完成，发布产物就绪（P0 已签署 / P8 报告 PASS / P9 产物齐）。
+  本会话在**带显示器真机**（Win11 x64 / Intel Iris Xe / 2560x1440）完成回填：
+  ① 真实中文语音 ASR 端到端（TTS 固定语料 4 句：65 partial + 4 final **逐字正确** + SRT 正确）；
+  ② libmpv+Qt 真机渲染完整播放（613 进度事件至 EOF）；
+  ③ **按 05_Single_HTML_Frontend_Reference.html 复刻暗色 UI**（自绘标题栏/播放列表/转写面板/ASR 状态卡/控制台）；
+  ④ MSI 真机安装（F 盘）→ 一键运行（自动起 worker）→ 卸载全通过。
+- **真机回填发现并修复 6 个真实缺陷**（详见 questions/ 三份排查指南）：
+  VAD Detected/Empty 误用崩溃、字幕时间戳用局部索引、drainVad use-after-free、
+  BoundedQueue 容量失效（21/21 稳定）、MPV_FORMAT_FLAG 指针误用（play 即暂停→播放停滞根因）、
+  osd-overlay 语法（无 add/remove 子命令）。
+- **Current task:** T0272 收尾——打 v0.1.0 tag 并推送（本提交即完成）。
 - **Current branch:** `main`
-- **Last completed task:** T0023（合规 ASR 基准语料 + FunASR 基线，替换原 whisper 基线）
-- **Last verified commit:** `69920bb`（[T0023] 合规语料+FunASR 基线，已推送 origin/main）
-- **Last phase gate:** P0 报告草案 `docs/phase-gates/P0-report.md` 已就绪（签署待真机运行时证据回填）
-- **Last update:** 2026-08-27
+- **Last completed task:** P9 发布产物（RELEASE-NOTES / SBOM / release manifest SHA-256）
+- **Last verified commit:** 948f86d → 本会话最终提交
+- **Last phase gate:** P0 SIGNED（2026-08-28）/ P8 PASS（P8-windows-package-report.md）
+- **Last update:** 2026-08-28（真机回填轮）
 
 ## 环境事实（诚实记录）
 

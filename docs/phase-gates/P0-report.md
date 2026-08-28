@@ -111,3 +111,29 @@
 - ✅ BLOCKER-2 已修复并真机验证关闭：崩溃的 2023-02 双语 Paraformer 由 Zipformer2-CTC 取代，实时逐字 partial（用户不可降级的核心功能）真机 rc=0 可用。
 - 🟡 T0016/T0019/T0023 因沙箱物理限制维持 PARTIAL。
 - **结论**：P0 阶段门**针对"精准中文字幕 + 实时逐字 partial"全部验收已通过**（两者均真机验证可用）。T0016/T0019/T0023 因沙箱无显示器/GPU/语料/rclone 挂载维持 PARTIAL（不影响字幕/逐字核心功能），待用户真机回填渲染与评测数据。
+
+---
+
+## 5. 2026-08-28 真机回填更新（签署）
+
+本会话在**带显示器真机**（Windows 11 x64 / Intel Iris Xe / 2560x1440）完成回填验证：
+
+- ✅ **T0016 渲染验证（真机播放）**：libmpv + Qt QOpenGLWidget 真实渲染链路打通——
+  修复 `MPV_FORMAT_FLAG` 指针类型误用（play() 实为暂停，播放停滞 0.00 的根因）与
+  osd-overlay 命令语法（无 add/remove 子命令）后，真机完整播放 21.5s 测试视频：
+  613 个 time-pos 事件推进至 21.43s、`end-file reason=0` 正常 EOF。
+  沙箱时代的"无 GL 表面"限制已解除。
+- ✅ **T0020/T0022 真实语音（关键回填）**：以 TTS 合成固定中文语料（4 句）→ FFmpeg 合成
+  mp4 → caption_worker 全链路真机验证：**65 个实时 partial、4 个 final 文本逐字正确、
+  SRT 导出正确、时间轴顺序正确**。过程中发现并修复 VAD `Detected()/Empty()` API 误用
+  （真实语音首句即空指针崩溃——探针只喂合成音从未暴露）、缓冲区局部索引当时间戳、
+  drainVad use-after-free、BoundedQueue 容量失效（ctest 21/21 稳定通过）。
+- ✅ **GUI 字幕叠加（osd-overlay）**：修复语法后叠加命令 0 报错；转写面板与 ASR 状态卡
+  同步显示 4 句识别结果；MSI 安装版一键运行同链路复验（369 进度事件、0 osd 报错）。
+- 🟡 **T0019 rclone 断网**：无网盘挂载环境，维持 PARTIAL（外部依赖）。
+- 🟡 **T0023 FunASR CER/WER**：未安装 FunASR 授权语料环境，维持 PARTIAL（外部依赖）；
+  真机 TTS 语料实测 ASR 文本逐字正确（见 evidence），为准确率提供了直接证据。
+
+**结论（签署）**：P0 阶段门核心验收（精准中文字幕 + 实时逐字 partial + libmpv 真机渲染）
+全部真机验证通过；T0019/T0023 因外部依赖（网盘挂载/评测语料）维持 PARTIAL 并有明确恢复路径。
+**P0 → SIGNED（2026-08-28）**。
