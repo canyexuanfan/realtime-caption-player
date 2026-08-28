@@ -210,3 +210,13 @@ VerifyReady 点 Install = EndDialog Return → 序列恢复后直接进 ExecuteA
 InstallUISequence：FatalError(-3)/UserExit(-2)/ExitDialog(-1)/WelcomeDlg(1001)/
 ProgressDlg(1299)/ExecuteAction(1300)；Dialog 表 ProgressDlg Attributes=5（非模态）；
 ControlEvent：ProgressDlg|Cancel|SpawnDialog|CancelDlg 接通。
+
+## 附：Qt 静态库资源丢失（图标/logo 全空白）——构建系统级坑
+
+**现象**：qt_add_resources 挂在 STATIC 库目标上时，qrc 初始化对象（qrc_*_init.cpp.obj）
+没有外部符号引用，MSVC 链接器将其丢弃 → 运行时 QFile(":/...") 全部失败：
+SVG 图标不渲染、按钮空圆、logo 不显示、窗口图标缺失。布局 a11y 检查完全发现不了。
+
+**修复**：qt_add_resources 必须挂在**最终可执行目标**上（player_app），
+且调用必须在 add_executable 之后（否则 CMake 报目标不存在）。
+验证：out/build/<cfg>/src/player/CMakeFiles/player_app.dir/.qt/rcc/qrc_*.obj 存在。

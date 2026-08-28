@@ -620,24 +620,23 @@ QWidget* MainWindow::buildAsrCard(QWidget* parent) {
     bv->addWidget(ck);
     bv->addWidget(confRow);
 
-    auto* met = new QWidget(body);
-    auto* mh = new QHBoxLayout(met);
-    mh->setContentsMargins(0, 0, 0, 0);
-    mh->setSpacing(6);
-    auto mkMetric = [body](const QString& k, QLabel** val) {
-        auto* kl = new QLabel(k, body);
+    // 指标：延迟 / 已识别时长（参考稿 asr-metrics：key ... value 两行，真实值）
+    auto metricRow = [body](const QString& k, QLabel** val) {
+        auto* row = new QWidget(body);
+        auto* h = new QHBoxLayout(row);
+        h->setContentsMargins(0, 0, 0, 0);
+        h->setSpacing(6);
+        auto* kl = new QLabel(k, row);
         kl->setObjectName(QStringLiteral("asrMetrics"));
-        *val = new QLabel(QStringLiteral("—"), body);
+        *val = new QLabel(QStringLiteral("—"), row);
         (*val)->setObjectName(QStringLiteral("asrMetricVal"));
-        return *val;
+        h->addWidget(kl);
+        h->addStretch();
+        h->addWidget(*val);
+        return row;
     };
-    QLabel* l1 = mkMetric(tr("延迟"), &m_asrLatency);
-    QLabel* l2 = mkMetric(tr("已识别时长"), &m_asrRecognized);
-    mh->addWidget(l1);
-    mh->addWidget(m_asrLatency, 1);
-    mh->addWidget(l2);
-    mh->addWidget(m_asrRecognized, 1);
-    bv->addWidget(met);
+    bv->addWidget(metricRow(tr("延迟"), &m_asrLatency));
+    bv->addWidget(metricRow(tr("已识别时长"), &m_asrRecognized));
     bv->addSpacing(2);
 
     auto* ex = new QPushButton(tr("导出字幕（SRT）"), body);
@@ -701,6 +700,8 @@ QWidget* MainWindow::buildControlDeck(QWidget* parent) {
             "QPushButton:checked{background:rgba(121,105,255,0.22);}"));
         return b;
     };
+    // 左组（参考稿：打开文件夹/截图/AB/字幕开关）
+    auto* btnLib = cbtn(QStringLiteral("folder"), tr("打开文件夹"));
     m_btnCaption = cbtn(QStringLiteral("subtitle"), tr("开关实时字幕（R）"), true);
     m_btnCaption->setChecked(true);
     m_btnCam = cbtn(QStringLiteral("camera"), tr("截图"));
@@ -744,9 +745,10 @@ QWidget* MainWindow::buildControlDeck(QWidget* parent) {
     m_volume->setCursor(Qt::PointingHandCursor);
     m_btnFs = cbtn(QStringLiteral("fullscreen"), tr("全屏（F）"));
 
-    ll->addWidget(m_btnCaption);
+    ll->addWidget(btnLib);
     ll->addWidget(m_btnCam);
     ll->addWidget(m_btnAb);
+    ll->addWidget(m_btnCaption);
     ll->addWidget(m_btnTrack);
     cc->addWidget(m_btnB10);
     cc->addWidget(m_btnPrev);
@@ -765,6 +767,7 @@ QWidget* MainWindow::buildControlDeck(QWidget* parent) {
     v->addLayout(row);
 
     connect(m_btnCaption, &QPushButton::clicked, this, &MainWindow::onToggleCaption);
+    connect(btnLib, &QPushButton::clicked, this, &MainWindow::onOpenFolder);
     connect(m_btnCam, &QPushButton::clicked, this, &MainWindow::onScreenshot);
     connect(m_btnAb, &QPushButton::clicked, this, &MainWindow::onAbLoop);
     connect(m_btnTrack, &QPushButton::clicked, this, &MainWindow::onCycleSub);
@@ -1644,6 +1647,11 @@ void MainWindow::repositionOverlays() {
     m_captionOverlay->setGeometry((vw - ow) / 2, qMax(0, oy), ow, oh);
     m_waveform->setGeometry((vw - qMin(vw * 48 / 100, 520)) / 2,
                             qMin(vh - 16, oy + oh + 17), qMin(vw * 48 / 100, 520), 14);
+    // 隐私徽标：top 17 right 18（参考稿 privacy-badge）
+    if (m_privacyBadge) {
+        m_privacyBadge->adjustSize();
+        m_privacyBadge->move(vw - m_privacyBadge->width() - 18, 17);
+    }
     if (m_asrCard && !m_asrMoved) m_asrCard->move(vw - 22 - 195, 88);
 }
 
