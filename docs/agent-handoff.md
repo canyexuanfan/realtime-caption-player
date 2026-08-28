@@ -91,3 +91,12 @@ cp out/build/spikes2/bin/*.exe out/bundle/runtime/
 - 构建/打包见上节；测试：在 `out/build/spikes2` 下运行
   `"C:/Users/<你的用户名>/.workbuddy/binaries/python/envs/default/Scripts/ctest.exe"`（tests 目录需 Qt6 DLL，构建后已拷入）。
 - E2E 语料：`out/e2e-verify/`（TTS 生成脚本 gen_tts.ps1、e2e-test.mp4、语料文本）。
+
+## 追加（2026-08-28 晚）：MSI 交互式「修改文件夹」2812 修复
+
+- 根因与修复：见 `questions/Wix安装器错误排查指南.md`（三次错误事件名试错记录 +
+  官方 BrowseDlg.wxs 对照正解）。product.wxs 已改用
+  `DirectoryListUp`/`DirectoryListNew`/`Subscribe IgnoreChange`/`SetTargetPath`/`Reset`。
+- 交互验证：非提权向导 a11y 驱动，Browse→Up 导航成功无 2812（旧包同操作必现）。
+- MSI 已重打，manifest 哈希已更新（tag v0.1.0 指向修复前状态，修复为 tag 后提交）。
+- 待用户重装复验完整链（Up/NewFolder/选目录/OK/安装）。

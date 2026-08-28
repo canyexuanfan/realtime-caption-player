@@ -70,7 +70,9 @@
         </Control>
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17">
           <Text>Next</Text>
-          <Publish Event="NewDialog" Value="VerifyReadyDlg" />
+          <!-- 提交手输路径到目录属性，再进入确认页。 -->
+          <Publish Event="SetTargetPath" Value="WIXUI_INSTALLDIR" Order="1">1</Publish>
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="2">1</Publish>
         </Control>
         <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17">
           <Text>Cancel</Text>
@@ -82,25 +84,34 @@
         <Control Id="Title" Type="Text" X="15" Y="15" Width="340" Height="20" NoPrefix="yes">
           <Text>Change Folder</Text>
         </Control>
-        <Control Id="DirectoryList" Type="DirectoryList" X="20" Y="50" Width="330" Height="150"
-                 Property="WIXUI_INSTALLDIR" Sunken="yes" Indirect="yes" />
-        <Control Id="Up" Type="PushButton" X="20" Y="210" Width="60" Height="18">
+        <!-- 标准三件套（逐项对照 WiX 官方 BrowseDlg.wxs 源码）：
+             Up = DirectoryListUp / New Folder = DirectoryListNew（参数 "0"）；
+             DirectoryCombo 必须订阅 IgnoreChange；Cancel 必须 Reset 恢复原值。
+             此前误用不存在的事件（SetTarget/DirectoryUp/NewFolder/DirectoryComboUp）
+             -> 点击即 Error 2812 (Event failed)。 -->
+        <Control Id="DirectoryCombo" Type="DirectoryCombo" X="20" Y="45" Width="330" Height="80"
+                 Property="WIXUI_INSTALLDIR" Indirect="yes" Fixed="yes" Remote="yes" TabSkip="no">
+          <Subscribe Event="IgnoreChange" Attribute="IgnoreChange" />
+        </Control>
+        <Control Id="Up" Type="PushButton" X="20" Y="78" Width="60" Height="18">
           <Text>Up</Text>
-          <Publish Event="SetTarget" Value="WIXUI_INSTALLDIR" Order="1">1</Publish>
-          <Publish Event="SpawnDialog" Value="BrowseDlg" Order="2">1</Publish>
+          <Publish Event="DirectoryListUp" Value="0">1</Publish>
         </Control>
-        <Control Id="NewFolder" Type="PushButton" X="90" Y="210" Width="80" Height="18">
+        <Control Id="NewFolder" Type="PushButton" X="90" Y="78" Width="80" Height="18">
           <Text>New Folder</Text>
-          <Publish Event="SetTarget" Value="WIXUI_INSTALLDIR" Order="1">1</Publish>
-          <Publish Event="SpawnDialog" Value="BrowseDlg" Order="2">1</Publish>
+          <Publish Event="DirectoryListNew" Value="0">1</Publish>
         </Control>
+        <Control Id="DirectoryList" Type="DirectoryList" X="20" Y="102" Width="330" Height="120"
+                 Property="WIXUI_INSTALLDIR" Sunken="yes" Indirect="yes" TabSkip="no" />
         <Control Id="OK" Type="PushButton" X="241" Y="243" Width="56" Height="17">
           <Text>OK</Text>
-          <Publish Event="NewDialog" Value="InstallDirDlg" Order="1">1</Publish>
+          <Publish Event="SetTargetPath" Value="WIXUI_INSTALLDIR" Order="1">1</Publish>
+          <Publish Event="EndDialog" Value="Return" Order="2">1</Publish>
         </Control>
         <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17">
           <Text>Cancel</Text>
-          <Publish Event="NewDialog" Value="InstallDirDlg" Order="1">1</Publish>
+          <Publish Event="Reset" Value="0" Order="1">1</Publish>
+          <Publish Event="EndDialog" Value="Return" Order="2">1</Publish>
         </Control>
       </Dialog>
 

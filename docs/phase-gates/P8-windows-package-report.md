@@ -70,3 +70,17 @@ MVP 按"把产品开发成型"的用户指令压缩推进，P8 对应能力落�
 ## Gate Result
 
 **PASS** —— 安装/运行/卸载真机闭环 + 真实语音 ASR 端到端全通过；限制项均有记录与后续路径。
+
+## 补记（2026-08-28 晚，tag v0.1.0 之后）
+
+用户交互安装时「修改文件夹」对话框报 **Error 2812**。根因：自定义 BrowseDlg 的按钮
+事件名错误（`SetTarget`/`DirectoryUp`/`DirectoryComboUp` 均非合法 MSI ControlEvent）。
+已逐项对照 WiX 官方 BrowseDlg.wxs 修复：Up=`DirectoryListUp(0)`、NewFolder=
+`DirectoryListNew(0)`、DirectoryCombo 订阅 `IgnoreChange`、OK=`SetTargetPath`+
+`EndDialog Return`、Cancel=`Reset`+`EndDialog Return`。
+
+**交互式验证（非提权向导，a11y 驱动）**：Browse→Up 导航到上级目录成功、目录列表与
+组合框同步更新、无任何错误弹窗（旧包同操作必现 2812）。ControlEvent 表复检确认包内
+零非法事件。完整安装链由用户重装复验（静默安装/卸载链路此前已 exit 0 通过）。
+修复后 MSI SHA-256 已更新至 `docs/release/release-manifest-v0.1.0.txt`
+（tag v0.1.0 指向修复前的代码状态，此为 tag 后的补丁提交）。

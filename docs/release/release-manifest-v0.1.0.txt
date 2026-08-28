@@ -1,4 +1,4 @@
-7529567094d3d0c01ce6279c473038a3081bd046647b256af0321ae3795e90b4 *out/package/RealtimeCaptionPlayer-0.1.0.msi
+45f2c6ee6d524b3b1e069c0adc666c3a1410b7c9e4ca4dcf8fbbdac498792349 *out/package/RealtimeCaptionPlayer-0.1.0.msi
 a7bbf304177b157f38ad88b48a4f03711713ec02d5f71edfee3c694bd182e5bf *out/bundle/runtime/player_app.exe
 08aab7ff514d26f0efe26dd6fe9fbd68874b33cb28ce214d24f516c1deaf3d76 *out/bundle/runtime/caption_worker.exe
 24ffdc19ba9aaed5a6a9beaede1e087745217d82425cf4041bca0c696661801e *.tools/models/zipformer-ctc/model.int8.onnx
