@@ -25,31 +25,23 @@
     <!-- 跳过许可证对话框（MVP 暂不展示 EULA），直接从目录选择开始 -->
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
 
-    <!-- 用户点 Change 选目录后，自动追加 \RealtimeCaptionPlayer 子文件夹 -->
-    <Binary Id="EnsureAppSubfolder_vbs" SourceFile="$(var.SourceDirPath)/EnsureAppSubfolder.vbs" />
+    <!-- 用户点 Change 选目录后，自动追加 \RealtimeCaptionPlayer 子文件夹。
+         使用 JScript（非 VBScript）：VBScript 在 perMachine(UAC提权) 安装中易触发 Error 1721。
+         仅挂载在按钮级 Publish（不排进 UI/Execute 序列），避免在 AppSearch 阶段过早执行。 -->
+    <Binary Id="EnsureAppSubfolder_js" SourceFile="$(var.SourceDirPath)/EnsureAppSubfolder.js" />
     <CustomAction Id="EnsureAppSubfolder"
-                  BinaryKey="EnsureAppSubfolder_vbs"
-                  VBScriptCall="EnsureAppSubfolder"
+                  BinaryKey="EnsureAppSubfolder_js"
+                  JScriptCall="EnsureAppSubfolder"
                   Execute="immediate" />
 
     <UI>
       <!-- ① 浏览对话框选完目录点 OK 时：立即追加子文件夹，回到目录页时显示已修正的路径 -->
       <Publish Dialog="BrowseDlg" Control="OK" Event="DoAction"
                Value="EnsureAppSubfolder" Order="999">1</Publish>
-      <!-- ② Next 按钮：安全兜底（确保最终安装路径正确） -->
+      <!-- ② 目录选择页 Next 按钮：安全兜底（确保最终安装路径正确） -->
       <Publish Dialog="InstallDirDlg" Control="Next" Event="DoAction"
                Value="EnsureAppSubfolder" Order="3">1</Publish>
     </UI>
-
-    <!-- ③ 必须在 UI 序列（对话框显示之前）跑：AppSearch 之后、WelcomeDlg 之前，
-         把 INSTALLFOLDER（含子文件夹）写回 WIXUI_INSTALLDIR，
-         覆盖上次安装残留的路径记忆，使目录选择页首次打开即显示正确路径 -->
-    <InstallUISequence>
-      <Custom Action="EnsureAppSubfolder" After="AppSearch">1</Custom>
-    </InstallUISequence>
-    <InstallExecuteSequence>
-      <Custom Action="EnsureAppSubfolder" After="AppSearch">1</Custom>
-    </InstallExecuteSequence>
 
     <Feature Id="Complete" Title="RealtimeCaptionPlayer" Level="1">
       <ComponentGroupRef Id="RcpRuntimeComponents" />
