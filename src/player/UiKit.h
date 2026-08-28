@@ -29,7 +29,9 @@ inline QIcon svgIcon(const QString& name, const QColor& color, int px) {
     QFile f(QStringLiteral(":/icons/%1.svg").arg(name));
     if (!f.open(QIODevice::ReadOnly)) return QIcon();
     QString svg = QString::fromUtf8(f.readAll());
-    svg.replace(QStringLiteral("currentColor"), color.name(QColor::HexArgb));
+    // 注意：必须用 6 位 #RRGGBB——QSvgHandler 不认 Qt 私有的 8 位 #AARRGGBB，
+    // 无效描边色会回落黑色，深色背景下图标"隐形"（快照实证）。
+    svg.replace(QStringLiteral("currentColor"), color.name());
     const qreal dpr = qApp->devicePixelRatio();
     QSvgRenderer renderer(svg.toUtf8());
     QPixmap pm(static_cast<int>(px * dpr), static_cast<int>(px * dpr));

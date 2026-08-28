@@ -6,6 +6,7 @@
 #include <QStandardPaths>
 #include <QSurfaceFormat>
 #include <QSvgRenderer>
+#include <QTimer>
 #include "MainWindow.h"
 
 int main(int argc, char* argv[]) {
@@ -50,7 +51,24 @@ int main(int argc, char* argv[]) {
     }
 
     MainWindow window;
+    // 离屏视觉自验证：RCP_SNAPSHOT=<png路径> 时以 WA_DontShowOnScreen 显示
+    // （布局照常激活、屏幕上无窗口），渲染主窗口存 PNG 并退出。
+    const QString snapPath = qEnvironmentVariable("RCP_SNAPSHOT");
+    if (!snapPath.isEmpty()) window.setAttribute(Qt::WA_DontShowOnScreen, true);
     window.show();
+    if (!snapPath.isEmpty()) {
+        QTimer::singleShot(2500, &window, [&window, snapPath] {
+            // 二分定位标记：fire=定时器已触发（接下来 grab）
+            QFile m1(QCoreApplication::applicationDirPath() + QStringLiteral("/snap-fire.txt"));
+            m1.open(QIODevice::WriteOnly | QIODevice::Truncate);
+            m1.write("fire");
+            m1.close();
+            const QPixmap pm = window.grab();
+            pm.save(snapPath);
+            QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/snap-fire.txt"));
+            QApplication::quit();
+        });
+    }
 
     if (argc > 1) {
         // 命令行传入媒体路径（本地 8-bit 路径）。

@@ -150,3 +150,11 @@ rcp_player 上，qrc 初始化对象被链接器丢弃（构建系统级坑，�
 延迟/已识别时长标签未入布局悬浮错位（改 metricRow 两行结构）；隐私徽标补定位
 （top17/right18，此前叠在文件名上）；控制台左组按参考稿改为 打开文件夹/截图/AB/
 字幕开关/字幕轨。真机 a11y 复检通过；截屏通道故障以构建产物 obj 证据替代视觉自检。
+
+### 补记 9（同日）：图标渲染像素级实证（快照自验证闭环）
+按用户要求落实问题修复流程（questions/Qt图标SVG不显示排查指南.md 建档）。
+新增 RCP_SNAPSHOT 离屏快照自验证（WA_DontShowOnScreen + grab，屏幕零干扰），
+snap3.png 像素级确认：logo/全部图标/列表行/设置面板渲染成功。
+修复第三层根因：SVG currentColor 替换色用了 Qt 私有 8 位 #AARRGGBB，
+QSvgHandler 不认导致描边回落黑色隐形——改 6 位 #RRGGBB。
+MSI 重打，manifest 同步。

@@ -108,6 +108,7 @@ private:
     // ---- 播放与字幕链路 ----
     MpvPlayer* m_player = nullptr;
     MpvRenderWidget* m_video = nullptr;
+    QWidget* m_videoHost = nullptr;   // 视频容器（离屏快照模式下为黑色占位）
     rcp::captions::CaptionController* m_captionCtl = nullptr;
     rcp::player::WorkerSupervisor* m_worker = nullptr;
     QSettings m_settings;

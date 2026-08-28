@@ -490,12 +490,26 @@ QWidget* MainWindow::buildVideoArea(QWidget* parent) {
     auto* grid = new QGridLayout(surface);
     grid->setContentsMargins(0, 0, 0, 0);
 
-    m_video = new MpvRenderWidget(surface);
-    m_video->setMinimumSize(320, 240);
-    if (m_player && m_player->handle()) m_video->attachPlayer(m_player);
-    m_video->installEventFilter(this);
+    // 离屏快照模式（RCP_SNAPSHOT）：跳过 GL 部件（offscreen 平台会挂住），
+    // 用黑色占位——图标/logo/布局验证不受影响。
+    const bool snapshotMode = !qEnvironmentVariableIsEmpty("RCP_SNAPSHOT");
+    if (!snapshotMode) {
+        m_video = new MpvRenderWidget(surface);
+        m_video->setMinimumSize(320, 240);
+        if (m_player && m_player->handle()) m_video->attachPlayer(m_player);
+        m_video->installEventFilter(this);
+        grid->addWidget(m_video, 0, 0);
+    } else {
+        auto* placeholder = new QWidget(surface);
+        placeholder->setStyleSheet(QStringLiteral("background:#10151d;"));
+        grid->addWidget(placeholder, 0, 0);
+    }
+    m_videoHost = surface;
+    surface->installEventFilter(this);
 
-    m_captionOverlay = new QWidget(m_video);
+    QWidget* overlayParent = m_video ? qobject_cast<QWidget*>(m_video) : surface;
+
+    m_captionOverlay = new QWidget(overlayParent);
     m_captionOverlay->setAttribute(Qt::WA_TransparentForMouseEvents);
     m_captionOverlay->setStyleSheet(QStringLiteral("background:transparent;"));
     auto* cv = new QVBoxLayout(m_captionOverlay);
@@ -509,10 +523,10 @@ QWidget* MainWindow::buildVideoArea(QWidget* parent) {
     cv->addWidget(m_partialLabel);
     cv->addWidget(m_finalLabel);
 
-    m_waveform = new Waveform(m_video);
+    m_waveform = new Waveform(overlayParent);
 
     // 渐晕层（.video-vignette）
-    m_vignette = new QLabel(m_video);
+    m_vignette = new QLabel(overlayParent);
     m_vignette->setAttribute(Qt::WA_TransparentForMouseEvents);
     m_vignette->setStyleSheet(QStringLiteral(
         "background:qlineargradient(x1:0,y1:0,x2:0,y2:1,"
@@ -520,19 +534,19 @@ QWidget* MainWindow::buildVideoArea(QWidget* parent) {
         " stop:0.65 rgba(5,7,10,0), stop:1 rgba(5,7,10,0.43));"));
 
     // 拖放提示（.drop-hint）
-    m_dropHint = new QLabel(tr("松开即可打开视频"), m_video);
+    m_dropHint = new QLabel(tr("松开即可打开视频"), overlayParent);
     m_dropHint->setAlignment(Qt::AlignCenter);
     m_dropHint->setStyleSheet(QStringLiteral(
         "border:2px dashed rgba(255,255,255,0.5); border-radius:12px;"
         "background:rgba(50,43,124,0.35); color:#fff; font-size:18px; font-weight:600;"));
     m_dropHint->hide();
 
-    m_videoFileTitle = new QLabel(tr("未打开媒体"), m_video);
+    m_videoFileTitle = new QLabel(tr("未打开媒体"), overlayParent);
     m_videoFileTitle->setObjectName(QStringLiteral("videoFileTitle"));
     m_videoFileTitle->setAttribute(Qt::WA_TransparentForMouseEvents);
     m_videoFileTitle->move(18, 18);
 
-    m_privacyBadge = new QWidget(m_video);
+    m_privacyBadge = new QWidget(overlayParent);
     m_privacyBadge->setObjectName(QStringLiteral("privacyBadge"));
     m_privacyBadge->setAttribute(Qt::WA_TransparentForMouseEvents);
     auto* ph = new QHBoxLayout(m_privacyBadge);
@@ -545,9 +559,7 @@ QWidget* MainWindow::buildVideoArea(QWidget* parent) {
     ph->addWidget(ptxt);
     m_privacyBadge->adjustSize();
 
-    m_asrCard = qobject_cast<QFrame*>(buildAsrCard(m_video));
-
-    grid->addWidget(m_video, 0, 0);
+    m_asrCard = qobject_cast<QFrame*>(buildAsrCard(overlayParent));
     return surface;
 }
 
@@ -1286,7 +1298,7 @@ void MainWindow::appendTranscriptPartial(const QString& text) {
     lab->setObjectName(QStringLiteral("transcriptItem"));
     lab->setTextFormat(Qt::RichText);
     lab->setWordWrap(true);
-    item->setSizeHint(QSize(0, lab->heightForWidth(190) + 20));
+    item->setSizeHint(QSize(218, lab->heightForWidth(190) + 20));
     m_transcript->setItemWidget(item, lab);
     m_lastPartialLabel = lab;
     m_transcript->scrollToBottom();
@@ -1307,7 +1319,7 @@ void MainWindow::appendTranscriptFinal(long long startMs, const QString& text) {
     lab->setObjectName(QStringLiteral("transcriptItem"));
     lab->setTextFormat(Qt::RichText);
     lab->setWordWrap(true);
-    item->setSizeHint(QSize(0, lab->heightForWidth(190) + 22));
+    item->setSizeHint(QSize(218, lab->heightForWidth(190) + 22));
     m_transcript->setItemWidget(item, lab);
     ++m_finalCount;
     m_statLines->setText(tr("字幕行数：%1").arg(m_finalCount));
@@ -1384,7 +1396,7 @@ void MainWindow::refreshMediaRows() {
                 h->addWidget(play);
                 h->addWidget(name, 1);
                 h->addWidget(dur);
-                it->setSizeHint(QSize(0, 40));
+                it->setSizeHint(QSize(218, 40));
                 list->setItemWidget(it, w);
             }
             const bool current = (p == m_currentPath);
@@ -1634,8 +1646,9 @@ void MainWindow::applyCaptionStyle() {
 }
 
 void MainWindow::repositionOverlays() {
-    if (!m_video || m_video->width() <= 0) return;
-    const int vw = m_video->width(), vh = m_video->height();
+    QWidget* host = m_video ? qobject_cast<QWidget*>(m_video) : m_videoHost;
+    if (!host || host->width() <= 0) return;
+    const int vw = host->width(), vh = host->height();
     m_vignette->setGeometry(0, 0, vw, vh);
     m_dropHint->setGeometry(18, 18, vw - 36, vh - 36);
     const int ow = qMin(static_cast<int>(vw * 0.86), 920);
@@ -1667,12 +1680,12 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
             if (me->buttons() & Qt::LeftButton && !isMaximized())
                 move(me->globalPosition().toPoint() - m_windowDrag);
         }
-    } else if (obj == m_video && event->type() == QEvent::Resize) {
+    } else if (obj == m_videoHost && event->type() == QEvent::Resize) {
         repositionOverlays();
-    } else if (obj == m_video && event->type() == QEvent::Enter) {
-        if (!m_currentPath.isEmpty()) m_privacyBadge->show();   // 悬停显示（参考稿 hover 态）
-    } else if (obj == m_video && event->type() == QEvent::Leave) {
-        m_privacyBadge->hide();
+    } else if (obj == m_videoHost && event->type() == QEvent::Enter) {
+        if (!m_currentPath.isEmpty() && m_privacyBadge) m_privacyBadge->show();   // 悬停显示（参考稿 hover 态）
+    } else if (obj == m_videoHost && event->type() == QEvent::Leave) {
+        if (m_privacyBadge) m_privacyBadge->hide();
     } else if (m_asrCard && obj == m_asrCard) {
         if (event->type() == QEvent::MouseButtonPress) {
             auto* me = static_cast<QMouseEvent*>(event);
