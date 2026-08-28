@@ -25,6 +25,13 @@
       <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2">1</Publish>
     </UI>
 
+    <!-- Force-reset WIXUI_INSTALLDIR to INSTALLFOLDER (which resolves to
+         ProgramFiles64Folder\RealtimeCaptionPlayer\) in the UI sequence,
+         BEFORE any dialog is shown. This overrides the stale registry path
+         from a previous install (e.g. E:\Program\ without subfolder).
+         Type 51 = built-in property assignment, NOT a script -> no Error 1721. -->
+    <SetProperty Id="WIXUI_INSTALLDIR" Value="[INSTALLFOLDER]" Before="CostInitialize" Sequence="ui" />
+
     <Feature Id="Complete" Title="RealtimeCaptionPlayer" Level="1">
       <ComponentGroupRef Id="RcpRuntimeComponents" />
       <ComponentRef Id="StartMenuShortcut" />
