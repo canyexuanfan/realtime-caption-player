@@ -3,7 +3,7 @@
 # 依赖 rcp::mpv（由 cmake/FindRcpNativeDeps.cmake 在 BUILD_PLAYER=ON 时提供）
 # 与 Qt6 Widgets/OpenGLWidgets。
 
-find_package(Qt6 COMPONENTS OpenGLWidgets REQUIRED)
+find_package(Qt6 COMPONENTS OpenGLWidgets Svg REQUIRED)
 
 add_library(rcp_player STATIC
     MpvPlayer.cpp
@@ -12,13 +12,9 @@ add_library(rcp_player STATIC
     MpvRenderWidget.h
     MainWindow.cpp
     MainWindow.h
+    UiKit.h
     WorkerSupervisor.cpp
     WorkerSupervisor.h
-)
-
-target_include_directories(rcp_player PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/src
 )
 
 target_link_libraries(rcp_player PUBLIC
@@ -28,12 +24,23 @@ target_link_libraries(rcp_player PUBLIC
     Qt6::Gui
     Qt6::Widgets
     Qt6::OpenGLWidgets
+    Qt6::Svg
     Qt6::Network
     opengl32
 )
 
+# UI 资源（参考稿复刻）：品牌 logo + sprite 图标 SVG 集
+file(GLOB RCP_UI_ICONS "${CMAKE_SOURCE_DIR}/resources/icons/*.svg")
+qt_add_resources(rcp_player "rcp_ui"
+    PREFIX "/"
+    BASE "${CMAKE_SOURCE_DIR}/resources"
+    FILES "${CMAKE_SOURCE_DIR}/resources/logo128.png" ${RCP_UI_ICONS}
+)
+
 # 真实播放器入口（GUI 程序，无控制台窗口）。
-add_executable(player_app main.cpp)
+add_executable(player_app main.cpp
+    "${CMAKE_SOURCE_DIR}/resources/app.rc"   # exe 图标（霓虹语音 logo .ico）
+)
 target_link_libraries(player_app PRIVATE
     rcp_player
 )

@@ -110,3 +110,26 @@ Install=EndDialog Return 恢复序列至 ExecuteAction。两表复检通过，ma
 ExecuteAction，订阅 SetProgress/ActionText/TimeRemaining）+ UserExit(OnExit=cancel)
 + FatalError(OnExit=error)。样式位经 MSDN Dialog Style Bits 核实：无 Modeless 位、
 不带 Modal(2) 即非模态（实测 ProgressDlg Attributes=5 正确）。manifest 已同步。
+
+### 补记 6（2026-08-29）：UI 全面复刻参考稿 + 品牌 logo
+用户要求：前端与 05_Single_HTML_Frontend_Reference.html 除实例数据外完全一致；
+logo 采用用户提供的霓虹语音图标。
+- 资源：resources/logo.png（原图）+ logo128.png（qrc）+ app.ico（ffmpeg 生成，
+  嵌入 exe via app.rc → 安装快捷方式自动继承图标）；30 个 sprite 图标转 SVG 入 qrc，
+  QSvgRenderer 运行期换色渲染（Qt6::Svg）。
+- MainWindow 全面重写（对照参考 :root 令牌与各区块 CSS）：自绘标题栏（25px logo+
+  品牌+文件名+打开文件/打开文件夹/设置+46px 窗控钮，close hover #c42b3a）；
+  左栏 238px（播放列表 276px 区+播放列表/历史记录 tabs（accent-soft 选中态）+
+  转写面板（时间戳小字+正文、partial 灰字原位更新）+搜索框+行数/实时延迟统计）；
+  视频区（文件名 17px、隐私徽标、字幕叠加（partial 82% 灰字+final 36px 白字描边，
+  位置 底部13%/中部/顶部 可调）、波形条（识别活动驱动渐变条）、ASR 浮卡
+  （引擎/语言/模型/置信度/延迟/已识别时长/导出，可拖动））；控制台 108px
+  （时间轴+三组圆形钮：字幕开关/截图(mpv screenshot)/AB循环(mpv ab-loop)/
+  字幕轨(cycle sub)、±10s、上下曲、45px 渐变主按钮、倍速弹窗(0.5-4x 网格)、
+  音量、全屏）；右滑设置面板 344px（常规/播放/字幕/实时字幕/快捷键/外观/高级 7 页，
+  真实接线：自动播放/记住位置/恢复会话/默认倍速/硬件解码/字幕延迟±5s/
+  加载外挂字幕/字号22-54/位置/灰字开关/文件夹连续播放/打开 ms-settings:defaultapps；
+  无后端项按参考稿模式置灰+说明，不做假开关）。
+- 历史记录：QSettings 持久化最近 30 条（真实）；启动恢复上次会话。
+- 验证：构建 rc=0；真机启动 a11y 树确认全部区块与控件就位；两处启动崩溃修复
+  （loadHistory 早于 UI 创建的空指针）。

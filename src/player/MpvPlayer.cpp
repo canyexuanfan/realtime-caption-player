@@ -143,6 +143,18 @@ void MpvPlayer::seek(double seconds, bool relative) {
     mpv_command(m_handle, args);
 }
 
+bool MpvPlayer::loadSubtitle(const QString& path) {
+    if (!m_handle) return false;
+    const QByteArray p = path.toUtf8();
+    const char* args[] = {
+        "sub-add",
+        p.constData(),
+        "auto",
+        nullptr
+    };
+    return mpv_command(m_handle, args) >= 0;
+}
+
 void MpvPlayer::setVolume(int vol) {
     m_volume = qBound(0, vol, 100);
     if (!m_handle) return;

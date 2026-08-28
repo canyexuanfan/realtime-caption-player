@@ -1,0 +1,32 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource prefix="/">
+    <file alias="logo.png">logo128.png</file>
+    <file alias="icons/folder.svg">icons/folder.svg</file>
+    <file alias="icons/folder-open.svg">icons/folder-open.svg</file>
+    <file alias="icons/settings.svg">icons/settings.svg</file>
+    <file alias="icons/minus.svg">icons/minus.svg</file>
+    <file alias="icons/max.svg">icons/max.svg</file>
+    <file alias="icons/close.svg">icons/close.svg</file>
+    <file alias="icons/plus.svg">icons/plus.svg</file>
+    <file alias="icons/list.svg">icons/list.svg</file>
+    <file alias="icons/history.svg">icons/history.svg</file>
+    <file alias="icons/search.svg">icons/search.svg</file>
+    <file alias="icons/play.svg">icons/play.svg</file>
+    <file alias="icons/pause.svg">icons/pause.svg</file>
+    <file alias="icons/prev.svg">icons/prev.svg</file>
+    <file alias="icons/next.svg">icons/next.svg</file>
+    <file alias="icons/rewind.svg">icons/rewind.svg</file>
+    <file alias="icons/forward.svg">icons/forward.svg</file>
+    <file alias="icons/volume.svg">icons/volume.svg</file>
+    <file alias="icons/fullscreen.svg">icons/fullscreen.svg</file>
+    <file alias="icons/camera.svg">icons/camera.svg</file>
+    <file alias="icons/subtitle.svg">icons/subtitle.svg</file>
+    <file alias="icons/monitor.svg">icons/monitor.svg</file>
+    <file alias="icons/sliders.svg">icons/sliders.svg</file>
+    <file alias="icons/keyboard.svg">icons/keyboard.svg</file>
+    <file alias="icons/palette.svg">icons/palette.svg</file>
+    <file alias="icons/info.svg">icons/info.svg</file>
+    <file alias="icons/chevron.svg">icons/chevron.svg</file>
+  </qresource>
+</RCC>

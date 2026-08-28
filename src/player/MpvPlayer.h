@@ -57,6 +57,7 @@ public:
     bool isPaused() const { return m_paused; }
     void stop();                       // 停止并卸载当前媒体
     void seek(double seconds, bool relative = false);
+    bool loadSubtitle(const QString& path);   // 外挂字幕（mpv sub-add）
 
     // ---- 音频/速度 ----
     void setVolume(int vol);           // 0..100
