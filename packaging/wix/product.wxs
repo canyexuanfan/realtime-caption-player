@@ -28,6 +28,13 @@
     <!-- WixUI_InstallDir：目录选择 → 确认安装 → 进度条 -->
     <UIRef Id="WixUI_InstallDir" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <!--
+      关键修复：Type 51 SetProperty（内置声明式属性赋值，非脚本，不会触发 1721）。
+      在 UI 序列对话框显示前，强制把 INSTALLFOLDER（含 \RealtimeCaptionPlayer 子文件夹）
+      写回 WIXUI_INSTALLDIR，覆盖上次安装残留的注册表路径记忆（如 E:\Program\）。
+      Sequence="ui" 确保在 CostInitialize 之前执行，目录选择页打开时即显示正确路径。
+    -->
+    <SetProperty Id="WIXUI_INSTALLDIR" Value="[INSTALLFOLDER]" Before="CostInitialize" Sequence="ui" />
     <!-- 跳过许可证对话框（MVP 暂不展示 EULA），直接从目录选择开始 -->
     <UI>
       <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog"
