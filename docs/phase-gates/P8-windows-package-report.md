@@ -97,3 +97,10 @@ BrowseDlg OK 点后冻结：SetTargetPath 参数未按 MSDN 规则为间接属�
 已按官方结构交错排布标准动作与对话框；同时实现用户需求的"Browse OK 后自动追加
 \RealtimeCaptionPlayer\ 子文件夹"（SetTargetPath 后接 SetProperty Publish）。
 InstallUISequence 与 ControlEvent 双表复检通过；MSI 重打，manifest 已同步。
+
+### 补记 4（同日）：2732 真正根因——NewDialog 不推进序列
+上轮"标准动作与对话框交错 + NewDialog 顺次执行中间动作"的理解是错误的：
+NewDialog 仅切换对话框，序列暂停在首个 Show 处不动。正确结构是先 Costing 再 Welcome
+（WelcomeDlg After=CostFinalize 唯一 Show），NewDialog 链在目录管理器就绪后运行；
+Install=EndDialog Return 恢复序列至 ExecuteAction。两表复检通过，manifest 已同步。
+完整流程待用户重装复验。详见 questions/Wix安装器错误排查指南.md 第四轮更正。

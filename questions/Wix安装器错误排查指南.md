@@ -150,3 +150,38 @@ InstallUISequence 实测表：SetINSTALLFOLDER(798) → WelcomeDlg(799) → Cost
 → FileCost(900) → CostFinalize(1000) → InstallDirDlg(1001) → VerifyReadyDlg(1299)
 → ExecuteAction(1300)；ControlEvent 表如上。静默安装链路（/qn 跳过 UI 序列）不受影响。
 完整交互链由用户重装复验。
+
+## 追加（第四轮用户反馈）：2732 依旧——上轮修复思路本身是错的（❌→✅ 更正）
+
+### ❌ 上轮修复思路错误（必须诚实更正）
+上轮声称"NewDialog 导航会顺次执行对话框之间的序列动作（CostInitialize 等）"——
+**这个理解是错的**。MSI 真实机制：
+- `NewDialog` 只切换当前显示的对话框，**序列仍暂停在第一个 Show 动作处**，中间排的
+  标准动作（CostInitialize/FileCost/CostFinalize）**不会执行**；
+- 只有 `EndDialog Return` 才恢复序列、继续执行后续动作。
+
+因此上一版把 Welcome 排在 CostInitialize 之前（Before=CostInitialize）、想靠
+NewDialog 链"穿过"标准动作的做法必然失败：用户进到目录页/Browse 时序列还停在
+Welcome 的 Show，目录管理器从未初始化 → Browse OK 依旧 2732。
+
+### ✅ 正确结构：先 Costing，再 Welcome（一次 Show + 纯 NewDialog 链）
+```xml
+<InstallUISequence>
+  <Show Dialog="ExitDialog" OnExit="success" />
+  <Show Dialog="WelcomeDlg" After="CostFinalize">1</Show>
+</InstallUISequence>
+```
+- 序列执行：SetINSTALLFOLDER(799) → CostInitialize(800) → FileCost(900) →
+  CostFinalize(1000) → WelcomeDlg 显示(1001)；
+- 之后整条链（Welcome→目录页→Browse→VerifyReady）全部 NewDialog 切换，
+  目录管理器始终就绪 → Browse OK / SetTargetPath / 追加子文件夹均正常；
+- VerifyReady 的 Install = EndDialog Return → 序列恢复 → MigrateFeatureStates(1200)
+  → ExecuteAction(1300) 真正开始安装 → 成功 → OnExit=success 弹 ExitDialog。
+- 目录页/VerifyReady **不要**再单独排 Show（它们由 NewDialog 到达；单独排会在
+  Return 恢复序列后被再次求值、二次弹出）。
+
+### 复检（两表实测，2026-08-28）
+InstallUISequence：CostInitialize(800)/FileCost(900)/CostFinalize(1000)/
+WelcomeDlg(1001)/MigrateFeatureStates(1200)/ExecuteAction(1300)。
+ControlEvent：BrowseDlg OK = SetTargetPath([WIXUI_INSTALLDIR]) →
+追加 \RealtimeCaptionPlayer\ → EndDialog Return。

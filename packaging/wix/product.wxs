@@ -170,15 +170,15 @@
       </Dialog>
 
       <InstallUISequence>
-        <!-- 标准 UI 序列（对齐官方 WiX 结构）：对话框与标准动作交错。
-             缺少 CostInitialize/CostFinalize 时目录管理器不初始化，
-             SetTargetPath 点击即 Error 2732 "Directory Manager not supplied"；
-             缺少 ExecuteAction 时点 Install（EndDialog Return）不会真正开始安装。
-             NewDialog 导航会在对话框之间顺次执行这些标准动作。 -->
+        <!-- 关键机制（上一版注释理解错误，此处更正）：NewDialog 只切换对话框，
+             序列仍暂停在当前 Show 处、不执行中间动作；EndDialog Return 才恢复序列。
+             因此 Welcome 必须排在 CostInitialize/CostFinalize 之后：
+             目录管理器就绪后整条 NewDialog 链（目录页/Browse/SetTargetPath）才可用，
+             否则 Browse OK 即 Error 2732 "Directory Manager not supplied"。
+             VerifyReady 的 Install = EndDialog Return → 序列恢复 → ExecuteAction
+             真正开始安装 → 成功后 OnExit=success 弹 ExitDialog。 -->
         <Show Dialog="ExitDialog" OnExit="success" />
-        <Show Dialog="WelcomeDlg" Before="CostInitialize" />
-        <Show Dialog="InstallDirDlg" After="CostFinalize" />
-        <Show Dialog="VerifyReadyDlg" Before="ExecuteAction" />
+        <Show Dialog="WelcomeDlg" After="CostFinalize">1</Show>
       </InstallUISequence>
     </UI>
 
