@@ -12,25 +12,153 @@
     <MajorUpgrade DowngradeErrorMessage="A newer version of RealtimeCaptionPlayer is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
-    <!-- WixUI_InstallDir provides the directory chooser (InstallDirDlg bound to WIXUI_INSTALLDIR).
-         This WixUIExtension build cannot embed a license RTF (its LicenseAgreementDlg
-         LicenseText control then has an empty property -> Error 2819), so we override the
-         navigation to skip LicenseAgreementDlg entirely. Flow: Welcome -> InstallDir -> VerifyReady. -->
-    <UIRef Id="WixUI_InstallDir" />
+    <!-- Custom minimal UI: Welcome -> InstallDir -> VerifyReady -> Exit.
+         NO WixUI_InstallDir, NO LicenseAgreementDlg (this build's WixUIExtension license
+         binder is broken and always yields an empty LicenseText.Property -> Error 2819).
+         Every dialog/control is defined here and verified via msilib so no control can
+         have an empty required property. -->
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
-    <UI>
-      <!-- Route Welcome->Next straight to InstallDirDlg (override WixUI default -> LicenseAgreementDlg) -->
-      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" Order="2">1</Publish>
-      <!-- Route InstallDirDlg->Back to WelcomeDlg (override WixUI default -> LicenseAgreementDlg) -->
-      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2">1</Publish>
-    </UI>
 
-    <!-- Force-reset WIXUI_INSTALLDIR to INSTALLFOLDER (which resolves to
-         ProgramFiles64Folder\RealtimeCaptionPlayer\) in the UI sequence,
-         BEFORE any dialog is shown. This overrides the stale registry path
-         from a previous install (e.g. E:\Program\ without subfolder).
-         Type 51 = built-in property assignment, NOT a script -> no Error 1721. -->
-    <SetProperty Id="WIXUI_INSTALLDIR" Value="[INSTALLFOLDER]" Before="CostInitialize" Sequence="ui" />
+    <!-- Type 51: force INSTALLFOLDER (the real install directory) back to the default
+         ProgramFiles64Folder\RealtimeCaptionPlayer BEFORE CostInitialize, overriding any
+         stale registry path from a prior install (e.g. E:\Program\ without subfolder).
+         With Indirect="yes" on the Folder/DirectoryList controls, the dialog edits INSTALLFOLDER
+         directly, so we reset the directory here (NOT WIXUI_INSTALLDIR).
+         Built-in property assignment, NOT a script -> no Error 1721. -->
+    <SetProperty Id="INSTALLFOLDER" Value="[ProgramFiles64Folder]RealtimeCaptionPlayer" Before="CostInitialize" Sequence="ui" />
+
+    <UI>
+      <Property Id="DefaultUIFont" Value="DlgFont" />
+      <TextStyle Id="DlgFont" FaceName="Tahoma" Size="8" />
+
+      <Dialog Id="WelcomeDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Title" Type="Text" X="15" Y="15" Width="340" Height="20" NoPrefix="yes">
+          <Text>Welcome to the [ProductName] Setup</Text>
+        </Control>
+        <Control Id="Description" Type="Text" X="20" Y="70" Width="330" Height="80">
+          <Text>Local-first offline realtime captioning player.\n\nClick Next to choose where to install, then Install.</Text>
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17">
+          <Text>Next</Text>
+          <Publish Event="NewDialog" Value="InstallDirDlg" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17">
+          <Text>Cancel</Text>
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <Dialog Id="InstallDirDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Title" Type="Text" X="15" Y="15" Width="340" Height="20" NoPrefix="yes">
+          <Text>Select Installation Folder</Text>
+        </Control>
+        <Control Id="Description" Type="Text" X="20" Y="45" Width="330" Height="30">
+          <Text>Where should [ProductName] be installed?</Text>
+        </Control>
+        <Control Id="FolderLabel" Type="Text" X="20" Y="90" Width="290" Height="15" NoPrefix="yes">
+          <Text>Folder:</Text>
+        </Control>
+        <Control Id="Folder" Type="PathEdit" X="20" Y="105" Width="320" Height="18"
+                 Property="WIXUI_INSTALLDIR" Sunken="yes" Indirect="yes" />
+        <Control Id="ChangeFolder" Type="PushButton" X="20" Y="130" Width="80" Height="18">
+          <Text>Browse...</Text>
+          <Publish Event="SpawnDialog" Value="BrowseDlg" />
+        </Control>
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17">
+          <Text>Back</Text>
+          <Publish Event="NewDialog" Value="WelcomeDlg" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17">
+          <Text>Next</Text>
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17">
+          <Text>Cancel</Text>
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <Dialog Id="BrowseDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Title" Type="Text" X="15" Y="15" Width="340" Height="20" NoPrefix="yes">
+          <Text>Change Folder</Text>
+        </Control>
+        <Control Id="DirectoryList" Type="DirectoryList" X="20" Y="50" Width="330" Height="150"
+                 Property="WIXUI_INSTALLDIR" Sunken="yes" Indirect="yes" />
+        <Control Id="Up" Type="PushButton" X="20" Y="210" Width="60" Height="18">
+          <Text>Up</Text>
+          <Publish Event="SetTarget" Value="WIXUI_INSTALLDIR" Order="1">1</Publish>
+          <Publish Event="SpawnDialog" Value="BrowseDlg" Order="2">1</Publish>
+        </Control>
+        <Control Id="NewFolder" Type="PushButton" X="90" Y="210" Width="80" Height="18">
+          <Text>New Folder</Text>
+          <Publish Event="SetTarget" Value="WIXUI_INSTALLDIR" Order="1">1</Publish>
+          <Publish Event="SpawnDialog" Value="BrowseDlg" Order="2">1</Publish>
+        </Control>
+        <Control Id="OK" Type="PushButton" X="241" Y="243" Width="56" Height="17">
+          <Text>OK</Text>
+          <Publish Event="NewDialog" Value="InstallDirDlg" Order="1">1</Publish>
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17">
+          <Text>Cancel</Text>
+          <Publish Event="NewDialog" Value="InstallDirDlg" Order="1">1</Publish>
+        </Control>
+      </Dialog>
+
+      <Dialog Id="VerifyReadyDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Title" Type="Text" X="15" Y="15" Width="340" Height="20" NoPrefix="yes">
+          <Text>Ready to Install</Text>
+        </Control>
+        <Control Id="Description" Type="Text" X="20" Y="70" Width="330" Height="60">
+          <Text>Click Install to begin installing [ProductName] to the folder you selected.</Text>
+        </Control>
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17">
+          <Text>Back</Text>
+          <Publish Event="NewDialog" Value="InstallDirDlg" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17">
+          <Text>Install</Text>
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17">
+          <Text>Cancel</Text>
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <Dialog Id="ExitDialog" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Title" Type="Text" X="15" Y="15" Width="340" Height="20" NoPrefix="yes">
+          <Text>Completed</Text>
+        </Control>
+        <Control Id="Description" Type="Text" X="20" Y="70" Width="330" Height="60">
+          <Text>[ProductName] has been installed successfully.</Text>
+        </Control>
+        <Control Id="Finish" Type="PushButton" X="236" Y="243" Width="56" Height="17">
+          <Text>Finish</Text>
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+      </Dialog>
+
+      <Dialog Id="CancelDlg" Width="260" Height="85" Title="[ProductName] Setup">
+        <Control Id="Title" Type="Text" X="48" Y="15" Width="194" Height="15" NoPrefix="yes">
+          <Text>Are you sure you want to cancel?</Text>
+        </Control>
+        <Control Id="No" Type="PushButton" X="72" Y="57" Width="56" Height="17">
+          <Text>No</Text>
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+        <Control Id="Yes" Type="PushButton" X="132" Y="57" Width="56" Height="17">
+          <Text>Yes</Text>
+          <Publish Event="EndDialog" Value="Exit" />
+        </Control>
+      </Dialog>
+
+      <InstallUISequence>
+        <Show Dialog="WelcomeDlg" Before="CostInitialize" />
+        <Show Dialog="InstallDirDlg" After="WelcomeDlg" />
+        <Show Dialog="VerifyReadyDlg" After="InstallDirDlg" />
+        <Show Dialog="ExitDialog" After="VerifyReadyDlg" />
+      </InstallUISequence>
+    </UI>
 
     <Feature Id="Complete" Title="RealtimeCaptionPlayer" Level="1">
       <ComponentGroupRef Id="RcpRuntimeComponents" />

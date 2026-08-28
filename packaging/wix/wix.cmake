@@ -35,13 +35,13 @@ function(rcp_package_wix)
             -nologo -ag -sfrag -sreg -srd -scom
             -dr INSTALLFOLDER -cg RcpRuntimeComponents -var var.RuntimeSource
             -out "${PKG_DEST}/files.wxs"
-    COMMAND "${WIX_CANDLE}" -nologo -ext WixUIExtension
+    COMMAND "${WIX_CANDLE}" -nologo
             "-dRuntimeSource=${PKG_RUNTIME}"
             "-dSourceDirPath=${CMAKE_SOURCE_DIR}/packaging/wix"
             "${CMAKE_SOURCE_DIR}/packaging/wix/product.wxs"
             "${PKG_DEST}/files.wxs"
             -out "${PKG_DEST}/"
-    COMMAND "${WIX_LIGHT}" -nologo -sval -ext WixUIExtension
+    COMMAND "${WIX_LIGHT}" -nologo -sval
             "${PKG_DEST}/product.wixobj" "${PKG_DEST}/files.wixobj"
             -out "${PKG_DEST}/RealtimeCaptionPlayer-${PROJECT_VERSION}.msi"
     VERBATIM
