@@ -62,7 +62,7 @@ QIcon icon(const QString& name, const QColor& c = kIcon, int px = 17) {
 // 参考设计 :root 令牌 → QSS
 const char* kAppQss = R"(
 * { outline: none; }
-QWidget { background: #090b0f; color: #f4f6fb; font-family: "Segoe UI","Microsoft YaHei UI"; font-size: 13px; }
+QWidget { background: #090b0f; color: #f4f6fb; font-family: "Segoe UI","Microsoft YaHei UI"; font-size: 14px; }
 
 QWidget#titleBar { background: #111419; border-bottom: 1px solid rgba(255,255,255,0.105); }
 QLabel#brand { color:#f4f6fb; font-size:13px; font-weight:650; background:transparent; }
@@ -74,9 +74,10 @@ QPushButton.iconBtn { background:transparent; border:none; border-radius:7px; co
 QPushButton.iconBtn:hover { background:#222832; color:#f4f6fb; }
 QListWidget { background:#15191f; border:none; outline:none; }
 QListWidget#playlist, QListWidget#history { padding:0 9px 8px 9px; }
+QListWidget#playlist::item, QListWidget#history::item { min-height:40px; }
 QListWidget::item { color:#a7adb8; border-radius:5px; padding:4px 9px; margin:0 0 1px 0; }
 QListWidget::item:hover { background:#222832; color:#f4f6fb; }
-QListWidget::item:selected { background:transparent; color:inherit; }
+QListWidget::item:selected { background:qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #5147aa, stop:1 #6254cb); color:#fff; }
 QListWidget#transcript { padding:0 9px 10px 9px; }
 QLabel#transcriptItem { background:transparent; color:#a7adb8; font-size:12px; }
 QLineEdit#searchBox {
@@ -215,7 +216,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     wh->addWidget(buildLeftRail(workspace));
     wh->addWidget(buildStage(workspace), 1);
     m_settingsPanel = buildSettingsPanel(workspace);
-    m_settingsPanel->setVisible(false);
+    // 参考稿默认展开设置面板且停驻「实时字幕」页
+    m_settingsPanel->setVisible(true);
+    m_panes->setCurrentIndex(3);
+    for (auto& [btn, i] : m_navBtns) btn->setChecked(i == 3);
     wh->addWidget(m_settingsPanel);
     root->addWidget(workspace, 1);
 
@@ -358,8 +362,8 @@ QWidget* MainWindow::buildLeftRail(QWidget* parent) {
     head->setFixedHeight(42);
     auto* hh = new QHBoxLayout(head);
     hh->setContentsMargins(18, 0, 6, 0);
-    auto* t1 = new QLabel(tr("播放列表"), head);
-    t1->setProperty("class", "railTitle");
+    m_libTitle = new QLabel(tr("播放列表"), head);
+    m_libTitle->setProperty("class", "railTitle");
     auto* add = new QPushButton(head);
     add->setIcon(icon(QStringLiteral("plus"), kMuted));
     add->setIconSize(QSize(17, 17));
@@ -370,15 +374,23 @@ QWidget* MainWindow::buildLeftRail(QWidget* parent) {
         "QPushButton{background:transparent;border:none;border-radius:7px;}"
         "QPushButton:hover{background:#222832;}"));
     connect(add, &QPushButton::clicked, this, &MainWindow::onOpen);
-    hh->addWidget(t1);
+    hh->addWidget(m_libTitle);
     hh->addStretch();
     hh->addWidget(add);
     pv->addWidget(head);
 
+    // 顶部 276px 区：tabs 切换播放列表 / 历史记录（参考稿 library-view 结构）
     m_mediaList = new QListWidget(plSection);
     m_mediaList->setObjectName(QStringLiteral("playlist"));
     connect(m_mediaList, &QListWidget::itemDoubleClicked, this, &MainWindow::onPlaylistActivated);
-    pv->addWidget(m_mediaList, 1);
+    connect(m_mediaList, &QListWidget::currentRowChanged, this, [this] { refreshMediaRows(); });
+    m_historyList = new QListWidget(plSection);
+    m_historyList->setObjectName(QStringLiteral("history"));
+    connect(m_historyList, &QListWidget::itemDoubleClicked, this, &MainWindow::onPlaylistActivated);
+    m_mediaStack = new QStackedWidget(plSection);
+    m_mediaStack->addWidget(m_mediaList);
+    m_mediaStack->addWidget(m_historyList);
+    pv->addWidget(m_mediaStack, 1);
     v->addWidget(plSection);
 
     auto* tabs = new QWidget(rail);
@@ -402,18 +414,10 @@ QWidget* MainWindow::buildLeftRail(QWidget* parent) {
     th->addWidget(m_tabHistory);
     v->addWidget(tabs);
 
-    auto* mediaStack = new QStackedWidget(rail);
-    QListWidget* playlist = m_mediaList;
-    m_mediaList->setParent(nullptr);
-    m_historyList = new QListWidget(mediaStack);
-    m_historyList->setObjectName(QStringLiteral("history"));
-    connect(m_historyList, &QListWidget::itemDoubleClicked, this, &MainWindow::onPlaylistActivated);
-    mediaStack->addWidget(playlist);
-    mediaStack->addWidget(m_historyList);
-    connect(m_tabPlaylist, &QPushButton::toggled, mediaStack, [mediaStack](bool on) {
-        mediaStack->setCurrentIndex(on ? 0 : 1);
+    connect(m_tabPlaylist, &QPushButton::toggled, this, [this](bool on) {
+        m_mediaStack->setCurrentIndex(on ? 0 : 1);
+        m_libTitle->setText(on ? tr("播放列表") : tr("历史记录"));
     });
-    v->addWidget(mediaStack, 1);
 
     auto* trHead = new QWidget(rail);
     trHead->setFixedHeight(42);
@@ -506,6 +510,22 @@ QWidget* MainWindow::buildVideoArea(QWidget* parent) {
     cv->addWidget(m_finalLabel);
 
     m_waveform = new Waveform(m_video);
+
+    // 渐晕层（.video-vignette）
+    m_vignette = new QLabel(m_video);
+    m_vignette->setAttribute(Qt::WA_TransparentForMouseEvents);
+    m_vignette->setStyleSheet(QStringLiteral(
+        "background:qlineargradient(x1:0,y1:0,x2:0,y2:1,"
+        " stop:0 rgba(5,7,10,0.20), stop:0.18 rgba(5,7,10,0),"
+        " stop:0.65 rgba(5,7,10,0), stop:1 rgba(5,7,10,0.43));"));
+
+    // 拖放提示（.drop-hint）
+    m_dropHint = new QLabel(tr("松开即可打开视频"), m_video);
+    m_dropHint->setAlignment(Qt::AlignCenter);
+    m_dropHint->setStyleSheet(QStringLiteral(
+        "border:2px dashed rgba(255,255,255,0.5); border-radius:12px;"
+        "background:rgba(50,43,124,0.35); color:#fff; font-size:18px; font-weight:600;"));
+    m_dropHint->hide();
 
     m_videoFileTitle = new QLabel(tr("未打开媒体"), m_video);
     m_videoFileTitle->setObjectName(QStringLiteral("videoFileTitle"));
@@ -1330,11 +1350,64 @@ void MainWindow::addMediaPaths(const QStringList& paths) {
     for (const QString& p : paths) {
         if (m_mediaPaths.contains(p)) continue;
         m_mediaPaths.append(p);
-        auto* it = new QListWidgetItem(QFileInfo(p).fileName(), m_mediaList);
+        auto* it = new QListWidgetItem(m_mediaList);
         it->setToolTip(p);
         it->setData(Qt::UserRole, p);
     }
     if (!m_mediaPaths.isEmpty() && m_mediaList->currentRow() < 0) m_mediaList->setCurrentRow(0);
+    refreshMediaRows();
+}
+
+// 播放列表/历史行：18px 播放位 + 名称(12px) + 时长(11px)，当前项 ▶ + 白字
+void MainWindow::refreshMediaRows() {
+    auto decorate = [this](QListWidget* list) {
+        for (int i = 0; i < list->count(); ++i) {
+            QListWidgetItem* it = list->item(i);
+            const QString p = it->data(Qt::UserRole).toString();
+            QWidget* w = list->itemWidget(it);
+            if (!w) {
+                w = new QWidget;
+                w->setAttribute(Qt::WA_TransparentForMouseEvents);
+                w->setStyleSheet(QStringLiteral("background:transparent;"));
+                auto* h = new QHBoxLayout(w);
+                h->setContentsMargins(0, 8, 0, 8);
+                h->setSpacing(7);
+                auto* play = new QLabel(w);
+                play->setObjectName(QStringLiteral("rowPlay"));
+                auto* name = new QLabel(w);
+                name->setObjectName(QStringLiteral("rowName"));
+                auto* dur = new QLabel(w);
+                dur->setObjectName(QStringLiteral("rowDur"));
+                h->addWidget(play);
+                h->addWidget(name, 1);
+                h->addWidget(dur);
+                it->setSizeHint(QSize(0, 40));
+                list->setItemWidget(it, w);
+            }
+            const bool current = (p == m_currentPath);
+            const bool selected = (list->currentItem() == it);
+            const QString fg = (current || selected) ? QStringLiteral("#ffffff")
+                                                     : QStringLiteral("#a7adb8");
+            auto* play = w->findChild<QLabel*>(QStringLiteral("rowPlay"));
+            auto* name = w->findChild<QLabel*>(QStringLiteral("rowName"));
+            auto* dur = w->findChild<QLabel*>(QStringLiteral("rowDur"));
+            play->setText(current ? QStringLiteral("\u25B6") : QString());
+            play->setStyleSheet(
+                QStringLiteral("color:%1;font-size:9px;background:transparent;").arg(fg));
+            const QFontMetrics fm(name->font());
+            name->setText(fm.elidedText(QFileInfo(p).fileName(), Qt::ElideRight, 130));
+            name->setStyleSheet(
+                QStringLiteral("color:%1;font-size:12px;background:transparent;").arg(fg));
+            const qint64 d = m_settings.value(QStringLiteral("duration/") + QFileInfo(p).fileName(), 0)
+                                 .toLongLong();
+            dur->setText(d > 0 ? formatTime(d / 1000.0) : QStringLiteral("--:--"));
+            dur->setStyleSheet(QStringLiteral(
+                "color:rgba(255,255,255,0.78);font-size:11px;background:transparent;%1")
+                                   .arg(current || selected ? QString() : QStringLiteral("color:#a7adb8;")));
+        }
+    };
+    decorate(m_mediaList);
+    decorate(m_historyList);
 }
 
 void MainWindow::onPlaylistActivated(QListWidgetItem* item) {
@@ -1349,6 +1422,10 @@ void MainWindow::openFile(const QString& path) {
     if (m_player->loadFile(path)) {
         addMediaPaths(QStringList{path});
         saveHistory(path);
+        m_currentPath = path;
+        const int row = m_mediaPaths.indexOf(path);
+        if (row >= 0) m_mediaList->setCurrentRow(row);
+        refreshMediaRows();
         const QString name = QFileInfo(path).fileName();
         m_titleFile->setText(name);
         m_videoFileTitle->setText(name);
@@ -1460,8 +1537,15 @@ void MainWindow::onPositionChanged(double seconds) {
 
 void MainWindow::onDurationChanged(double seconds) {
     m_duration = seconds;
-    if (seconds > 0.0) m_seek->setRange(0, static_cast<int>(seconds));
+    if (seconds > 0.0) {
+        m_seek->setRange(0, static_cast<int>(seconds));
+        if (!m_currentPath.isEmpty()) {
+            m_settings.setValue(QStringLiteral("duration/") + QFileInfo(m_currentPath).fileName(),
+                                static_cast<qint64>(seconds));
+        }
+    }
     m_timeDur->setText(formatTime(seconds));
+    refreshMediaRows();
 }
 
 void MainWindow::onSeekSlider(int value) {
@@ -1549,6 +1633,8 @@ void MainWindow::applyCaptionStyle() {
 void MainWindow::repositionOverlays() {
     if (!m_video || m_video->width() <= 0) return;
     const int vw = m_video->width(), vh = m_video->height();
+    m_vignette->setGeometry(0, 0, vw, vh);
+    m_dropHint->setGeometry(18, 18, vw - 36, vh - 36);
     const int ow = qMin(static_cast<int>(vw * 0.86), 920);
     const int oh = qMin(vh / 2, 180);
     const int pos = m_settings.value(QStringLiteral("caption/position"), 0).toInt();
@@ -1575,6 +1661,10 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
         }
     } else if (obj == m_video && event->type() == QEvent::Resize) {
         repositionOverlays();
+    } else if (obj == m_video && event->type() == QEvent::Enter) {
+        if (!m_currentPath.isEmpty()) m_privacyBadge->show();   // 悬停显示（参考稿 hover 态）
+    } else if (obj == m_video && event->type() == QEvent::Leave) {
+        m_privacyBadge->hide();
     } else if (m_asrCard && obj == m_asrCard) {
         if (event->type() == QEvent::MouseButtonPress) {
             auto* me = static_cast<QMouseEvent*>(event);
@@ -1596,10 +1686,18 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent* event) {
-    if (event->mimeData()->hasUrls()) event->acceptProposedAction();
+    if (event->mimeData()->hasUrls()) {
+        event->acceptProposedAction();
+        if (m_dropHint) m_dropHint->show();
+    }
+}
+
+void MainWindow::dragLeaveEvent(QDragLeaveEvent*) {
+    if (m_dropHint) m_dropHint->hide();
 }
 
 void MainWindow::dropEvent(QDropEvent* event) {
+    if (m_dropHint) m_dropHint->hide();
     QStringList files;
     for (const QUrl& u : event->mimeData()->urls())
         if (u.isLocalFile()) files << u.toLocalFile();

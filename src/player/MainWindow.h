@@ -26,6 +26,7 @@ class QFrame;
 class QLineEdit;
 class QStackedWidget;
 class QTimer;
+class QDragLeaveEvent;
 namespace rcpui { class Switch; class CaptionLabel; class Waveform; }
 namespace rcp::player { class WorkerSupervisor; }
 namespace rcp::captions { class CaptionController; }
@@ -41,6 +42,7 @@ public slots:
 protected:
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dropEvent(QDropEvent* event) override;
+    void dragLeaveEvent(QDragLeaveEvent* event) override;
     bool eventFilter(QObject* obj, QEvent* event) override;
     void closeEvent(QCloseEvent* event) override;
 
@@ -95,6 +97,7 @@ private:
     QString formatTime(double seconds) const;
     void setAsrStatus(const QString& text, const QString& color);
     void addMediaPaths(const QStringList& paths);
+    void refreshMediaRows();
     void loadHistory();
     void saveHistory(const QString& path);
     void updateOverlay();
@@ -123,6 +126,8 @@ private:
     // ---- 左侧栏 ----
     QListWidget* m_mediaList = nullptr;
     QListWidget* m_historyList = nullptr;
+    QStackedWidget* m_mediaStack = nullptr;
+    QLabel* m_libTitle = nullptr;
     QListWidget* m_transcript = nullptr;
     QPointer<QLabel> m_lastPartialLabel;
     QLabel* m_statLines = nullptr;
@@ -146,6 +151,9 @@ private:
     QLabel* m_asrRecognized = nullptr;
     QWidget* m_privacyBadge = nullptr;
     QLabel* m_videoFileTitle = nullptr;
+    QLabel* m_vignette = nullptr;
+    QLabel* m_dropHint = nullptr;
+    QString m_currentPath;
 
     // ---- 控制台 ----
     QSlider* m_seek = nullptr;
