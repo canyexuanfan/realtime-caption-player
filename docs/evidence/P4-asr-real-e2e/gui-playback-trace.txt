@@ -1,0 +1,859 @@
+[22:01:35.295] mpv initialized
+[22:01:36.373] GL context type=0 ver=4.6 profile=2 renderer=[Intel(R) Iris(R) Xe Graphics] glver=[4.6.0 - Build 32.0.101.6314]
+[22:01:36.423] mpv_render_context_create OK
+[22:01:36.424] paintGL: first frame (mpvGL=1)
+[22:01:36.508] pause -> 0
+[22:01:36.508] mpv[v] Waiting for scripts...
+[22:01:36.508] mpv[v] Set property: volume="100" -> 1
+[22:01:36.508] mpv[v] Set property: mute=false -> 1
+[22:01:36.508] mpv[v] Set property: speed="1.000" -> 1
+[22:01:36.508] mpv[v] Done loading scripts.
+[22:01:36.508] mpv[v] Set property: speed="1.000" -> 1
+[22:01:36.508] mpv[v] GL_VERSION='4.6.0 - Build 32.0.101.6314'
+[22:01:36.508] mpv[v] Detected desktop OpenGL 4.6.
+[22:01:36.508] mpv[v] GL_VENDOR='Intel'
+[22:01:36.508] mpv[v] GL_RENDERER='Intel(R) Iris(R) Xe Graphics'
+[22:01:36.508] mpv[v] GL_SHADING_LANGUAGE_VERSION='4.60 - Build 32.0.101.6314'
+[22:01:36.508] mpv[v] Loaded extension WGL_EXT_swap_control.
+[22:01:36.508] mpv[v] Loaded extension GL_KHR_debug.
+[22:01:36.508] mpv[v] GL_*_swap_control extension missing.
+[22:01:36.508] mpv[v] Testing FBO format rgba16f
+[22:01:36.508] mpv[v] Using FBO format rgba16f.
+[22:01:36.508] mpv[v] Loading hwdec driver 'd3d11va'
+[22:01:36.508] mpv[v] Loading failed.
+[22:01:36.508] mpv[v] Loading hwdec driver 'dxva2-dxgi'
+[22:01:36.508] mpv[v] Loading failed.
+[22:01:36.508] mpv[v] Loading hwdec driver 'd3d11-egl'
+[22:01:36.508] mpv[v] Loading failed.
+[22:01:36.508] mpv[v] Loading hwdec driver 'dxva2-egl'
+[22:01:36.508] mpv[v] Loading failed.
+[22:01:36.508] mpv[v] Loading hwdec driver 'vaapi'
+[22:01:36.508] mpv[v] VAAPI hwdec only works with OpenGL or Vulkan backends.
+[22:01:36.508] mpv[v] Loading failed.
+[22:01:36.508] mpv[v] Loading hwdec driver 'dxva2-dxinterop'
+[22:01:36.508] mpv[v] Loading failed.
+[22:01:36.508] mpv[v] Loading hwdec driver 'cuda'
+[22:01:36.508] mpv[v] cu->cuGLGetDevices(&device_count, &display_dev, 1, CU_GL_DEVICE_LIST_ALL) failed -> CUDA_ERROR_OPERATING_SYSTEM: OS call failed or operation not supported on this OS
+[22:01:36.508] mpv[v] CUDA hwdec only works with OpenGL or Vulkan backends.
+[22:01:36.508] mpv[v] Loading failed.
+[22:01:36.509] mpv[v] Loading hwdec driver 'vulkan'
+[22:01:36.509] mpv[v] This is not a libplacebo vulkan gpu api context.
+[22:01:36.509] mpv[v] Set property: pause=false -> 1
+[22:01:36.509] mpv[v] Running hook: auto_profiles/on_before_start_file
+[22:01:36.509] mpv[v] Failed sending hook command auto_profiles/on_before_start_file. Removing hook.
+[22:01:36.509] mpv[v] Running hook: auto_profiles/on_load
+[22:01:36.509] mpv[v] Failed sending hook command auto_profiles/on_load. Removing hook.
+[22:01:36.509] mpv[v] Running hook: ytdl_hook/on_load
+[22:01:36.509] mpv[v] Running hook: ytdl_hook/on_load
+[22:01:36.509] mpv[v] playlist hook
+[22:01:36.509] mpv[v] Opening F:\workbuddy\rcp-e2e\e2e-test.mp4
+[22:01:36.509] mpv[v] Opening F:\workbuddy\rcp-e2e\e2e-test.mp4
+[22:01:36.509] mpv[v] Opening F:\workbuddy\rcp-e2e\e2e-test.mp4
+[22:01:36.509] mpv[v] Opening F:\workbuddy\rcp-e2e\e2e-test.mp4
+[22:01:36.509] mpv[v] Trying demuxers for level=normal.
+[22:01:36.509] mpv[v] Found 'mov,mp4,m4a,3gp,3g2,mj2' at score=100 size=2048.
+[22:01:36.509] mpv[v] stream level seek from 131072 to 17941112
+[22:01:36.509] mpv[v] Could not set AVOption http_persistent='0'
+[22:01:36.509] mpv[v] Could not set AVOption http_multiple='1'
+[22:01:36.509] mpv[v] Detected file format: mov,mp4,m4a,3gp,3g2,mj2 (libavformat)
+[22:01:36.509] mpv[v] Opening done: F:\workbuddy\rcp-e2e\e2e-test.mp4
+[22:01:36.509] mpv[v] Loading external files in F:\workbuddy\rcp-e2e\
+[22:01:36.509] mpv[v] Running hook: auto_profiles/on_preloaded
+[22:01:36.509] mpv[v] Failed sending hook command auto_profiles/on_preloaded. Removing hook.
+[22:01:36.509] mpv[v] Running hook: ytdl_hook/on_preloaded
+[22:01:36.509] mpv[v] Running hook: auto_profiles/on_loaded
+[22:01:36.509] mpv[v] Failed sending hook command auto_profiles/on_loaded. Removing hook.
+[22:01:36.509] mpv[v] select track 0
+[22:01:36.509] mpv[v] select track 1
+[22:01:36.509] mpv[info] ● Video  --vid=1  (mpeg4 30 fps 6610 kbps) [default]
+[22:01:36.509] mpv[info] ● Audio  --aid=1  (aac 1ch 16000 Hz 55 kbps) [default]
+[22:01:36.509] mpv[v] Container reported FPS: 30.000000
+[22:01:36.509] mpv[v] Codec list:
+[22:01:36.509] mpv[v] mpeg4 - MPEG-4 part 2
+[22:01:36.509] mpv[v] mpeg4_cuvid (mpeg4) - Nvidia CUVID MPEG4 decoder
+[22:01:36.509] mpv[v] Opening decoder mpeg4
+[22:01:36.509] mpv[v] No hardware decoding requested.
+[22:01:36.509] mpv[v] Using software decoding.
+[22:01:36.509] mpv[v] Detected 20 logical cores.
+[22:01:36.509] mpv[v] Requesting 16 threads for decoding.
+[22:01:36.509] mpv[v] Selected decoder: mpeg4 - MPEG-4 part 2
+[22:01:36.509] mpv[v] User filter list:
+[22:01:36.509] mpv[v] (empty)
+[22:01:36.509] mpv[v] Codec list:
+[22:01:36.509] mpv[v] aac - AAC (Advanced Audio Coding)
+[22:01:36.509] mpv[v] aac_fixed (aac) - AAC (Advanced Audio Coding)
+[22:01:36.509] mpv[v] Opening decoder aac
+[22:01:36.509] mpv[v] Requesting 1 threads for decoding.
+[22:01:36.585] time-pos 0.00
+[22:01:37.071] mpv[v] Selected decoder: aac - AAC (Advanced Audio Coding)
+[22:01:37.071] mpv[v] User filter list:
+[22:01:37.071] mpv[v] (empty)
+[22:01:37.071] mpv[v] Starting playback...
+[22:01:37.071] mpv[v] stream level seek from 17950008 to 44
+[22:01:37.071] mpv[v] DR failed - disabling.
+[22:01:37.071] mpv[v] Window size: 1016x640 (Borders: l=0 t=0 r=0 b=0)
+[22:01:37.071] mpv[v] Video source: 0x0 (0:0)
+[22:01:37.071] mpv[v] Video display: (0, 0) 1x1 -> (507, 0) 1x640
+[22:01:37.071] mpv[v] Video scale: 1.000000/640.000000
+[22:01:37.071] mpv[v] OSD borders: l=507 t=0 r=508 b=0
+[22:01:37.071] mpv[v] Video borders: l=507 t=0 r=508 b=0
+[22:01:37.071] mpv[v] Using software decoding.
+[22:01:37.071] mpv[v] Decoder format: 1280x720 yuv420p auto/auto/auto/auto/auto CL=mpeg2/4/h264 crop=1280x720+0+0 A=none
+[22:01:37.071] mpv[v] Using container aspect ratio.
+[22:01:37.071] mpv[v] [in] 1280x720 yuv420p bt.709/bt.709/bt.1886/limited/display CL=mpeg2/4/h264 crop=1280x720+0+0 A=none
+[22:01:37.071] mpv[v] [userdeint] 1280x720 yuv420p bt.709/bt.709/bt.1886/limited/display CL=mpeg2/4/h264 crop=1280x720+0+0 A=none
+[22:01:37.071] mpv[v] [userdeint] (disabled)
+[22:01:37.071] mpv[v] [autovflip] 1280x720 yuv420p bt.709/bt.709/bt.1886/limited/display CL=mpeg2/4/h264 crop=1280x720+0+0 A=none
+[22:01:37.071] mpv[v] [autovflip] (disabled)
+[22:01:37.071] mpv[v] [autorotate] 1280x720 yuv420p bt.709/bt.709/bt.1886/limited/display CL=mpeg2/4/h264 crop=1280x720+0+0 A=none
+[22:01:37.071] mpv[v] [autorotate] (disabled)
+[22:01:37.071] mpv[v] [convert] 1280x720 yuv420p bt.709/bt.709/bt.1886/limited/display CL=mpeg2/4/h264 crop=1280x720+0+0 A=none
+[22:01:37.071] mpv[v] [convert] (disabled)
+[22:01:37.071] mpv[v] [out] 1280x720 yuv420p bt.709/bt.709/bt.1886/limited/display CL=mpeg2/4/h264 crop=1280x720+0+0 A=none
+[22:01:37.071] mpv[v] [in] 16000Hz mono 1ch floatp
+[22:01:37.071] mpv[v] [userspeed] 16000Hz mono 1ch floatp
+[22:01:37.071] mpv[v] [userspeed] (disabled)
+[22:01:37.071] mpv[v] [convert] 16000Hz mono 1ch floatp
+[22:01:37.071] mpv[v] Trying audio driver 'wasapi'
+[22:01:37.071] mpv[v] requested format: 16000 Hz, mono channels, floatp
+[22:01:37.071] mpv[v] No device specified. Selecting default.
+[22:01:37.071] mpv[v] Selecting device '{12c0be63-b587-409d-867c-347fa7c8e05f}' (扬声器 (Realtek(R) Audio))
+[22:01:37.071] mpv[v] Monitoring changes in device {0.0.0.00000000}.{12c0be63-b587-409d-867c-347fa7c8e05f}
+[22:01:37.071] mpv[v] Trying mono float (32/32 bits) @ 48000hz (shared) -> close
+[22:01:37.071] mpv[v] Closest match is stereo float (32/32 bits) @ 48000hz
+[22:01:37.071] mpv[v] Accepted as stereo float @ 48000hz -> stereo float (32/32 bits) @ 48000hz (shared)
+[22:01:37.071] mpv[v] Device period: default 10000 us, minimum 3000 us
+[22:01:37.071] mpv[v] Buffer frame count: 1056 (22000 us)
+[22:01:37.071] mpv[v] IAudioClock::GetFrequency gave a frequency of 384000.
+[22:01:37.071] mpv[v] device buffer: 1056 samples.
+[22:01:37.071] mpv[v] using soft-buffer of 9600 samples.
+[22:01:37.071] mpv[info] AO: [wasapi] 48000Hz stereo 2ch float
+[22:01:37.071] mpv[v] AO: Description: Windows WASAPI audio output (event mode)
+[22:01:37.071] mpv[v] inserting resampler
+[22:01:37.071] mpv[v] format change, reinitializing resampler
+[22:01:37.071] mpv[v] 16000Hz mono floatp -> 48000Hz stereo float
+[22:01:37.071] mpv[v] Remix: mono -> stereo
+[22:01:37.071] mpv[v] [out] 48000Hz stereo 2ch float
+[22:01:37.071] mpv[info] VO: [libmpv] 1280x720 yuv420p
+[22:01:37.071] mpv[v] VO: Description: render API for libmpv
+[22:01:37.071] mpv[v] reconfig to 1280x720 yuv420p bt.709/bt.709/bt.1886/limited/display CL=mpeg2/4/h264 crop=1280x720+0+0 A=none
+[22:01:37.071] mpv[v] mpv_render_context_render() not being called or stuck.
+[22:01:37.071] mpv[v] first video frame after restart shown
+[22:01:37.071] mpv[v] libass API version: 0x1705000
+[22:01:37.071] mpv[v] libass source: meson, commit: 0.17.5-8-gb2fe9d8770678a7b5271387d38c20657ebf3429a
+[22:01:37.084] time-pos 0.03
+[22:01:37.084] mpv[v] Shaper: FriBidi 1.0.16 (SIMPLE) HarfBuzz-ng 14.3.1 (COMPLEX)
+[22:01:37.084] mpv[v] Setting up fonts...
+[22:01:37.084] mpv[v] Using font provider directwrite (with GDI)
+[22:01:37.084] mpv[v] Done.
+[22:01:37.084] mpv[v] audio ready
+[22:01:37.084] mpv[v] delaying audio start 0.064000 vs. 0.000000, diff=0.064000
+[22:01:37.084] mpv[v] playback restart complete @ 0.000000, audio=ready, video=playing
+[22:01:37.084] mpv[v] delaying audio start 0.064000 vs. 0.033333, diff=0.030667
+[22:01:37.158] time-pos 0.07
+[22:01:37.526] mpv[v] Window size: 1016x640 (Borders: l=0 t=0 r=0 b=0)
+[22:01:37.526] mpv[v] Video source: 1280x720 (1:1)
+[22:01:37.526] mpv[v] Video display: (0, 0) 1280x720 -> (0, 34) 1016x571
+[22:01:37.526] mpv[v] Video scale: 0.793750/0.793056
+[22:01:37.526] mpv[v] OSD borders: l=0 t=34 r=0 b=35
+[22:01:37.526] mpv[v] Video borders: l=0 t=34 r=0 b=35
+[22:01:37.526] mpv[v] Texture for plane 0: 1280x720
+[22:01:37.526] mpv[error] after creating texture: OpenGL error INVALID_ENUM.
+[22:01:37.526] time-pos 0.10
+[22:01:37.526] mpv[v] Texture for plane 1: 640x360
+[22:01:37.526] mpv[v] Texture for plane 2: 640x360
+[22:01:37.526] mpv[v] Testing FBO format rgba16f
+[22:01:37.526] mpv[v] Using FBO format rgba16f.
+[22:01:37.526] mpv[v] Dither to 8.
+[22:01:37.526] mpv[v] starting audio playback
+[22:01:37.526] mpv[v] OnPropertyValueChanged triggered on device {0.0.0.00000000}.{12c0be63-b587-409d-867c-347fa7c8e05f}
+[22:01:37.526] mpv[v] Changed property: {c4f6b0fa-fd32-4c99-8050-8f8a193a7e48},3
+[22:01:37.526] mpv[v] mpv_render_context_render() not being called or stuck.
+[22:01:37.526] mpv[v] mpv_render_context_render() not being called or stuck.
+[22:01:37.526] mpv[warn] Audio device underrun detected.
+[22:01:37.526] mpv[v] restarting audio after underrun
+[22:01:37.610] time-pos 0.13
+[22:01:37.610] time-pos 0.20
+[22:01:37.610] time-pos 0.23
+[22:01:37.610] time-pos 0.27
+[22:01:37.611] time-pos 0.30
+[22:01:37.611] time-pos 0.33
+[22:01:37.611] time-pos 0.37
+[22:01:37.611] time-pos 0.40
+[22:01:37.611] time-pos 0.43
+[22:01:37.654] time-pos 0.47
+[22:01:37.684] time-pos 0.50
+[22:01:37.715] time-pos 0.53
+[22:01:37.743] time-pos 0.57
+[22:01:37.777] time-pos 0.60
+[22:01:37.811] time-pos 0.63
+[22:01:37.852] time-pos 0.67
+[22:01:37.884] time-pos 0.70
+[22:01:37.914] time-pos 0.73
+[22:01:37.945] time-pos 0.77
+[22:01:37.977] time-pos 0.80
+[22:01:38.007] time-pos 0.83
+[22:01:38.053] time-pos 0.87
+[22:01:38.090] time-pos 0.90
+[22:01:38.090] time-pos 0.93
+[22:01:38.151] time-pos 0.97
+[22:01:38.179] time-pos 1.00
+[22:01:38.221] time-pos 1.03
+[22:01:38.260] time-pos 1.10
+[22:01:38.319] time-pos 1.13
+[22:01:38.352] time-pos 1.17
+[22:01:38.381] time-pos 1.20
+[22:01:38.419] time-pos 1.23
+[22:01:38.446] time-pos 1.27
+[22:01:38.474] time-pos 1.30
+[22:01:38.513] time-pos 1.33
+[22:01:38.553] time-pos 1.37
+[22:01:38.588] time-pos 1.40
+[22:01:38.612] time-pos 1.43
+[22:01:38.641] time-pos 1.47
+[22:01:38.676] time-pos 1.50
+[22:01:38.708] time-pos 1.53
+[22:01:38.741] time-pos 1.57
+[22:01:38.785] time-pos 1.60
+[22:01:38.812] time-pos 1.63
+[22:01:38.846] time-pos 1.67
+[22:01:38.880] time-pos 1.70
+[22:01:38.913] time-pos 1.73
+[22:01:38.958] time-pos 1.77
+[22:01:38.959] time-pos 1.80
+[22:01:39.020] time-pos 1.83
+[22:01:39.051] time-pos 1.87
+[22:01:39.086] time-pos 1.90
+[22:01:39.114] time-pos 1.93
+[22:01:39.145] time-pos 1.97
+[22:01:39.178] time-pos 2.00
+[22:01:39.228] time-pos 2.07
+[22:01:39.287] time-pos 2.10
+[22:01:39.317] time-pos 2.13
+[22:01:39.341] time-pos 2.17
+[22:01:39.381] time-pos 2.20
+[22:01:39.411] time-pos 2.23
+[22:01:39.462] time-pos 2.27
+[22:01:39.462] time-pos 2.30
+[22:01:39.517] time-pos 2.33
+[22:01:39.552] time-pos 2.37
+[22:01:39.588] time-pos 2.40
+[22:01:39.611] time-pos 2.43
+[22:01:39.644] time-pos 2.47
+[22:01:39.688] time-pos 2.50
+[22:01:39.719] time-pos 2.53
+[22:01:39.749] time-pos 2.57
+[22:01:39.783] time-pos 2.60
+[22:01:39.812] time-pos 2.63
+[22:01:39.845] time-pos 2.67
+[22:01:39.892] time-pos 2.70
+[22:01:39.892] time-pos 2.73
+[22:01:39.952] time-pos 2.77
+[22:01:39.987] time-pos 2.80
+[22:01:40.014] time-pos 2.83
+[22:01:40.048] time-pos 2.87
+[22:01:40.079] time-pos 2.90
+[22:01:40.113] time-pos 2.93
+[22:01:40.157] time-pos 2.97
+[22:01:40.187] time-pos 3.00
+[22:01:40.221] time-pos 3.03
+[22:01:40.243] time-pos 3.07
+[22:01:40.284] time-pos 3.10
+[22:01:40.315] time-pos 3.13
+[22:01:40.343] time-pos 3.17
+[22:01:40.375] time-pos 3.20
+[22:01:40.414] time-pos 3.23
+[22:01:40.453] time-pos 3.27
+[22:01:40.486] time-pos 3.30
+[22:01:40.514] time-pos 3.33
+[22:01:40.545] time-pos 3.37
+[22:01:40.581] time-pos 3.40
+[22:01:40.608] time-pos 3.43
+[22:01:40.656] time-pos 3.47
+[22:01:40.686] time-pos 3.50
+[22:01:40.717] time-pos 3.53
+[22:01:40.751] time-pos 3.57
+[22:01:40.782] time-pos 3.60
+[22:01:40.809] time-pos 3.63
+[22:01:40.842] time-pos 3.67
+[22:01:40.883] time-pos 3.70
+[22:01:40.920] time-pos 3.73
+[22:01:40.942] time-pos 3.77
+[22:01:40.981] time-pos 3.80
+[22:01:41.012] time-pos 3.83
+[22:01:41.046] time-pos 3.87
+[22:01:41.077] time-pos 3.90
+[22:01:41.113] time-pos 3.93
+[22:01:41.151] time-pos 3.97
+[22:01:41.184] time-pos 4.00
+[22:01:41.220] time-pos 4.03
+[22:01:41.243] time-pos 4.07
+[22:01:41.277] time-pos 4.10
+[22:01:41.313] time-pos 4.13
+[22:01:41.357] time-pos 4.20
+[22:01:41.419] time-pos 4.23
+[22:01:41.450] time-pos 4.27
+[22:01:41.480] time-pos 4.30
+[22:01:41.513] time-pos 4.33
+[22:01:41.557] time-pos 4.37
+[22:01:41.558] time-pos 4.40
+[22:01:41.622] time-pos 4.43
+[22:01:41.651] time-pos 4.47
+[22:01:41.681] time-pos 4.50
+[22:01:41.712] time-pos 4.53
+[22:01:41.744] time-pos 4.57
+[22:01:41.775] time-pos 4.60
+[22:01:41.813] time-pos 4.63
+[22:01:41.842] time-pos 4.67
+[22:01:41.883] time-pos 4.70
+[22:01:41.919] time-pos 4.73
+[22:01:41.942] time-pos 4.77
+[22:01:41.979] time-pos 4.80
+[22:01:42.008] time-pos 4.83
+[22:01:42.057] time-pos 4.90
+[22:01:42.125] time-pos 4.97
+[22:01:42.181] time-pos 5.00
+[22:01:42.217] time-pos 5.03
+[22:01:42.244] time-pos 5.07
+[22:01:42.274] time-pos 5.10
+[22:01:42.326] time-pos 5.13
+[22:01:42.326] time-pos 5.17
+[22:01:42.386] time-pos 5.20
+[22:01:42.418] time-pos 5.23
+[22:01:42.447] time-pos 5.27
+[22:01:42.478] time-pos 5.30
+[22:01:42.522] time-pos 5.33
+[22:01:42.546] time-pos 5.37
+[22:01:42.590] time-pos 5.40
+[22:01:42.612] time-pos 5.43
+[22:01:42.649] time-pos 5.47
+[22:01:42.680] time-pos 5.50
+[22:01:42.711] time-pos 5.53
+[22:01:42.756] time-pos 5.60
+[22:01:42.799] time-pos 5.63
+[22:01:42.846] time-pos 5.67
+[22:01:42.884] time-pos 5.70
+[22:01:42.918] time-pos 5.73
+[22:01:42.947] time-pos 5.77
+[22:01:42.975] time-pos 5.80
+[22:01:43.027] time-pos 5.83
+[22:01:43.027] time-pos 5.87
+[22:01:43.089] time-pos 5.93
+[22:01:43.146] time-pos 5.97
+[22:01:43.177] time-pos 6.00
+[22:01:43.228] time-pos 6.07
+[22:01:43.287] time-pos 6.10
+[22:01:43.313] time-pos 6.13
+[22:01:43.346] time-pos 6.17
+[22:01:43.382] time-pos 6.20
+[22:01:43.409] time-pos 6.23
+[22:01:43.448] time-pos 6.27
+[22:01:43.491] time-pos 6.33
+[22:01:43.529] time-pos 6.37
+[22:01:43.564] time-pos 6.40
+[22:01:43.617] time-pos 6.43
+[22:01:43.646] time-pos 6.47
+[22:01:43.686] time-pos 6.50
+[22:01:43.717] time-pos 6.53
+[22:01:43.752] time-pos 6.57
+[22:01:43.781] time-pos 6.60
+[22:01:43.812] time-pos 6.63
+[22:01:43.842] time-pos 6.67
+[22:01:43.888] time-pos 6.70
+[22:01:43.919] time-pos 6.73
+[22:01:43.952] time-pos 6.77
+[22:01:43.981] time-pos 6.80
+[22:01:44.016] time-pos 6.83
+[22:01:44.054] time-pos 6.87
+[22:01:44.079] time-pos 6.90
+[22:01:44.128] time-pos 6.93
+[22:01:44.129] time-pos 6.97
+[22:01:44.184] time-pos 7.00
+[22:01:44.222] time-pos 7.03
+[22:01:44.249] time-pos 7.07
+[22:01:44.277] time-pos 7.10
+[22:01:44.313] time-pos 7.13
+[22:01:44.356] time-pos 7.17
+[22:01:44.393] time-pos 7.20
+[22:01:44.393] time-pos 7.23
+[22:01:44.444] time-pos 7.27
+[22:01:44.484] time-pos 7.30
+[22:01:44.510] time-pos 7.33
+[22:01:44.556] time-pos 7.37
+[22:01:44.557] time-pos 7.40
+[22:01:44.595] time-pos 7.43
+[22:01:44.626] time-pos 7.47
+[22:01:44.680] time-pos 7.50
+[22:01:44.719] time-pos 7.53
+[22:01:44.756] time-pos 7.57
+[22:01:44.794] time-pos 7.60
+[22:01:44.794] time-pos 7.63
+[22:01:44.850] time-pos 7.67
+[22:01:44.884] time-pos 7.70
+[22:01:44.911] time-pos 7.73
+[22:01:44.943] time-pos 7.77
+[22:01:44.976] time-pos 7.80
+[22:01:45.012] time-pos 7.83
+[22:01:45.041] time-pos 7.87
+[22:01:45.085] time-pos 7.90
+[22:01:45.114] time-pos 7.93
+[22:01:45.142] time-pos 7.97
+[22:01:45.178] time-pos 8.00
+[22:01:45.217] time-pos 8.03
+[22:01:45.255] time-pos 8.07
+[22:01:45.292] time-pos 8.13
+[22:01:45.326] time-pos 8.17
+[22:01:45.358] time-pos 8.20
+[22:01:45.415] time-pos 8.23
+[22:01:45.442] time-pos 8.27
+[22:01:45.489] time-pos 8.30
+[22:01:45.520] time-pos 8.33
+[22:01:45.552] time-pos 8.37
+[22:01:45.587] time-pos 8.40
+[22:01:45.619] time-pos 8.43
+[22:01:45.648] time-pos 8.47
+[22:01:45.676] time-pos 8.50
+[22:01:45.711] time-pos 8.53
+[22:01:45.742] time-pos 8.57
+[22:01:45.786] time-pos 8.60
+[22:01:45.816] time-pos 8.63
+[22:01:45.846] time-pos 8.67
+[22:01:45.882] time-pos 8.70
+[22:01:45.914] time-pos 8.73
+[22:01:45.956] time-pos 8.77
+[22:01:45.989] time-pos 8.83
+[22:01:46.045] time-pos 8.87
+[22:01:46.081] time-pos 8.90
+[22:01:46.113] time-pos 8.93
+[22:01:46.159] time-pos 9.00
+[22:01:46.192] time-pos 9.03
+[22:01:46.254] time-pos 9.07
+[22:01:46.280] time-pos 9.10
+[22:01:46.314] time-pos 9.13
+[22:01:46.346] time-pos 9.17
+[22:01:46.387] time-pos 9.20
+[22:01:46.418] time-pos 9.23
+[22:01:46.450] time-pos 9.27
+[22:01:46.482] time-pos 9.30
+[22:01:46.512] time-pos 9.33
+[22:01:46.543] time-pos 9.37
+[22:01:46.590] time-pos 9.40
+[22:01:46.590] time-pos 9.43
+[22:01:46.624] time-pos 9.47
+[22:01:46.682] time-pos 9.50
+[22:01:46.714] time-pos 9.53
+[22:01:46.741] time-pos 9.57
+[22:01:46.777] time-pos 9.60
+[22:01:46.808] time-pos 9.63
+[22:01:46.856] time-pos 9.67
+[22:01:46.886] time-pos 9.70
+[22:01:46.889] mpv[v] libass API version: 0x1705000
+[22:01:46.889] mpv[v] libass source: meson, commit: 0.17.5-8-gb2fe9d8770678a7b5271387d38c20657ebf3429a
+[22:01:46.890] mpv[v] Shaper: FriBidi 1.0.16 (SIMPLE) HarfBuzz-ng 14.3.1 (COMPLEX)
+[22:01:46.890] mpv[v] Setting up fonts...
+[22:01:46.890] mpv[v] Using font provider directwrite (with GDI)
+[22:01:46.890] mpv[v] Done.
+[22:01:46.980] time-pos 9.80
+[22:01:46.980] mpv[v] fontselect: (sans-serif, 400, 0) -> ArialMT, 0, ArialMT
+[22:01:46.980] mpv[v] Glyph 0x4EBA not found, selecting one more font for (sans-serif, 400, 0)
+[22:01:46.980] mpv[v] fontselect: (sans-serif, 400, 0) -> MicrosoftYaHeiUI, 1, MicrosoftYaHeiUI
+[22:01:46.980] mpv[v] Reallocating OSD texture to 1024x128.
+[22:01:46.980] mpv[error] after creating texture: OpenGL error INVALID_ENUM.
+[22:01:46.993] time-pos 9.83
+[22:01:47.042] time-pos 9.87
+[22:01:47.090] time-pos 9.93
+[22:01:47.126] time-pos 9.97
+[22:01:47.184] time-pos 10.00
+[22:01:47.219] time-pos 10.03
+[22:01:47.254] time-pos 10.07
+[22:01:47.279] time-pos 10.10
+[22:01:47.313] time-pos 10.13
+[22:01:47.345] time-pos 10.17
+[22:01:47.383] time-pos 10.20
+[22:01:47.417] time-pos 10.23
+[22:01:47.452] time-pos 10.27
+[22:01:47.477] time-pos 10.30
+[22:01:47.515] time-pos 10.33
+[22:01:47.562] time-pos 10.40
+[22:01:47.605] time-pos 10.43
+[22:01:47.656] time-pos 10.47
+[22:01:47.666] time-pos 10.50
+[22:01:47.722] time-pos 10.53
+[22:01:47.752] time-pos 10.57
+[22:01:47.792] time-pos 10.63
+[22:01:47.849] time-pos 10.67
+[22:01:47.886] time-pos 10.70
+[22:01:47.912] time-pos 10.73
+[22:01:47.946] time-pos 10.77
+[22:01:47.993] time-pos 10.83
+[22:01:48.027] time-pos 10.87
+[22:01:48.088] time-pos 10.90
+[22:01:48.120] time-pos 10.93
+[22:01:48.147] time-pos 10.97
+[22:01:48.180] time-pos 11.00
+[22:01:48.219] time-pos 11.03
+[22:01:48.245] time-pos 11.07
+[22:01:48.284] time-pos 11.10
+[22:01:48.318] time-pos 11.13
+[22:01:48.345] time-pos 11.17
+[22:01:48.386] time-pos 11.20
+[22:01:48.416] time-pos 11.23
+[22:01:48.461] time-pos 11.30
+[22:01:48.519] time-pos 11.33
+[22:01:48.550] time-pos 11.37
+[22:01:48.583] time-pos 11.40
+[22:01:48.614] time-pos 11.43
+[22:01:48.648] time-pos 11.47
+[22:01:48.676] time-pos 11.50
+[22:01:48.725] time-pos 11.53
+[22:01:48.725] time-pos 11.57
+[22:01:48.784] time-pos 11.60
+[22:01:48.813] time-pos 11.63
+[22:01:48.844] time-pos 11.67
+[22:01:48.882] time-pos 11.70
+[22:01:48.925] time-pos 11.73
+[22:01:48.925] time-pos 11.77
+[22:01:48.984] time-pos 11.80
+[22:01:49.013] time-pos 11.83
+[22:01:49.046] time-pos 11.87
+[22:01:49.091] time-pos 11.90
+[22:01:49.091] time-pos 11.93
+[22:01:49.154] time-pos 11.97
+[22:01:49.183] time-pos 12.00
+[22:01:49.219] time-pos 12.03
+[22:01:49.243] time-pos 12.07
+[22:01:49.276] time-pos 12.10
+[22:01:49.323] time-pos 12.13
+[22:01:49.323] time-pos 12.17
+[22:01:49.388] time-pos 12.20
+[22:01:49.417] time-pos 12.23
+[22:01:49.446] time-pos 12.27
+[22:01:49.491] time-pos 12.33
+[22:01:49.555] time-pos 12.37
+[22:01:49.586] time-pos 12.40
+[22:01:49.615] time-pos 12.43
+[22:01:49.647] time-pos 12.47
+[22:01:49.677] time-pos 12.50
+[22:01:49.712] time-pos 12.53
+[22:01:49.754] time-pos 12.57
+[22:01:49.790] time-pos 12.60
+[22:01:49.791] time-pos 12.63
+[22:01:49.842] time-pos 12.67
+[22:01:49.883] time-pos 12.70
+[22:01:49.909] time-pos 12.73
+[22:01:49.941] time-pos 12.77
+[22:01:49.986] time-pos 12.80
+[22:01:50.012] time-pos 12.83
+[22:01:50.047] time-pos 12.87
+[22:01:50.091] time-pos 12.90
+[22:01:50.109] time-pos 12.93
+[22:01:50.157] time-pos 12.97
+[22:01:50.157] time-pos 13.00
+[22:01:50.193] time-pos 13.03
+[22:01:50.254] time-pos 13.07
+[22:01:50.280] time-pos 13.10
+[22:01:50.311] time-pos 13.13
+[22:01:50.344] time-pos 13.17
+[22:01:50.389] time-pos 13.20
+[22:01:50.419] time-pos 13.23
+[22:01:50.452] time-pos 13.27
+[22:01:50.484] time-pos 13.30
+[22:01:50.515] time-pos 13.33
+[22:01:50.547] time-pos 13.37
+[22:01:50.579] time-pos 13.40
+[22:01:50.613] time-pos 13.43
+[22:01:50.653] time-pos 13.47
+[22:01:50.684] time-pos 13.50
+[22:01:50.713] time-pos 13.53
+[22:01:50.751] time-pos 13.57
+[22:01:50.777] time-pos 13.60
+[22:01:50.822] time-pos 13.63
+[22:01:50.843] time-pos 13.67
+[22:01:50.887] time-pos 13.70
+[22:01:50.921] time-pos 13.73
+[22:01:50.948] time-pos 13.77
+[22:01:50.979] time-pos 13.80
+[22:01:51.011] time-pos 13.83
+[22:01:51.057] time-pos 13.87
+[22:01:51.057] time-pos 13.90
+[22:01:51.123] time-pos 13.93
+[22:01:51.152] time-pos 13.97
+[22:01:51.181] time-pos 14.00
+[22:01:51.224] time-pos 14.07
+[22:01:51.276] time-pos 14.10
+[22:01:51.314] time-pos 14.13
+[22:01:51.352] time-pos 14.17
+[22:01:51.387] time-pos 14.20
+[22:01:51.414] time-pos 14.23
+[22:01:51.449] time-pos 14.27
+[22:01:51.480] time-pos 14.30
+[22:01:51.517] time-pos 14.33
+[22:01:51.541] time-pos 14.37
+[22:01:51.587] time-pos 14.40
+[22:01:51.611] time-pos 14.43
+[22:01:51.651] time-pos 14.47
+[22:01:51.683] time-pos 14.50
+[22:01:51.714] time-pos 14.53
+[22:01:51.746] time-pos 14.57
+[22:01:51.790] time-pos 14.63
+[22:01:51.854] time-pos 14.67
+[22:01:51.890] time-pos 14.73
+[22:01:51.951] time-pos 14.77
+[22:01:51.976] time-pos 14.80
+[22:01:52.026] time-pos 14.87
+[22:01:52.082] time-pos 14.90
+[22:01:52.120] time-pos 14.93
+[22:01:52.141] time-pos 14.97
+[22:01:52.181] time-pos 15.00
+[22:01:52.215] time-pos 15.03
+[22:01:52.252] time-pos 15.07
+[22:01:52.286] time-pos 15.10
+[22:01:52.313] time-pos 15.13
+[22:01:52.355] time-pos 15.17
+[22:01:52.382] time-pos 15.20
+[22:01:52.416] time-pos 15.23
+[22:01:52.442] time-pos 15.27
+[22:01:52.489] time-pos 15.33
+[22:01:52.550] time-pos 15.37
+[22:01:52.583] time-pos 15.40
+[22:01:52.612] time-pos 15.43
+[22:01:52.644] time-pos 15.47
+[22:01:52.691] time-pos 15.50
+[22:01:52.691] time-pos 15.53
+[22:01:52.751] time-pos 15.57
+[22:01:52.783] time-pos 15.60
+[22:01:52.814] time-pos 15.63
+[22:01:52.843] time-pos 15.67
+[22:01:52.875] time-pos 15.70
+[22:01:52.912] time-pos 15.73
+[22:01:52.951] time-pos 15.77
+[22:01:52.985] time-pos 15.80
+[22:01:53.012] time-pos 15.83
+[22:01:53.043] time-pos 15.87
+[22:01:53.080] time-pos 15.90
+[22:01:53.110] time-pos 15.93
+[22:01:53.142] time-pos 15.97
+[22:01:53.187] time-pos 16.00
+[22:01:53.190] mpv[v] libass API version: 0x1705000
+[22:01:53.190] time-pos 16.03
+[22:01:53.190] mpv[v] libass source: meson, commit: 0.17.5-8-gb2fe9d8770678a7b5271387d38c20657ebf3429a
+[22:01:53.190] mpv[v] Shaper: FriBidi 1.0.16 (SIMPLE) HarfBuzz-ng 14.3.1 (COMPLEX)
+[22:01:53.190] mpv[v] Setting up fonts...
+[22:01:53.190] mpv[v] Using font provider directwrite (with GDI)
+[22:01:53.190] mpv[v] Done.
+[22:01:53.222] mpv[v] fontselect: (sans-serif, 400, 0) -> ArialMT, 0, ArialMT
+[22:01:53.222] mpv[v] Glyph 0x64AD not found, selecting one more font for (sans-serif, 400, 0)
+[22:01:53.222] mpv[v] fontselect: (sans-serif, 400, 0) -> MicrosoftYaHeiUI, 1, MicrosoftYaHeiUI
+[22:01:53.253] time-pos 16.07
+[22:01:53.278] time-pos 16.10
+[22:01:53.311] time-pos 16.13
+[22:01:53.341] time-pos 16.17
+[22:01:53.389] time-pos 16.20
+[22:01:53.423] time-pos 16.27
+[22:01:53.482] time-pos 16.30
+[22:01:53.514] time-pos 16.33
+[22:01:53.547] time-pos 16.37
+[22:01:53.578] time-pos 16.40
+[22:01:53.614] time-pos 16.43
+[22:01:53.655] time-pos 16.47
+[22:01:53.683] time-pos 16.50
+[22:01:53.720] time-pos 16.53
+[22:01:53.743] time-pos 16.57
+[22:01:53.779] time-pos 16.60
+[22:01:53.813] time-pos 16.63
+[22:01:53.853] time-pos 16.67
+[22:01:53.887] time-pos 16.70
+[22:01:53.914] time-pos 16.73
+[22:01:53.948] time-pos 16.77
+[22:01:53.979] time-pos 16.80
+[22:01:54.011] time-pos 16.83
+[22:01:54.056] time-pos 16.87
+[22:01:54.057] time-pos 16.90
+[22:01:54.118] time-pos 16.93
+[22:01:54.152] time-pos 16.97
+[22:01:54.183] time-pos 17.00
+[22:01:54.215] time-pos 17.03
+[22:01:54.246] time-pos 17.07
+[22:01:54.297] time-pos 17.10
+[22:01:54.297] time-pos 17.13
+[22:01:54.354] time-pos 17.17
+[22:01:54.384] time-pos 17.20
+[22:01:54.419] time-pos 17.23
+[22:01:54.447] time-pos 17.27
+[22:01:54.477] time-pos 17.30
+[22:01:54.512] time-pos 17.33
+[22:01:54.556] time-pos 17.37
+[22:01:54.587] time-pos 17.40
+[22:01:54.613] time-pos 17.43
+[22:01:54.645] time-pos 17.47
+[22:01:54.683] time-pos 17.50
+[22:01:54.713] time-pos 17.53
+[22:01:54.750] time-pos 17.57
+[22:01:54.777] time-pos 17.60
+[22:01:54.823] time-pos 17.63
+[22:01:54.823] time-pos 17.67
+[22:01:54.882] time-pos 17.70
+[22:01:54.922] time-pos 17.73
+[22:01:54.945] time-pos 17.77
+[22:01:54.976] time-pos 17.80
+[22:01:55.024] time-pos 17.87
+[22:01:55.089] time-pos 17.90
+[22:01:55.117] time-pos 17.93
+[22:01:55.145] time-pos 17.97
+[22:01:55.178] time-pos 18.00
+[22:01:55.214] time-pos 18.03
+[22:01:55.257] time-pos 18.07
+[22:01:55.257] time-pos 18.10
+[22:01:55.318] time-pos 18.13
+[22:01:55.342] time-pos 18.17
+[22:01:55.381] time-pos 18.20
+[22:01:55.414] time-pos 18.23
+[22:01:55.447] time-pos 18.27
+[22:01:55.491] time-pos 18.33
+[22:01:55.553] time-pos 18.37
+[22:01:55.587] time-pos 18.40
+[22:01:55.619] time-pos 18.43
+[22:01:55.641] time-pos 18.47
+[22:01:55.678] time-pos 18.50
+[22:01:55.710] time-pos 18.53
+[22:01:55.762] time-pos 18.60
+[22:01:55.790] time-pos 18.63
+[22:01:55.830] time-pos 18.67
+[22:01:55.885] time-pos 18.70
+[22:01:55.911] time-pos 18.73
+[22:01:55.943] time-pos 18.77
+[22:01:55.992] time-pos 18.83
+[22:01:56.050] time-pos 18.87
+[22:01:56.078] time-pos 18.90
+[22:01:56.111] time-pos 18.93
+[22:01:56.141] time-pos 18.97
+[22:01:56.189] time-pos 19.00
+[22:01:56.220] time-pos 19.03
+[22:01:56.243] time-pos 19.07
+[22:01:56.280] time-pos 19.10
+[22:01:56.312] time-pos 19.13
+[22:01:56.343] time-pos 19.17
+[22:01:56.377] time-pos 19.20
+[22:01:56.415] time-pos 19.23
+[22:01:56.458] time-pos 19.27
+[22:01:56.458] time-pos 19.30
+[22:01:56.517] time-pos 19.33
+[22:01:56.548] time-pos 19.37
+[22:01:56.578] time-pos 19.40
+[22:01:56.607] time-pos 19.43
+[22:01:56.655] time-pos 19.47
+[22:01:56.686] time-pos 19.50
+[22:01:56.716] time-pos 19.53
+[22:01:56.751] time-pos 19.57
+[22:01:56.781] time-pos 19.60
+[22:01:56.812] time-pos 19.63
+[22:01:56.842] time-pos 19.67
+[22:01:56.881] time-pos 19.70
+[22:01:56.923] time-pos 19.73
+[22:01:56.924] time-pos 19.77
+[22:01:56.984] time-pos 19.80
+[22:01:57.014] time-pos 19.83
+[22:01:57.047] time-pos 19.87
+[22:01:57.076] time-pos 19.90
+[22:01:57.115] time-pos 19.93
+[22:01:57.154] time-pos 19.97
+[22:01:57.155] mpv[v] EOF reached.
+[22:01:57.186] time-pos 20.00
+[22:01:57.221] time-pos 20.03
+[22:01:57.243] time-pos 20.07
+[22:01:57.281] time-pos 20.10
+[22:01:57.313] time-pos 20.13
+[22:01:57.358] time-pos 20.17
+[22:01:57.358] time-pos 20.20
+[22:01:57.419] time-pos 20.23
+[22:01:57.450] time-pos 20.27
+[22:01:57.484] time-pos 20.30
+[22:01:57.512] time-pos 20.33
+[22:01:57.543] time-pos 20.37
+[22:01:57.592] time-pos 20.43
+[22:01:57.652] time-pos 20.47
+[22:01:57.684] time-pos 20.50
+[22:01:57.714] time-pos 20.53
+[22:01:57.749] time-pos 20.57
+[22:01:57.778] time-pos 20.60
+[22:01:57.813] time-pos 20.63
+[22:01:57.844] time-pos 20.67
+[22:01:57.886] time-pos 20.70
+[22:01:57.919] time-pos 20.73
+[22:01:57.945] time-pos 20.77
+[22:01:57.977] time-pos 20.80
+[22:01:58.009] time-pos 20.83
+[22:01:58.060] time-pos 20.87
+[22:01:58.061] time-pos 20.90
+[22:01:58.120] time-pos 20.93
+[22:01:58.152] time-pos 20.97
+[22:01:58.182] time-pos 21.00
+[22:01:58.219] time-pos 21.03
+[22:01:58.244] time-pos 21.07
+[22:01:58.295] time-pos 21.10
+[22:01:58.295] time-pos 21.13
+[22:01:58.351] time-pos 21.17
+[22:01:58.383] time-pos 21.20
+[22:01:58.417] time-pos 21.23
+[22:01:58.447] time-pos 21.27
+[22:01:58.479] time-pos 21.30
+[22:01:58.487] mpv[v] filter input EOF
+[22:01:58.487] mpv[v] filter output EOF
+[22:01:58.487] mpv[v] audio filter EOF
+[22:01:58.487] mpv[v] audio draining
+[22:01:58.487] mpv[v] audio EOF reached
+[22:01:58.513] time-pos 21.33
+[22:01:58.544] time-pos 21.37
+[22:01:58.587] time-pos 21.40
+[22:01:58.618] time-pos 21.43
+[22:01:58.651] time-pos 21.47
+[22:01:58.651] mpv[v] filter input EOF
+[22:01:58.651] mpv[v] filter output EOF
+[22:01:58.682] mpv[v] EOF code: 1
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.682] mpv[v] dropping request due to pin disconnect
+[22:01:58.686] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] mpv[v] dropping request due to pin disconnect
+[22:01:58.687] end-file reason=0
+[22:01:58.687] mpv[v] finished playback, success (reason 0)
+[22:01:58.688] mpv[v] Running hook: ytdl_hook/on_after_end_file
+[22:01:58.688] mpv[v] draining left over audio
+[22:01:58.711] mpv[v] OnPropertyValueChanged triggered on device {0.0.0.00000000}.{12c0be63-b587-409d-867c-347fa7c8e05f}
+[22:01:58.711] mpv[v] Changed property: {c4f6b0fa-fd32-4c99-8050-8f8a193a7e48},3

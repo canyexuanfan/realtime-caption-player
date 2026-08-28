@@ -3,6 +3,7 @@
 
 #include <QMetaObject>
 #include <QCoreApplication>
+#include "MpvTrace.h"
 
 namespace {
 constexpr int kPropTimePos = 1;
@@ -50,6 +51,10 @@ bool MpvPlayer::initialize() {
     // 唤醒回调：mpv 有事件时通知 Qt 主线程排泄队列。
     mpv_set_wakeup_callback(m_handle, &MpvPlayer::wakeupCallback, this);
 
+    // 诊断：把 mpv 内部日志引入事件流（v 级别可定位 GL 报错组件）。
+    mpv_request_log_messages(m_handle, "v");
+    rcpTrace(QStringLiteral("mpv initialized"));
+
     applyInitialProperties();
     return true;
 }
@@ -95,16 +100,17 @@ int MpvPlayer::createRenderContext(mpv_render_context** outCtx,
 
 void MpvPlayer::play() {
     if (!m_handle) return;
-    const char* val = "no";
-    mpv_set_property(m_handle, "pause", MPV_FORMAT_FLAG, &val);
+    // MPV_FORMAT_FLAG 要求 int*（0/1）；传字符串指针会解引用出非零值=暂停。
+    int flag = 0;
+    mpv_set_property(m_handle, "pause", MPV_FORMAT_FLAG, &flag);
     m_paused = false;
     emit pauseStateChanged(false);
 }
 
 void MpvPlayer::pause() {
     if (!m_handle) return;
-    const char* val = "yes";
-    mpv_set_property(m_handle, "pause", MPV_FORMAT_FLAG, &val);
+    int flag = 1;
+    mpv_set_property(m_handle, "pause", MPV_FORMAT_FLAG, &flag);
     m_paused = true;
     emit pauseStateChanged(true);
 }
@@ -147,8 +153,8 @@ void MpvPlayer::setVolume(int vol) {
 void MpvPlayer::setMuted(bool muted) {
     m_muted = muted;
     if (!m_handle) return;
-    const char* val = muted ? "yes" : "no";
-    mpv_set_property(m_handle, "mute", MPV_FORMAT_FLAG, &val);
+    int flag = muted ? 1 : 0;
+    mpv_set_property(m_handle, "mute", MPV_FORMAT_FLAG, &flag);
 }
 
 void MpvPlayer::setSpeed(double speed) {
@@ -166,19 +172,20 @@ void MpvPlayer::setAudioTrack(int aid) {
 
 void MpvPlayer::showSubtitleOverlay(const QString& assEvents) {
     if (!m_handle) return;
-    const QByteArray id = "rcp-live";
+    // mpv osd-overlay 语法：osd-overlay <id:int> <format> <data>。
+    // 同一 id 重复下发即原位更新；没有 add/remove 子命令。
     const QByteArray data = assEvents.toUtf8();
     const char* args[] = {
-        "osd-overlay", "add", id.constData(), "ass-events", data.constData(), nullptr
+        "osd-overlay", "1", "ass-events", data.constData(), nullptr
     };
     mpv_command(m_handle, args);
 }
 
 void MpvPlayer::clearSubtitleOverlay() {
     if (!m_handle) return;
-    const QByteArray id = "rcp-live";
+    // format "none" 表示移除该 id 的叠加层。
     const char* args[] = {
-        "osd-overlay", "remove", id.constData(), nullptr
+        "osd-overlay", "1", "none", "", nullptr
     };
     mpv_command(m_handle, args);
 }
@@ -205,12 +212,14 @@ void MpvPlayer::handleEvent(mpv_event* event) {
         if (!pc || !pc->data) break;
         if (pc->name == QStringLiteral("time-pos") && pc->format == MPV_FORMAT_DOUBLE) {
             m_timePos = *static_cast<double*>(pc->data);
+            rcpTrace(QStringLiteral("time-pos %1").arg(m_timePos, 0, 'f', 2));
             emit positionChanged(m_timePos);
         } else if (pc->name == QStringLiteral("duration") && pc->format == MPV_FORMAT_DOUBLE) {
             m_duration = *static_cast<double*>(pc->data);
             emit durationChanged(m_duration);
         } else if (pc->name == QStringLiteral("pause") && pc->format == MPV_FORMAT_FLAG) {
-            m_paused = *static_cast<bool*>(pc->data);
+            m_paused = *static_cast<int*>(pc->data) != 0;   // FLAG 数据是 int
+            rcpTrace(QStringLiteral("pause -> %1").arg(m_paused ? 1 : 0));
             emit pauseStateChanged(m_paused);
         }
         break;
@@ -222,6 +231,7 @@ void MpvPlayer::handleEvent(mpv_event* event) {
     }
     case MPV_EVENT_END_FILE: {
         auto* ef = static_cast<mpv_event_end_file*>(event->data);
+        rcpTrace(QStringLiteral("end-file reason=%1").arg(ef ? static_cast<int>(ef->reason) : -1));
         if (ef && ef->reason == MPV_END_FILE_REASON_EOF) {
             emit mediaEnded();
         }
@@ -232,6 +242,11 @@ void MpvPlayer::handleEvent(mpv_event* event) {
         break;
     }
     case MPV_EVENT_LOG_MESSAGE: {
+        auto* lm = static_cast<mpv_event_log_message*>(event->data);
+        if (lm && lm->text)
+            rcpTrace(QStringLiteral("mpv[%1] %2")
+                            .arg(QString::fromUtf8(lm->level),
+                                 QString::fromUtf8(lm->text).trimmed()));
         break;
     }
     default:

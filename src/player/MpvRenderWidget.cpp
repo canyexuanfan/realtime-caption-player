@@ -1,8 +1,10 @@
 // src/player/MpvRenderWidget.cpp
 #include "MpvRenderWidget.h"
 #include "MpvPlayer.h"
+#include "MpvTrace.h"
 
 #include <QOpenGLContext>
+#include <QSurfaceFormat>
 #include <QMetaObject>
 
 MpvRenderWidget::MpvRenderWidget(QWidget* parent) : QOpenGLWidget(parent) {
@@ -33,6 +35,18 @@ bool MpvRenderWidget::attachPlayer(MpvPlayer* player) {
 void MpvRenderWidget::createRenderContextNow() {
     if (!m_player || !m_player->handle() || m_mpvGL) return;
 
+    // 诊断：记录 Qt 给到的 GL 上下文类型/版本（区分 desktop GL / GLES / 软件）。
+    if (auto* c = context()) {
+        const QSurfaceFormat f = c->format();
+        const QByteArray renderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
+        const QByteArray glver = reinterpret_cast<const char*>(glGetString(GL_VERSION));
+        rcpTrace(QStringLiteral("GL context type=%1 ver=%2.%3 profile=%4 renderer=[%5] glver=[%6]")
+                     .arg(int(c->openGLModuleType()))
+                     .arg(f.majorVersion()).arg(f.minorVersion())
+                     .arg(int(f.profile()))
+                     .arg(QString::fromLatin1(renderer), QString::fromLatin1(glver)));
+    }
+
     mpv_opengl_init_params glInit{};
     glInit.get_proc_address = [](void* /*ctx*/, const char* name) -> void* {
         QOpenGLContext* glctx = QOpenGLContext::currentContext();
@@ -49,9 +63,11 @@ void MpvRenderWidget::createRenderContextNow() {
         {MPV_RENDER_PARAM_INVALID, nullptr},
     };
     if (mpv_render_context_create(&m_mpvGL, m_player->handle(), params) < 0) {
+        rcpTrace(QStringLiteral("mpv_render_context_create FAILED"));
         m_mpvGL = nullptr;
         return;
     }
+    rcpTrace(QStringLiteral("mpv_render_context_create OK"));
     mpv_render_context_set_update_callback(m_mpvGL, &MpvRenderWidget::onUpdate, this);
 }
 
@@ -68,6 +84,11 @@ void MpvRenderWidget::initializeGL() {
 }
 
 void MpvRenderWidget::paintGL() {
+    static bool tracedFirstFrame = false;
+    if (!tracedFirstFrame) {
+        tracedFirstFrame = true;
+        rcpTrace(QStringLiteral("paintGL: first frame (mpvGL=%1)").arg(m_mpvGL ? 1 : 0));
+    }
     if (!m_mpvGL) {
         // 尚无渲染上下文：清为黑屏。
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
