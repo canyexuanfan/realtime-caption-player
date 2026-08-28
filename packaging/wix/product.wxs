@@ -41,9 +41,15 @@
                Value="EnsureAppSubfolder" Order="3">1</Publish>
     </UI>
 
-    <!-- ③ 安装早期预置：把 INSTALLFOLDER（含子文件夹）同步到 WIXUI_INSTALLDIR，
-         覆盖上次安装残留的错误路径记忆，使目录选择页首次打开即显示正确路径 -->
-    <SetProperty Id="WIXUI_INSTALLDIR" Value="[INSTALLFOLDER]" Before="CostInitialize" Sequence="execute" />
+    <!-- ③ 必须在 UI 序列（对话框显示之前）跑：AppSearch 之后、WelcomeDlg 之前，
+         把 INSTALLFOLDER（含子文件夹）写回 WIXUI_INSTALLDIR，
+         覆盖上次安装残留的路径记忆，使目录选择页首次打开即显示正确路径 -->
+    <InstallUISequence>
+      <Custom Action="EnsureAppSubfolder" After="AppSearch">1</Custom>
+    </InstallUISequence>
+    <InstallExecuteSequence>
+      <Custom Action="EnsureAppSubfolder" After="AppSearch">1</Custom>
+    </InstallExecuteSequence>
 
     <Feature Id="Complete" Title="RealtimeCaptionPlayer" Level="1">
       <ComponentGroupRef Id="RcpRuntimeComponents" />
