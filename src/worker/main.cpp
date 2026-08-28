@@ -20,6 +20,8 @@
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
     QCoreApplication::setApplicationName(QStringLiteral("caption-worker"));
+    // stdout 无缓冲：崩溃前已产生的 partial/final 输出不丢失。
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
 
     QCommandLineParser parser;
     parser.addOption(QCommandLineOption(QStringList{"f", "file"}, "media file", "path"));

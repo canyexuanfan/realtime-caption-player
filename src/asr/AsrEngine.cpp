@@ -122,9 +122,20 @@ void AsrEngine::flush() {
 
 void AsrEngine::drainVad() {
     const int32_t sr = 16000;
-    while (SherpaOnnxVoiceActivityDetectorDetected(d_->vad)) {
+    // 注意：必须用 Empty() 判断"已完成分句队列"。
+    // Detected() 仅表示"当前处于语音内"，此时 Front() 会返回 NULL
+    // （真实语音首句进行中即触发空指针解引用，见 questions/ 指南）。
+    while (!SherpaOnnxVoiceActivityDetectorEmpty(d_->vad)) {
         const SherpaOnnxSpeechSegment* seg = SherpaOnnxVoiceActivityDetectorFront(d_->vad);
-        const float* segSamples = allSamples_.data() + (seg->start - consumed_);
+        if (!seg) break;
+        const long long localStart = static_cast<long long>(seg->start) - consumed_;
+        if (localStart < 0 || localStart + seg->n > static_cast<long long>(allSamples_.size())) {
+            // 分句超出当前缓冲区（理论上不应发生），防御性跳过，避免野指针。
+            SherpaOnnxVoiceActivityDetectorPop(d_->vad);
+            SherpaOnnxDestroySpeechSegment(seg);
+            continue;
+        }
+        const float* segSamples = allSamples_.data() + localStart;
         const SherpaOnnxOfflineStream* os = SherpaOnnxCreateOfflineStream(d_->sv);
         SherpaOnnxAcceptWaveformOffline(os, sr, segSamples, seg->n);
         SherpaOnnxDecodeOfflineStream(d_->sv, os);
@@ -132,18 +143,20 @@ void AsrEngine::drainVad() {
         CaptionUtterance u;
         u.text = (r && r->text) ? QString::fromUtf8(r->text) : QString();
         u.isPartial = false;
-        u.startMs = static_cast<long long>((static_cast<double>(seg->start - consumed_) / sr) * 1000.0);
-        u.endMs   = static_cast<long long>((static_cast<double>(seg->start - consumed_ + seg->n) / sr) * 1000.0);
+        // seg->start 是自流开始的绝对采样索引；时间戳必须用绝对值，
+        // 减 consumed_ 只用于取缓冲区内的样本指针。
+        u.startMs = static_cast<long long>(seg->start) * 1000LL / sr;
+        u.endMs   = (static_cast<long long>(seg->start) + seg->n) * 1000LL / sr;
+        const long long localEnd = localStart + seg->n;
         if (cb_) cb_(u);
         SherpaOnnxDestroyOfflineStream(os);
         if (r) SherpaOnnxDestroyOfflineRecognizerResult(r);
         SherpaOnnxVoiceActivityDetectorPop(d_->vad);
         SherpaOnnxDestroySpeechSegment(seg);
 
-        int drop = static_cast<int>(seg->start + seg->n);
-        if (drop > 0 && static_cast<size_t>(drop) <= allSamples_.size()) {
-            allSamples_.erase(allSamples_.begin(), allSamples_.begin() + drop);
-            consumed_ += drop;
+        if (localEnd > 0 && localEnd <= static_cast<long long>(allSamples_.size())) {
+            allSamples_.erase(allSamples_.begin(), allSamples_.begin() + localEnd);
+            consumed_ += localEnd;
         }
     }
 }

@@ -29,11 +29,12 @@ public:
     /// queue was shut down or cancellation fired before space became available.
     bool push(T item, const CancellationToken& tok = {}) {
         std::unique_lock<std::mutex> lock(mutex_);
-        if (tok.isCanceled()) return false;
-        notFull_.wait_for(lock, kCancelPollInterval, [&] {
-            return shutdown_ || tok.isCanceled() || items_.size() < capacity_;
-        });
-        if (shutdown_ || tok.isCanceled()) return false;
+        // wait_for 仅为轮询 CancellationToken（协作式取消不会主动 notify），
+        // 满时必须继续等待；超时返回不代表谓词为真，不能落入"满了也入队"。
+        while (!shutdown_ && !tok.isCanceled() && items_.size() >= capacity_) {
+            notFull_.wait_for(lock, kCancelPollInterval);
+        }
+        if (shutdown_ || tok.isCanceled() || items_.size() >= capacity_) return false;
         items_.push(std::move(item));
         notEmpty_.notify_one();
         return true;

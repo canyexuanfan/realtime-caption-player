@@ -1,0 +1,5 @@
+﻿欢迎使用实时字幕播放器。 -> F:\workbuddy\视频播放器\out\e2e-verify\s1.wav
+今天我们一起测试实时语音识别功能。 -> F:\workbuddy\视频播放器\out\e2e-verify\s2.wav
+人工智能正在改变世界，字幕让视频更容易理解。 -> F:\workbuddy\视频播放器\out\e2e-verify\s3.wav
+播放器支持导出SRT字幕文件，方便离线使用。 -> F:\workbuddy\视频播放器\out\e2e-verify\s4.wav
+DONE
