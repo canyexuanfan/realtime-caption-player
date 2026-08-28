@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product
+      Id="*"
+      Name="RealtimeCaptionPlayer"
+      Language="1033"
+      Version="0.1.0"
+      Manufacturer="Rcp"
+      UpgradeCode="6E6B4C1A-2F3A-4B8C-9D1E-5A7B2C3D4E5F">
+
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of RealtimeCaptionPlayer is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- WixUI_InstallDir provides the directory chooser (InstallDirDlg bound to WIXUI_INSTALLDIR).
+         This WixUIExtension build cannot embed a license RTF (its LicenseAgreementDlg
+         LicenseText control then has an empty property -> Error 2819), so we override the
+         navigation to skip LicenseAgreementDlg entirely. Flow: Welcome -> InstallDir -> VerifyReady. -->
+    <UIRef Id="WixUI_InstallDir" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <UI>
+      <!-- Route Welcome->Next straight to InstallDirDlg (override WixUI default -> LicenseAgreementDlg) -->
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" Order="2">1</Publish>
+      <!-- Route InstallDirDlg->Back to WelcomeDlg (override WixUI default -> LicenseAgreementDlg) -->
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2">1</Publish>
+    </UI>
+
+    <Feature Id="Complete" Title="RealtimeCaptionPlayer" Level="1">
+      <ComponentGroupRef Id="RcpRuntimeComponents" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="RealtimeCaptionPlayer" />
+      </Directory>
+
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="RealtimeCaptionPlayer">
+          <Component Id="StartMenuShortcut" Guid="*">
+            <Shortcut Id="StartMenuShortcutId"
+                      Name="RealtimeCaptionPlayer"
+                      Description="Local-first offline realtime captioning player"
+                      Target="[INSTALLFOLDER]player_app.exe"
+                      WorkingDirectory="INSTALLFOLDER" />
+            <RemoveFolder Id="RemoveApplicationProgramsFolder"
+                          Directory="ApplicationProgramsFolder" On="uninstall" />
+            <RegistryValue Root="HKCU"
+                           Key="Software\Rcp\RealtimeCaptionPlayer" Name="installed"
+                           Type="integer" Value="1" KeyPath="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+
+      <Directory Id="DesktopFolder" />
+    </Directory>
+
+    <Component Id="DesktopShortcut" Guid="*" Directory="DesktopFolder">
+      <Shortcut Id="DesktopShortcutId"
+                Name="RealtimeCaptionPlayer"
+                Description="Local-first offline realtime captioning player"
+                Target="[INSTALLFOLDER]player_app.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKLM"
+                     Key="Software\Rcp\RealtimeCaptionPlayer" Name="desktop"
+                     Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+  </Product>
+</Wix>
