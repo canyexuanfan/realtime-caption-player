@@ -71,7 +71,7 @@
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17">
           <Text>Next</Text>
           <!-- 提交手输路径到目录属性，再进入确认页。 -->
-          <Publish Event="SetTargetPath" Value="WIXUI_INSTALLDIR" Order="1">1</Publish>
+          <Publish Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="1">1</Publish>
           <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="2">1</Publish>
         </Control>
         <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17">
@@ -105,7 +105,7 @@
                  Property="WIXUI_INSTALLDIR" Sunken="yes" Indirect="yes" TabSkip="no" />
         <Control Id="OK" Type="PushButton" X="241" Y="243" Width="56" Height="17">
           <Text>OK</Text>
-          <Publish Event="SetTargetPath" Value="WIXUI_INSTALLDIR" Order="1">1</Publish>
+          <Publish Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="1">1</Publish>
           <Publish Event="EndDialog" Value="Return" Order="2">1</Publish>
         </Control>
         <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17">

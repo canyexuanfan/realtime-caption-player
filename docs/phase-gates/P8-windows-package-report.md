@@ -84,3 +84,9 @@ MVP 按"把产品开发成型"的用户指令压缩推进，P8 对应能力落�
 零非法事件。完整安装链由用户重装复验（静默安装/卸载链路此前已 exit 0 通过）。
 修复后 MSI SHA-256 已更新至 `docs/release/release-manifest-v0.1.0.txt`
 （tag v0.1.0 指向修复前的代码状态，此为 tag 后的补丁提交）。
+
+### 补记 2（同日）：OK 卡死修复
+BrowseDlg OK 点后冻结：SetTargetPath 参数未按 MSDN 规则为间接属性加方括号，
+导致路径校验失败并封锁该控件全部 ControlEvent（含 EndDialog）。已改为
+`[WIXUI_INSTALLDIR]`（InstallDirDlg Next 与 BrowseDlg OK 两处），ControlEvent 表
+复检通过；MSI 重打，manifest 哈希同步更新。详见 questions/Wix安装器错误排查指南.md。

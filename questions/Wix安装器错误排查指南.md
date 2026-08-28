@@ -86,3 +86,28 @@ unexpected error installing this package... The error code is 2812."）。
 - 2026-08-28 首次记录：SetTarget/DirectoryUp/DirectoryComboUp 三次失败试错 →
   官方源码对照修复（DirectoryListUp/DirectoryListNew + Subscribe IgnoreChange +
   SetTargetPath + Reset），交互实测 Up 导航通过、无 2812；OK/整链由用户重装复验。
+
+## 追加（第二轮用户反馈）：点 OK 卡死（无 2812，但对话框冻结）
+
+### ❌ 第四次失败：SetTargetPath 参数不带方括号
+`SetTargetPath Value="WIXUI_INSTALLDIR"`（不带括号）+ 控件 `Indirect="yes"` 的组合：
+MSDN 明确规则——"**Argument = 含路径的属性名；若属性是间接的，属性名必须用方括号**"。
+不带括号时 MSI 把 WIXUI_INSTALLDIR **本身**当作含路径的属性，而它的值是字面字符串
+"INSTALLFOLDER"（不是路径）→ 路径校验失败 → 触发文档中的另一条规则：
+"**若路径不可写/无效，安装器封锁该控件后续的所有 ControlEvent**"——连同按钮上的
+EndDialog Return 一起失效 → 表现为点 OK 后对话框死住（用户实测复现）。
+
+### ✅ 正解
+间接（Indirect=yes）控件场景下，SetTargetPath 参数必须写：
+`Value="[WIXUI_INSTALLDIR]"`（方括号解析后得到真实含路径的属性名 INSTALLFOLDER）。
+官方 BrowseDlg.wxs 里 `SetTargetPath Value="[_BrowseProperty]"` 带括号正是此规则。
+
+### 验证状态
+- ControlEvent 表复检：`BrowseDlg | OK | SetTargetPath | [WIXUI_INSTALLDIR]` ✓
+- Up 导航（DirectoryListUp）上一轮已交互实测通过。
+- OK 全链由用户重装复验（本机不再代操作）。
+
+### 附注（行为说明，非缺陷）
+若用户选择了不可写的路径，MSDN 规定 MSI 会封锁 OK 控件后续事件（防错误安装），
+此时 Cancel 按钮仍可用（封锁按控件粒度）。此为 Windows Installer 原生行为，
+标准安装器同样如此。
