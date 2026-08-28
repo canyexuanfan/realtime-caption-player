@@ -185,3 +185,28 @@ InstallUISequence：CostInitialize(800)/FileCost(900)/CostFinalize(1000)/
 WelcomeDlg(1001)/MigrateFeatureStates(1200)/ExecuteAction(1300)。
 ControlEvent：BrowseDlg OK = SetTargetPath([WIXUI_INSTALLDIR]) →
 追加 \RealtimeCaptionPlayer\ → EndDialog Return。
+
+## 追加（第五轮用户反馈）：点 Install 后窗口消失、静默安装无反馈
+
+### 根因：没有进度页
+VerifyReady 点 Install = EndDialog Return → 序列恢复后直接进 ExecuteAction。
+包里没有 ProgressDlg ⇒ 确认页关闭后、整个安装期间**没有任何窗口**
+（677MB 包静默解压数十秒），看起来像安装器闪退；装完才弹完成页（或因间隔太长被误以为没有）。
+
+### ✅ 修复：补标准三件
+1. **ProgressDlg（Modeless）**：`<Show Dialog="ProgressDlg" Before="ExecuteAction" />`。
+   非模态是关键——Show 动作不阻塞序列，继续进 ExecuteAction，引擎把
+   SetProgress/ActionText/TimeRemaining 实时推送到对话框订阅控件
+   （ProgressBar/ActionText/TimeRemaining 三订阅）。
+   **样式位知识（MSDN Dialog Style Bits 权威值，此前凭记忆的"Modeless=bit8"是错的）**：
+   Visible=1 / Modal=2 / Minimize=4 / SysModal=8 / KeepModeless=16。
+   **没有 Modeless 位——不带 Modal(2) 位即为非模态**。实测本包
+   ProgressDlg Attributes=5（Visible+Minimize，无 Modal）＝正确非模态；
+   向导页=7（含 Modal）＝模态。
+2. **UserExit（OnExit=cancel）**：进度页取消 → 回滚 → 显示"安装被中断"。
+3. **FatalError（OnExit=error）**：失败 → 显示出错收尾页。
+
+### 复检
+InstallUISequence：FatalError(-3)/UserExit(-2)/ExitDialog(-1)/WelcomeDlg(1001)/
+ProgressDlg(1299)/ExecuteAction(1300)；Dialog 表 ProgressDlg Attributes=5（非模态）；
+ControlEvent：ProgressDlg|Cancel|SpawnDialog|CancelDlg 接通。

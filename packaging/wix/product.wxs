@@ -169,16 +169,72 @@
         </Control>
       </Dialog>
 
+      <Dialog Id="ProgressDlg" Width="370" Height="270" Title="[ProductName] Setup" Modeless="yes">
+        <!-- Modeless 是关键：序列不在此阻塞，继续进入 ExecuteAction，
+             引擎在执行安装脚本时把进度推送到本对话框的订阅控件。
+             此前没有进度页：点 Install 后窗口消失、677MB 包全程无窗口静默安装，
+             看起来像安装器闪退（用户反馈）。 -->
+        <Control Id="Title" Type="Text" X="15" Y="15" Width="340" Height="20" NoPrefix="yes">
+          <Text>Installing [ProductName]</Text>
+        </Control>
+        <Control Id="Description" Type="Text" X="20" Y="50" Width="330" Height="25" NoPrefix="yes">
+          <Text>Please wait while [ProductName] is being installed. This may take a minute.</Text>
+        </Control>
+        <Control Id="ActionText" Type="Text" X="20" Y="85" Width="330" Height="18">
+          <Subscribe Event="ActionText" Attribute="Text" />
+        </Control>
+        <Control Id="ProgressBar" Type="ProgressBar" X="20" Y="110" Width="330" Height="15" ProgressBlocks="yes" Text="Progress">
+          <Subscribe Event="SetProgress" Attribute="Progress" />
+        </Control>
+        <Control Id="TimeRemaining" Type="Text" X="20" Y="132" Width="330" Height="18">
+          <Subscribe Event="TimeRemaining" Attribute="Text" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes">
+          <Text>Cancel</Text>
+          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+        </Control>
+      </Dialog>
+
+      <Dialog Id="UserExit" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Title" Type="Text" X="15" Y="15" Width="340" Height="20" NoPrefix="yes">
+          <Text>[ProductName] setup was interrupted</Text>
+        </Control>
+        <Control Id="Description" Type="Text" X="20" Y="60" Width="330" Height="60">
+          <Text>The installation was cancelled. Your system has not been modified. Click Finish to exit.</Text>
+        </Control>
+        <Control Id="Finish" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes">
+          <Text>Finish</Text>
+          <Publish Event="EndDialog" Value="Return">1</Publish>
+        </Control>
+      </Dialog>
+
+      <Dialog Id="FatalError" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Title" Type="Text" X="15" Y="15" Width="340" Height="20" NoPrefix="yes">
+          <Text>[ProductName] setup ended prematurely</Text>
+        </Control>
+        <Control Id="Description" Type="Text" X="20" Y="60" Width="330" Height="60">
+          <Text>An error occurred during installation. Your system has not been modified. Click Finish to exit and try again.</Text>
+        </Control>
+        <Control Id="Finish" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes">
+          <Text>Finish</Text>
+          <Publish Event="EndDialog" Value="Return">1</Publish>
+        </Control>
+      </Dialog>
+
       <InstallUISequence>
-        <!-- 关键机制（上一版注释理解错误，此处更正）：NewDialog 只切换对话框，
-             序列仍暂停在当前 Show 处、不执行中间动作；EndDialog Return 才恢复序列。
-             因此 Welcome 必须排在 CostInitialize/CostFinalize 之后：
-             目录管理器就绪后整条 NewDialog 链（目录页/Browse/SetTargetPath）才可用，
-             否则 Browse OK 即 Error 2732 "Directory Manager not supplied"。
-             VerifyReady 的 Install = EndDialog Return → 序列恢复 → ExecuteAction
-             真正开始安装 → 成功后 OnExit=success 弹 ExitDialog。 -->
+        <!-- 关键机制：NewDialog 只切换对话框，序列仍暂停在当前 Show 处；
+             EndDialog Return 才恢复序列。
+             Welcome 排在 CostFinalize 之后（目录管理器就绪后整条 NewDialog 链可用，
+             否则 Browse OK 即 Error 2732）。
+             ProgressDlg 为 Modeless：显示后序列不阻塞、直接进 ExecuteAction，
+             安装脚本执行时进度实时推送到进度条（缺它则点 Install 后窗口消失、
+             全程无窗口静默安装）。OnExit 三态收尾：成功 ExitDialog /
+             用户取消 UserExit / 出错 FatalError。 -->
         <Show Dialog="ExitDialog" OnExit="success" />
+        <Show Dialog="UserExit" OnExit="cancel" />
+        <Show Dialog="FatalError" OnExit="error" />
         <Show Dialog="WelcomeDlg" After="CostFinalize">1</Show>
+        <Show Dialog="ProgressDlg" Before="ExecuteAction" />
       </InstallUISequence>
     </UI>
 

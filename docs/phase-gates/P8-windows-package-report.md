@@ -104,3 +104,9 @@ NewDialog 仅切换对话框，序列暂停在首个 Show 处不动。正确结�
 （WelcomeDlg After=CostFinalize 唯一 Show），NewDialog 链在目录管理器就绪后运行；
 Install=EndDialog Return 恢复序列至 ExecuteAction。两表复检通过，manifest 已同步。
 完整流程待用户重装复验。详见 questions/Wix安装器错误排查指南.md 第四轮更正。
+
+### 补记 5（同日）：补安装进度页与收尾三态页
+用户反馈点 Install 后窗口消失、全程静默。补 ProgressDlg（Modeless，Before=
+ExecuteAction，订阅 SetProgress/ActionText/TimeRemaining）+ UserExit(OnExit=cancel)
++ FatalError(OnExit=error)。样式位经 MSDN Dialog Style Bits 核实：无 Modeless 位、
+不带 Modal(2) 即非模态（实测 ProgressDlg Attributes=5 正确）。manifest 已同步。
