@@ -29,21 +29,19 @@ target_link_libraries(rcp_player PUBLIC
     opengl32
 )
 
-# UI 资源（参考稿复刻）：品牌 logo + sprite 图标 SVG 集。
-# 注意：必须挂在 player_app 可执行目标上——静态库中的 qrc 初始化对象会被
-# 链接器丢弃，导致 :/ 资源全部读取失败（图标/logo 全空白）。
+# UI 资源（参考稿复刻）：品牌 logo + sprite 图标 SVG 集（见下方 AUTORCC + rcp.qrc）。
 file(GLOB RCP_UI_ICONS "${CMAKE_SOURCE_DIR}/resources/icons/*.svg")
 
 
 # 真实播放器入口（GUI 程序，无控制台窗口）。
+# 资源用经典 AUTORCC + 手写 rcp.qrc（含 alias logo.png/icons/*.svg）。
+# 教训：qt_add_resources 挂静态库→初始化对象被链接器丢弃；且 FILES 不支持
+# alias（资源路径变 logo128.png，代码读 :/logo.png 必失败）。
 add_executable(player_app main.cpp
+    "${CMAKE_SOURCE_DIR}/resources/rcp.qrc"
     "${CMAKE_SOURCE_DIR}/resources/app.rc"   # exe 图标（霓虹语音 logo .ico）
 )
-qt_add_resources(player_app "rcp_ui"
-    PREFIX "/"
-    BASE "${CMAKE_SOURCE_DIR}/resources"
-    FILES "${CMAKE_SOURCE_DIR}/resources/logo128.png" ${RCP_UI_ICONS}
-)
+set_property(TARGET player_app PROPERTY AUTORCC ON)
 target_link_libraries(player_app PRIVATE
     rcp_player
 )

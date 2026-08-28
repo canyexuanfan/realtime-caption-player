@@ -220,3 +220,17 @@ SVG 图标不渲染、按钮空圆、logo 不显示、窗口图标缺失。布�
 **修复**：qt_add_resources 必须挂在**最终可执行目标**上（player_app），
 且调用必须在 add_executable 之后（否则 CMake 报目标不存在）。
 验证：out/build/<cfg>/src/player/CMakeFiles/player_app.dir/.qt/rcc/qrc_*.obj 存在。
+
+## 附 2（2026-08-29）：图标仍空白第二轮——qt_add_resources 两个隐藏坑 + 运行时自检
+
+第一轮修复（qrc 移到 exe 目标）后用户仍报"没有变化"。深挖出两层叠加问题：
+1. **qt_add_resources 的 FILES 不支持 alias**：资源落在 :/logo128.png，
+   而代码读 :/logo.png → logo 必然失败（与静态库问题无关的独立 bug）。
+2. 初始化时序仍不完全可靠。
+**最终方案（运行时验证通过）**：改用经典 **AUTORCC + 手写 rcp.qrc**（alias 正确、
+机制久经考验），qrc 作为 player_app 源文件编译（AUTORCC ON 属性）。
+**启动资源自检**：main.cpp 启动时把 :/logo.png、:/icons/*.svg 可达性 +
+QSvgRenderer 渲染有效性写入 exe 旁 resource-check.txt（不可写则落 AppData）。
+实测：4 资源全 OK、svg-render(play)=OK（227 字节解析成功）。
+排查教训：加自检时 QFile(...).readAll() 在未 open 的临时对象上返回空字节，
+会让"渲染级自检"假阴性——必须先 open。

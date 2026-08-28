@@ -1,7 +1,11 @@
 // src/player/main.cpp
 // 播放器应用入口（P2 基础窗口）。后续里程碑接入字幕 worker 与叠加层。
 #include <QApplication>
+#include <QDir>
+#include <QFile>
+#include <QStandardPaths>
 #include <QSurfaceFormat>
+#include <QSvgRenderer>
 #include "MainWindow.h"
 
 int main(int argc, char* argv[]) {
@@ -16,6 +20,34 @@ int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("RealtimeCaptionPlayer"));
     QApplication::setOrganizationName(QStringLiteral("RealtimeCaption"));
+
+    // 资源自检（图标/logo 空白排查）：启动时记录 :/ 资源可达性到诊断文件。
+    {
+        const QStringList probes = {
+            QStringLiteral(":/logo.png"),
+            QStringLiteral(":/icons/play.svg"),
+            QStringLiteral(":/icons/settings.svg"),
+            QStringLiteral(":/icons/subtitle.svg")};
+        QStringList lines;
+        for (const QString& p : probes)
+            lines << p + QStringLiteral(" = ") + (QFile::exists(p) ? QStringLiteral("OK") : QStringLiteral("MISSING"));
+        // 渲染级自检：QSvgRenderer 能否解析（防颜色格式/内容问题导致空图标）
+        QFile svgf(QStringLiteral(":/icons/play.svg"));
+        const QByteArray svgBytes = svgf.open(QIODevice::ReadOnly) ? svgf.readAll() : QByteArray();
+        QSvgRenderer r(svgBytes);
+        lines << QStringLiteral("svg-bytes = %1 svg-render(play) = %2")
+                     .arg(svgBytes.size())
+                     .arg(r.isValid() ? QStringLiteral("OK") : QStringLiteral("INVALID"));
+        QDir().mkpath(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation));
+        QFile f(QCoreApplication::applicationDirPath() + QStringLiteral("/resource-check.txt"));
+        if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            f.setFileName(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)
+                          + QStringLiteral("/resource-check.txt"));
+            f.open(QIODevice::WriteOnly | QIODevice::Truncate);
+        }
+        f.write(lines.join(QLatin1Char('\n')).toUtf8());
+        f.close();
+    }
 
     MainWindow window;
     window.show();
