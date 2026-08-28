@@ -5,17 +5,8 @@
 
 ## 当前快照（2026-08-28 · 真机回填完成）
 
-- **Current phase:** MVP 端到端真机验证完成，发布产物就绪（P0 已签署 / P8 报告 PASS / P9 产物齐）。
-  本会话在**带显示器真机**（Win11 x64 / Intel Iris Xe / 2560x1440）完成回填：
-  ① 真实中文语音 ASR 端到端（TTS 固定语料 4 句：65 partial + 4 final **逐字正确** + SRT 正确）；
-  ② libmpv+Qt 真机渲染完整播放（613 进度事件至 EOF）；
-  ③ **按 05_Single_HTML_Frontend_Reference.html 复刻暗色 UI**（自绘标题栏/播放列表/转写面板/ASR 状态卡/控制台）；
-  ④ MSI 真机安装（F 盘）→ 一键运行（自动起 worker）→ 卸载全通过。
-- **真机回填发现并修复 6 个真实缺陷**（详见 questions/ 三份排查指南）：
-  VAD Detected/Empty 误用崩溃、字幕时间戳用局部索引、drainVad use-after-free、
-  BoundedQueue 容量失效（21/21 稳定）、MPV_FORMAT_FLAG 指针误用（play 即暂停→播放停滞根因）、
-  osd-overlay 语法（无 add/remove 子命令）。
-- **Current task:** T0272 收尾——打 v0.1.0 tag 并推送（本提交即完成）。
+- **Current phase:** COMPLETE — MVP v0.1.0 RELEASE READY（tag `v0.1.0` 指向 419c3a3，已推送）
+- **Current task:** NONE（T0001–T0272 MVP 范围收口完成；T0500+ 需 PRD/用户授权后启动）
 - **Current branch:** `main`
 - **Last completed task:** P9 发布产物（RELEASE-NOTES / SBOM / release manifest SHA-256）
 - **Last verified commit:** 948f86d → 本会话最终提交
