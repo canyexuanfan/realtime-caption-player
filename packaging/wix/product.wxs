@@ -1,17 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <!--
-    RealtimeCaptionPlayer 安装包主 wxs（WiX v3）。
-    运行时目录（含 ffmpeg/mpv/sherpa DLL + ASR 模型 + player_app.exe + Qt6）由
-    cmake/RcpBundle.cmake 生成到 out/bundle/runtime，再用 heat 走 -var var.RuntimeSource
-    harvest 成 files.wxs（组件组 RcpRuntimeComponents，安装到 INSTALLFOLDER）。
-    本文件负责 Product/Package 元数据、目录骨架、开始菜单/桌面快捷方式。
-
-    设计决策：不使用任何脚本类 CustomAction（VBScript/JScript/DLL）。
-    perMachine 安装在 UAC 提权上下文中执行脚本 CA 极易触发 Error 1721/1625。
-    子文件夹由 Directory 结构声明式保证（INSTALLFOLDER = ProgramFiles64Folder\RealtimeCaptionPlayer），
-    用户通过 Change 浏览选目录时获得所选路径——这是标准 Windows Installer 行为。
-  -->
   <Product
       Id="*"
       Name="RealtimeCaptionPlayer"
@@ -21,25 +9,16 @@
       UpgradeCode="6E6B4C1A-2F3A-4B8C-9D1E-5A7B2C3D4E5F">
 
     <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" />
-
     <MajorUpgrade DowngradeErrorMessage="A newer version of RealtimeCaptionPlayer is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
-    <!-- WixUI_InstallDir：目录选择 → 确认安装 → 进度条 -->
+    <!-- Standard wizard: Welcome -> License -> Browse Dir -> Confirm -> Install -->
     <UIRef Id="WixUI_InstallDir" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
-    <!--
-      关键修复：Type 51 SetProperty（内置声明式属性赋值，非脚本，不会触发 1721）。
-      在 UI 序列对话框显示前，强制把 INSTALLFOLDER（含 \RealtimeCaptionPlayer 子文件夹）
-      写回 WIXUI_INSTALLDIR，覆盖上次安装残留的注册表路径记忆（如 E:\Program\）。
-      Sequence="ui" 确保在 CostInitialize 之前执行，目录选择页打开时即显示正确路径。
-    -->
+    <!-- No WixUILicenseRtf set -> license dialog shows empty, user clicks "I Agree" -->
+
+    <!-- Type 51 SetProperty: forces correct default path before dialog shows -->
     <SetProperty Id="WIXUI_INSTALLDIR" Value="[INSTALLFOLDER]" Before="CostInitialize" Sequence="ui" />
-    <!-- 跳过许可证对话框（MVP 暂不展示 EULA），直接从目录选择开始 -->
-    <UI>
-      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog"
-               Value="InstallDirDlg">1</Publish>
-    </UI>
 
     <Feature Id="Complete" Title="RealtimeCaptionPlayer" Level="1">
       <ComponentGroupRef Id="RcpRuntimeComponents" />
@@ -49,7 +28,6 @@
 
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
-        <!-- 声明式子文件夹：默认安装路径 = C:\Program Files\RealtimeCaptionPlayer\ -->
         <Directory Id="INSTALLFOLDER" Name="RealtimeCaptionPlayer" />
       </Directory>
 
