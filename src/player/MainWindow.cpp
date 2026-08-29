@@ -189,6 +189,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
                     m_partialText = seg.text;
                     appendTranscriptPartial(seg.text);
                     m_waveform->pulse(1.0);
+                    updateOverlay();   // partial 也要实时上叠加层（原缺失，仅 final 刷新）
                 } else {
                     m_captionCtl->onFinal(seg, seg.generation);
                     m_finals.append(seg);
@@ -1636,7 +1637,23 @@ void MainWindow::updateOverlay() {
     if (!m_captionOn) return;
     if (!qEnvironmentVariableIsEmpty("RCP_NO_OVERLAY")) return;   // 诊断开关
     const bool showPartial = m_settings.value(QStringLiteral("caption/showPartial"), true).toBool();
-    m_partialLabel->setText(m_partialText);
+    // 参考稿视觉：叠加层只保留"当前句尾"——partial 一行、final 至多两行。
+    // worker 的 partial 覆盖整段未完句（授课式语音一段可达数百字），直接
+    // 显示会换行成文字墙。按像素宽度取尾部，截断处加省略号。
+    auto tailToFit = [](const QString& t, const QFont& f, qreal maxW, int maxLines) {
+        if (t.isEmpty()) return t;
+        const QFontMetrics fm(f);
+        const qreal unit = qMax<qreal>(4.0, fm.averageCharWidth());
+        const int perLine = qMax(6, static_cast<int>(maxW / unit));
+        const int maxChars = perLine * qMax(1, maxLines);
+        if (t.size() <= maxChars) return t;
+        return QStringLiteral("…") + t.right(maxChars - 1);
+    };
+    const QString prevPartial = m_partialLabel->text();
+    const QString prevFinal = m_finalLabel->text();
+    const qreal pw = qMax<qreal>(320.0, m_partialLabel->width() - 8.0);
+    const qreal fw = qMax<qreal>(320.0, m_finalLabel->width() - 8.0);
+    m_partialLabel->setText(showPartial ? tailToFit(m_partialText, m_partialLabel->font(), pw, 1) : QString());
     m_partialLabel->setVisible(showPartial && !m_partialText.isEmpty());
     const double s = m_player->timePosition() + m_delayMs / 1000.0;
     const long long head = static_cast<long long>(s * 1000.0);
@@ -1644,7 +1661,12 @@ void MainWindow::updateOverlay() {
     for (const auto& seg : m_finals) {
         if (head >= seg.startMs && head <= seg.endMs) { active = seg.text; break; }
     }
+    active = tailToFit(active, m_finalLabel->font(), fw, 2);
     if (m_finalLabel->text() != active) m_finalLabel->setText(active);
+    // 叠加文字变化时强制视频区整体重组：QOpenGLWidget 的子控件脏区合成
+    // 在仅子控件重绘时可能残留下帧旧文字（重影），整块 update 一并消除。
+    if (m_video && (m_partialLabel->text() != prevPartial || m_finalLabel->text() != prevFinal))
+        m_video->update();
 }
 
 void MainWindow::applyCaptionStyle() {
