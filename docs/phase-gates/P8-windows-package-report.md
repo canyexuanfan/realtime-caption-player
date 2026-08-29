@@ -158,3 +158,18 @@ snap3.png 像素级确认：logo/全部图标/列表行/设置面板渲染成功
 修复第三层根因：SVG currentColor 替换色用了 Qt 私有 8 位 #AARRGGBB，
 QSvgHandler 不认导致描边回落黑色隐形——改 6 位 #RRGGBB。
 MSI 重打，manifest 同步。
+
+### 补记 10（2026-08-29 深夜）：视频画面+实时字幕端到端根治（用户核心诉求闭环）
+用户报告"视频都没有画面，也没有识别出来的实时字幕"。快照自验证 + 调用点标签
+trace 剥出四个根因（详见 questions/libmpv播放停滞排查指南.md 追加 2）：
+1. paintGL 传 fbo.fbo=0：QOpenGLWidget 绘制目标是内部 FBO，帧被 Qt 合成丢弃
+   → 黑屏真正主因。修复：defaultFramebufferObject() + 物理像素尺寸（DPR）。
+2. 重绘链改官方 maybeUpdate 模式（含最小化兜底，防 render API 超时卡顿）。
+3. argv 与恢复会话双 loadfile 抢跑 → replace 重载风暴（end-file reason=2）。
+   修复：setStartupMedia，argv 媒体存在时恢复会话直接让位。
+4. 快照模式残留 2.5s grab-后-quit 二分定时器（假崩溃/复验缺失元凶），已删。
+验证：ctest 21/21；真机双快照 vidU.png/vidU.b.png —— 视频帧持续推进
+（01.480→12.380）、partial/final 双层字幕叠加、转写面板 2 条 final、
+延迟 0.0s、ASR 运行中；trace 单次 loadFile、time-pos 实时推进、心跳无断流。
+MSI 重打（TEMP 重定向 F 盘——C 盘仅剩 75MB 致 WiX LGHT0297 ERROR_DISK_FULL），
+manifest 同步（MSI cf781e8e…、player_app 425f015e…）。提交 faadb35 已推送。
