@@ -91,3 +91,12 @@ qrc 初始化对象（qrc_*_init.cpp.obj）无外部符号引用，被 MSVC 链�
   openFile 先设 m_currentPath；显示阈值 d>999。
 - 引擎值文案过长被 195px 卡截断 → 「本地（双引擎）」。
 - snap4/snap5 像素级确认以上全部生效。
+
+### 追加（用户三条反馈，快照闭环处理）
+1. 幽灵 ▶：cbtn("play") 创建临时按钮只为偷样式表，未入布局→默认位置显示。
+   修复：AB 按钮直接内联相同样式，不创建临时控件。
+2. QSS `.className` 类选择器在 Qt 中不匹配 property("class") —— 全部改为
+   `[class="className"]` 属性选择器后，iconBtn 悬停、rowLabel/rowHelp 层级、
+   fieldSelect 下拉样式才真正生效（此前这批规则整体静默失效）。
+3. ASR 浮卡与设置「实时字幕」页功能重复 → 浮卡删除，运行状态（状态灯/延迟/
+   已识别时长/置信度/导出 SRT）合并进设置页，快照 snap9 确认。

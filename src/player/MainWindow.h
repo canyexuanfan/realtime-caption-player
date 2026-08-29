@@ -75,7 +75,6 @@ private:
     QWidget* buildLeftRail(QWidget* parent);
     QWidget* buildStage(QWidget* parent);
     QWidget* buildVideoArea(QWidget* parent);
-    QWidget* buildAsrCard(QWidget* parent);
     QWidget* buildControlDeck(QWidget* parent);
     QWidget* buildSettingsPanel(QWidget* parent);
     QWidget* wrapPaneScroll(QWidget* inner);
@@ -142,12 +141,10 @@ private:
     rcpui::CaptionLabel* m_partialLabel = nullptr;
     rcpui::CaptionLabel* m_finalLabel = nullptr;
     rcpui::Waveform* m_waveform = nullptr;
-    QFrame* m_asrCard = nullptr;
     QLabel* m_asrDot = nullptr;
     QLabel* m_asrStatus = nullptr;
     QLabel* m_asrEngine = nullptr;
     QLabel* m_asrConf = nullptr;
-    QLabel* m_asrConfBar = nullptr;
     QLabel* m_asrLatency = nullptr;
     QLabel* m_asrRecognized = nullptr;
     QWidget* m_privacyBadge = nullptr;
@@ -184,7 +181,4 @@ private:
     double m_duration = 0.0;
     bool m_seeking = false;
     QPoint m_windowDrag;
-    QPoint m_asrDragStart;
-    bool m_asrDragging = false;
-    bool m_asrMoved = false;
 };

@@ -69,9 +69,9 @@ QLabel#brand { color:#f4f6fb; font-size:13px; font-weight:650; background:transp
 QLabel#titleFile { color:#f4f6fb; font-size:16px; font-weight:500; background:transparent; }
 
 QFrame#leftRail { background:#15191f; border:none; border-right:1px solid rgba(255,255,255,0.105); }
-QLabel.railTitle { color:#f4f6fb; font-size:12px; font-weight:600; background:transparent; }
-QPushButton.iconBtn { background:transparent; border:none; border-radius:7px; color:#a7adb8; padding:0; }
-QPushButton.iconBtn:hover { background:#222832; color:#f4f6fb; }
+QLabel[class="railTitle"] { color:#f4f6fb; font-size:12px; font-weight:600; background:transparent; }
+QPushButton[class="iconBtn"] { background:transparent; border:none; border-radius:7px; color:#a7adb8; padding:0; }
+QPushButton[class="iconBtn"]:hover { background:#222832; color:#f4f6fb; }
 QListWidget { background:#15191f; border:none; outline:none; }
 QListWidget#playlist, QListWidget#history { padding:0 9px 8px 9px; }
 QListWidget#playlist::item, QListWidget#history::item { min-height:40px; }
@@ -94,7 +94,7 @@ QFrame#asrCard { background:rgba(16,19,24,0.86); border:1px solid rgba(255,255,2
 QFrame#asrCard QLabel { background:transparent; }
 QLabel#asrHead { color:#f5f6fa; font-size:12px; font-weight:600; }
 QLabel#asrStatus { color:#d9dde4; font-size:11px; font-weight:400; }
-QLabel.asrKey { color:#9da4af; font-size:10px; background:transparent; }
+QLabel[class="asrKey"] { color:#9da4af; font-size:10px; background:transparent; }
 QLabel#selectShell { color:#e8eaf0; font-size:10px; background:rgba(255,255,255,0.025);
   border:1px solid rgba(255,255,255,0.13); border-radius:5px; padding:0 8px; }
 QLabel#asrMetrics { color:#aeb4bd; font-size:10px; background:transparent; }
@@ -118,11 +118,11 @@ QSlider::handle:horizontal:hover { background:#9184ff; }
 
 QFrame#settingsPanel { background:#15191f; border:none; border-left:1px solid rgba(255,255,255,0.105); }
 QLabel#settingsTitle { color:#f4f6fb; font-size:13px; font-weight:600; background:transparent; }
-QLabel.paneTitle { color:#f4f6fb; font-size:13px; font-weight:700; background:transparent; }
-QLabel.secTitle { color:#f4f6fb; font-size:11px; font-weight:650; background:transparent; }
-QLabel.rowLabel { color:#a7adb8; font-size:10px; background:transparent; }
-QLabel.rowHelp { color:#757c88; font-size:9px; background:transparent; }
-QComboBox.fieldSelect { background:#171b21; border:1px solid rgba(255,255,255,0.16);
+QLabel[class="paneTitle"] { color:#f4f6fb; font-size:13px; font-weight:700; background:transparent; }
+QLabel[class="secTitle"] { color:#f4f6fb; font-size:11px; font-weight:650; background:transparent; }
+QLabel[class="rowLabel"] { color:#a7adb8; font-size:10px; background:transparent; }
+QLabel[class="rowHelp"] { color:#757c88; font-size:9px; background:transparent; }
+QComboBox[class="fieldSelect"] { background:#171b21; border:1px solid rgba(255,255,255,0.16);
   border-radius:5px; color:#f4f6fb; font-size:10px; min-height:28px; padding:0 9px; }
 QComboBox QAbstractItemView { background:#191e25; color:#f4f6fb; selection-background-color:#5c4bd5; }
 
@@ -402,6 +402,7 @@ QWidget* MainWindow::buildLeftRail(QWidget* parent) {
     m_tabHistory = new QPushButton(tr("历史记录"), tabs);
     const QString tabQss = QStringLiteral(
         "QPushButton{background:transparent;border:none;border-right:1px solid rgba(255,255,255,0.105);color:#a7adb8;font-size:12px;min-height:42px;border-radius:0;}"
+        "QPushButton:hover{background:#222832;color:#f4f6fb;}"
         "QPushButton:checked{color:#7868ff;background:rgba(120,104,255,0.18);}");
     m_tabPlaylist->setStyleSheet(tabQss);
     m_tabHistory->setStyleSheet(tabQss + QStringLiteral("QPushButton{border-right:none;}"));
@@ -559,107 +560,9 @@ QWidget* MainWindow::buildVideoArea(QWidget* parent) {
     ph->addWidget(ptxt);
     m_privacyBadge->adjustSize();
 
-    m_asrCard = qobject_cast<QFrame*>(buildAsrCard(overlayParent));
     return surface;
 }
 
-QWidget* MainWindow::buildAsrCard(QWidget* parent) {
-    QFrame* card = new QFrame(parent);
-    card->setObjectName(QStringLiteral("asrCard"));
-    card->setFixedWidth(195);
-    card->installEventFilter(this);
-
-    auto* v = new QVBoxLayout(card);
-    v->setContentsMargins(0, 0, 0, 0);
-    v->setSpacing(0);
-
-    auto* head = new QWidget(card);
-    head->setFixedHeight(42);
-    head->setStyleSheet(QStringLiteral("background:transparent;border-bottom:1px solid rgba(255,255,255,0.1);"));
-    auto* hh = new QHBoxLayout(head);
-    hh->setContentsMargins(12, 0, 12, 0);
-    auto* title = new QLabel(tr("实时字幕"), head);
-    title->setObjectName(QStringLiteral("asrHead"));
-    title->setAttribute(Qt::WA_TransparentForMouseEvents);
-    auto* st = new QWidget(head);
-    st->setAttribute(Qt::WA_TransparentForMouseEvents);
-    auto* sh = new QHBoxLayout(st);
-    sh->setContentsMargins(0, 0, 0, 0);
-    sh->setSpacing(6);
-    m_asrDot = new QLabel(QStringLiteral("\u25CF"), st);
-    m_asrDot->setStyleSheet(QStringLiteral("color:#69717d;font-size:7px;background:transparent;"));
-    m_asrStatus = new QLabel(tr("未运行"), st);
-    m_asrStatus->setObjectName(QStringLiteral("asrStatus"));
-    sh->addWidget(m_asrDot);
-    sh->addWidget(m_asrStatus);
-    hh->addWidget(title);
-    hh->addStretch();
-    hh->addWidget(st);
-    v->addWidget(head);
-
-    auto* body = new QWidget(card);
-    auto* bv = new QVBoxLayout(body);
-    bv->setContentsMargins(12, 10, 12, 12);
-    bv->setSpacing(9);
-
-    auto miniVal = [body, bv](const QString& key, const QString& val, QLabel** out) {
-        auto* k = new QLabel(key, body);
-        k->setProperty("class", "asrKey");
-        auto* vl = new QLabel(val, body);
-        vl->setObjectName(QStringLiteral("selectShell"));
-        vl->setFixedHeight(27);
-        bv->addWidget(k);
-        bv->addWidget(vl);
-        if (out) *out = vl;
-    };
-    miniVal(tr("引擎"), tr("本地（双引擎）"), &m_asrEngine);
-    miniVal(tr("语言"), tr("中文（auto）"), nullptr);
-    miniVal(tr("模型"), tr("Balanced（中文通用）"), nullptr);
-
-    auto* ck = new QLabel(tr("置信度"), body);
-    ck->setProperty("class", "asrKey");
-    auto* confRow = new QWidget(body);
-    auto* ch = new QHBoxLayout(confRow);
-    ch->setContentsMargins(0, 0, 0, 0);
-    ch->setSpacing(8);
-    auto* barBg = new QWidget(confRow);
-    barBg->setFixedHeight(5);
-    barBg->setStyleSheet(QStringLiteral("background:rgba(255,255,255,0.13);border-radius:3px;"));
-    m_asrConf = new QLabel(QStringLiteral("—"), confRow);
-    m_asrConf->setObjectName(QStringLiteral("asrMetricVal"));
-    ch->addWidget(barBg, 1);
-    ch->addWidget(m_asrConf);
-    bv->addWidget(ck);
-    bv->addWidget(confRow);
-
-    // 指标：延迟 / 已识别时长（参考稿 asr-metrics：key ... value 两行，真实值）
-    auto metricRow = [body](const QString& k, QLabel** val) {
-        auto* row = new QWidget(body);
-        auto* h = new QHBoxLayout(row);
-        h->setContentsMargins(0, 0, 0, 0);
-        h->setSpacing(6);
-        auto* kl = new QLabel(k, row);
-        kl->setObjectName(QStringLiteral("asrMetrics"));
-        *val = new QLabel(QStringLiteral("—"), row);
-        (*val)->setObjectName(QStringLiteral("asrMetricVal"));
-        h->addWidget(kl);
-        h->addStretch();
-        h->addWidget(*val);
-        return row;
-    };
-    bv->addWidget(metricRow(tr("延迟"), &m_asrLatency));
-    bv->addWidget(metricRow(tr("已识别时长"), &m_asrRecognized));
-    bv->addSpacing(2);
-
-    auto* ex = new QPushButton(tr("导出字幕（SRT）"), body);
-    ex->setObjectName(QStringLiteral("asrExport"));
-    ex->setCursor(Qt::PointingHandCursor);
-    connect(ex, &QPushButton::clicked, this, &MainWindow::onExportSrt);
-    bv->addWidget(ex);
-    v->addWidget(body, 1);
-    card->adjustSize();   // 确定高度=内容 sizeHint（不依赖运行时 polish，快照/真机一致）
-    return card;
-}
 
 // ================= 控制台 =================
 QWidget* MainWindow::buildControlDeck(QWidget* parent) {
@@ -722,7 +625,11 @@ QWidget* MainWindow::buildControlDeck(QWidget* parent) {
     m_btnAb->setFixedSize(34, 34);
     m_btnAb->setToolTip(tr("设置 AB 循环"));
     m_btnAb->setCursor(Qt::PointingHandCursor);
-    m_btnAb->setStyleSheet(cbtn(QStringLiteral("play"), QString())->styleSheet());
+    // 幽灵按钮修复：此前创建临时 play 按钮只为偷样式，未入布局成幽灵 ▶。
+    m_btnAb->setStyleSheet(QStringLiteral(
+        "QPushButton{background:transparent;border:none;border-radius:17px;}"
+        "QPushButton:hover{background:rgba(255,255,255,0.08);}"
+        "QPushButton:checked{background:rgba(121,105,255,0.22);}"));
     m_btnTrack = cbtn(QStringLiteral("monitor"), tr("切换字幕轨"));
 
     m_btnB10 = cbtn(QStringLiteral("rewind"), tr("后退 10 秒"));
@@ -1079,6 +986,46 @@ QWidget* MainWindow::paneRealtime() {
     auto* title = new QLabel(tr("实时字幕"), w);
     title->setProperty("class", "paneTitle");
     v->addWidget(title);
+    // 运行状态（原视频区浮动卡合并至此，消除重复；数据全部真实）
+    v->addWidget(sectionTitle(tr("运行状态"), w));
+    auto* stRow = new QWidget(w);
+    auto* sth = new QHBoxLayout(stRow);
+    sth->setContentsMargins(0, 0, 0, 0);
+    sth->setSpacing(6);
+    m_asrDot = new QLabel(QStringLiteral("\u25CF"), stRow);
+    m_asrDot->setStyleSheet(QStringLiteral("color:#69717d;font-size:7px;background:transparent;"));
+    m_asrStatus = new QLabel(tr("未运行"), stRow);
+    m_asrStatus->setStyleSheet(QStringLiteral("color:#69717d;font-size:11px;background:transparent;"));
+    sth->addWidget(m_asrDot);
+    sth->addWidget(m_asrStatus);
+    sth->addStretch();
+    v->addWidget(stRow);
+    auto metricRow = [w](const QString& k, QLabel** val) {
+        auto* row = new QWidget(w);
+        auto* h = new QHBoxLayout(row);
+        h->setContentsMargins(0, 0, 0, 0);
+        h->setSpacing(6);
+        auto* kl = new QLabel(k, row);
+        kl->setProperty("class", "rowLabel");
+        *val = new QLabel(QStringLiteral("—"), row);
+        (*val)->setProperty("class", "rowLabel");
+        h->addWidget(kl);
+        h->addStretch();
+        h->addWidget(*val);
+        return row;
+    };
+    v->addWidget(metricRow(tr("延迟"), &m_asrLatency));
+    v->addWidget(metricRow(tr("已识别时长"), &m_asrRecognized));
+    v->addWidget(metricRow(tr("置信度"), &m_asrConf));
+    auto* ex = new QPushButton(tr("导出字幕（SRT）"), w);
+    ex->setCursor(Qt::PointingHandCursor);
+    ex->setStyleSheet(QStringLiteral(
+        "QPushButton{background:transparent;border:1px solid rgba(255,255,255,0.14);"
+        "border-radius:6px;color:#9e91ff;min-height:30px;font-size:11px;}"
+        "QPushButton:hover{background:rgba(121,105,255,0.13);}"));
+    connect(ex, &QPushButton::clicked, this, &MainWindow::onExportSrt);
+    v->addWidget(ex);
+
     v->addWidget(sectionTitle(tr("总开关"), w));
     auto* sw = new Switch(w);
     sw->setChecked(m_captionOn);
@@ -1204,10 +1151,6 @@ QWidget* MainWindow::paneAppearance() {
     title->setProperty("class", "paneTitle");
     v->addWidget(title);
     v->addWidget(sectionTitle(tr("界面"), w));
-    auto* card = new Switch(w);
-    card->setChecked(true);
-    connect(card, &Switch::toggled, this, [this](bool on) { m_asrCard->setVisible(on); });
-    v->addWidget(settingRow(tr("字幕状态浮窗"), card, w));
     auto* note = new QLabel(tr("深色主题为当前版本唯一主题；浅色主题属后续版本。"), w);
     note->setProperty("class", "rowHelp");
     note->setWordWrap(true);
@@ -1666,7 +1609,6 @@ void MainWindow::repositionOverlays() {
         m_privacyBadge->adjustSize();
         m_privacyBadge->move(vw - m_privacyBadge->width() - 18, 17);
     }
-    if (m_asrCard && !m_asrMoved) m_asrCard->move(vw - 22 - 195, 88);
 }
 
 // ================= 事件 =================
@@ -1687,22 +1629,6 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
         if (!m_currentPath.isEmpty() && m_privacyBadge) m_privacyBadge->show();   // 悬停显示（参考稿 hover 态）
     } else if (obj == m_videoHost && event->type() == QEvent::Leave) {
         if (m_privacyBadge) m_privacyBadge->hide();
-    } else if (m_asrCard && obj == m_asrCard) {
-        if (event->type() == QEvent::MouseButtonPress) {
-            auto* me = static_cast<QMouseEvent*>(event);
-            if (me->button() == Qt::LeftButton) {
-                m_asrDragging = true;
-                m_asrDragStart = me->globalPosition().toPoint();
-            }
-        } else if (event->type() == QEvent::MouseMove && m_asrDragging) {
-            auto* me = static_cast<QMouseEvent*>(event);
-            const QPoint g = me->globalPosition().toPoint();
-            m_asrCard->move(m_asrCard->pos() + g - m_asrDragStart);
-            m_asrMoved = true;
-            m_asrDragStart = g;
-        } else if (event->type() == QEvent::MouseButtonRelease) {
-            m_asrDragging = false;
-        }
     }
     return QMainWindow::eventFilter(obj, event);
 }
