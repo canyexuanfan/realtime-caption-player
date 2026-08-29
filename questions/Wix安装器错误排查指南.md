@@ -278,3 +278,16 @@ FindRelatedProducts 忽略**同版本号**的相关产品。MVP 阶段 ProductVe
   未设 Platform="x64"），32 位包内 ProgramFiles64Folder 解析同 32 位 PF。
   应用本体是 x64，装在 x86 PF 只是观感问题；迁移 x64 包留待版本号变化时一并做
   （x86→x64 跨位宽升级链需单独验证）。
+
+## ✅ 追加 3：检测到了但目录仍回默认——尾反斜杠破掉 ends-with 校验（2026-08-30）
+
+用户实测：欢迎页显示"已检测到安装"（AppSearch 生效），但目录页仍是默认。
+注册表实证：`HKLM\SOFTWARE\WOW6432Node\Rcp\...\InstallDir = E:\Program\RealtimeCaptionPlayer\`
+——BrowseDlg 追加子目录时写入的值**带尾反斜杠**，`>>`（ends-with）判败，
+两个条件 Custom 都不执行 → 回退目录表默认。
+
+修复：条件改"包含"（MSI 操作符 `><`），容忍尾反斜杠。同修 Welcome 文本
+`\n` 字面量（MSI Text 控件不解析反斜杠转义，需真实 0x0A，WiX 用 &#10;）。
+COM 验证：InstallUISequence 条件列与 Description 换行符合预期。
+
+经验：目录类注册表值的尾反斜杠是常态，路径谓词一律用"包含"而非"结尾"。

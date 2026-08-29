@@ -44,7 +44,7 @@
           <Text>Welcome to the [ProductName] Setup</Text>
         </Control>
         <Control Id="Description" Type="Text" X="20" Y="70" Width="330" Height="80">
-          <Text>Local-first offline realtime captioning player.\n\nClick Next to choose where to install, then Install.</Text>
+          <Text>Local-first offline realtime captioning player.&#10;&#10;Click Next to choose where to install, then Install.</Text>
         </Control>
         <!-- 检测到既往安装时显示升级提示（PREVINSTALLDIR 由 AppSearch 填充）。 -->
         <Control Id="UpgradeDesc" Type="Text" X="20" Y="140" Width="330" Height="30">
@@ -248,7 +248,7 @@
         <Show Dialog="FatalError" OnExit="error" />
         <AppSearch Before="CostInitialize" />
         <Custom Action="SetInstallFolderDefault" After="AppSearch">NOT PREVINSTALLDIR</Custom>
-        <Custom Action="SetInstallFolderPrev" After="AppSearch">PREVINSTALLDIR &gt;&gt; &quot;RealtimeCaptionPlayer&quot;</Custom>
+        <Custom Action="SetInstallFolderPrev" After="AppSearch">PREVINSTALLDIR &gt;&lt; &quot;RealtimeCaptionPlayer&quot;</Custom>
         <Show Dialog="WelcomeDlg" After="CostFinalize">1</Show>
         <Show Dialog="ProgressDlg" Before="ExecuteAction" />
       </InstallUISequence>
