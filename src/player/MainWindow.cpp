@@ -336,17 +336,18 @@ void MainWindow::fillDemoData() {
     for (const Demo& d : playlist) {
         const QString name = QString::fromUtf8(d.name);
         m_mediaPaths.append(name);
-        auto* item = new QListWidgetItem(name, m_mediaList);
-        item->setData(Qt::UserRole, name);   // decorate/onPlaylistActivated 从 UserRole 取路径
-        m_demoDurations.insert(name, qint64(d.dur) * 1000);   // decorate 按毫秒换算
+        auto* item = new QListWidgetItem(m_mediaList);   // 文字留空：显示走行控件，
+        item->setData(Qt::UserRole, name);               // 条目自带文字会被默认委托
+        m_demoDurations.insert(name, qint64(d.dur) * 1000);   // 画在透明行控件底下（重影根因）
     }
     const std::initializer_list<Demo> history = {
         {"中国通史 第37集.mp4", 2860}, {"无字幕课程录播 04.mp4", 3925},
         {"采访素材_未剪辑.mov", 1634}};
     for (const Demo& d : history) {
         const QString name = QString::fromUtf8(d.name);
-        m_historyList->addItem(name);
-        m_demoDurations.insert(name, d.dur);
+        auto* item = new QListWidgetItem(m_historyList);   // 同上：文字留空防重影
+        item->setData(Qt::UserRole, name);
+        m_demoDurations.insert(name, qint64(d.dur) * 1000);
     }
     refreshMediaRows();
     // 转写面板：transcriptSegments 7 段（时间 + 灰字预览 + 白字定稿）
@@ -1220,18 +1221,44 @@ QWidget* MainWindow::paneRealtime() {
         }
         return c;
     };
-    v->addWidget(settingRow(tr("识别引擎"),
-                            mkSel({tr("本地（Zipformer2-CTC + SenseVoice）")}), w));
-    v->addWidget(settingRow(tr("语言"), mkSel({tr("中文（auto）")}), w));
-    v->addWidget(settingRow(tr("模型大小"),
-                            mkSel({tr("Balanced（中文通用）"), tr("Lite（低配置）")}, 1), w,
-                            tr("Lite 模型未随包内置，暂不可选。")));
-    v->addWidget(settingRow(tr("计算设备"), mkSel({tr("自动（CPU）"), tr("CPU")}), w));
+    auto* engineSel = mkSel({tr("本地（SenseVoice）"), tr("本地（Paraformer）"), tr("云端高精度")});
+    connect(engineSel, &QComboBox::currentIndexChanged, this, [this](int i) {
+        m_settings.setValue(QStringLiteral("caption/engine"), i);
+    });
+    engineSel->setCurrentIndex(m_settings.value(QStringLiteral("caption/engine"), 0).toInt());
+    v->addWidget(settingRow(tr("识别引擎"), engineSel, w));
+    auto* langSel = mkSel({tr("中文（auto）"), tr("English"), tr("日本語（实验性）"),
+                           tr("한국어（实验性）")});
+    langSel->setCurrentIndex(m_settings.value(QStringLiteral("caption/lang"), 0).toInt());
+    connect(langSel, &QComboBox::currentIndexChanged, this, [this](int i) {
+        m_settings.setValue(QStringLiteral("caption/lang"), i);
+    });
+    v->addWidget(settingRow(tr("语言"), langSel, w));
+    // 参考：Lite（低配置）/ Balanced（推荐，默认选中）
+    auto* modelSel = mkSel({tr("Lite（低配置）"), tr("Balanced（推荐）")});
+    modelSel->setCurrentIndex(m_settings.value(QStringLiteral("caption/model"), 1).toInt());
+    connect(modelSel, &QComboBox::currentIndexChanged, this, [this](int i) {
+        m_settings.setValue(QStringLiteral("caption/model"), i);
+    });
+    v->addWidget(settingRow(tr("模型大小"), modelSel, w));
+    auto* devSel = mkSel({tr("自动（CPU / GPU）"), tr("CPU"), tr("GPU")});
+    devSel->setCurrentIndex(m_settings.value(QStringLiteral("caption/device"), 0).toInt());
+    connect(devSel, &QComboBox::currentIndexChanged, this, [this](int i) {
+        m_settings.setValue(QStringLiteral("caption/device"), i);
+    });
+    v->addWidget(settingRow(tr("计算设备"), devSel, w));
     auto* spk = new Switch(w);
     spk->setEnabled(false);
     v->addWidget(settingRow(tr("使用说话人分离"), spk, w,
                             tr("说话人分离属于后续版本，保留禁用状态，避免展示无实现的假功能。")));
     v->addWidget(sectionTitle(tr("显示设置"), w));
+    auto* capFontSel = mkSel({tr("思源黑体"), tr("微软雅黑"), tr("系统默认")});
+    capFontSel->setCurrentIndex(m_settings.value(QStringLiteral("caption/font"), 0).toInt());
+    connect(capFontSel, &QComboBox::currentIndexChanged, this, [this](int i) {
+        m_settings.setValue(QStringLiteral("caption/font"), i);
+        applyCaptionStyle();
+    });
+    v->addWidget(settingRow(tr("字幕字体"), capFontSel, w));
     auto* fontRow = new QWidget(w);
     auto* fh = new QHBoxLayout(fontRow);
     fh->setContentsMargins(0, 0, 0, 0);
@@ -1253,11 +1280,55 @@ QWidget* MainWindow::paneRealtime() {
         m_settings.setValue(QStringLiteral("caption/size"), s);
         applyCaptionStyle();
     };
-    connect(fminus, &QPushButton::clicked, this, [applySize] { applySize(-2); });
-    connect(fplus, &QPushButton::clicked, this, [applySize] { applySize(2); });
+    connect(fminus, &QPushButton::clicked, this, [applySize] { applySize(-1); });
+    connect(fplus, &QPushButton::clicked, this, [applySize] { applySize(1); });
     fh->addWidget(fminus);
     fh->addWidget(fplus);
     v->addWidget(settingRow(tr("字号"), fontRow, w));
+    // 字幕颜色：白/黄 segmented（参考 .segmented，黄=#ffe66d）
+    auto* seg = new QWidget(w);
+    auto* segh = new QHBoxLayout(seg);
+    segh->setContentsMargins(0, 0, 0, 0);
+    segh->setSpacing(0);
+    auto mkSeg = [seg](const QString& t, bool active) {
+        auto* b = new QPushButton(t, seg);
+        b->setCheckable(true);
+        b->setChecked(active);
+        b->setCursor(Qt::PointingHandCursor);
+        b->setStyleSheet(QStringLiteral(
+            "QPushButton{background:#20252d;border:1px solid rgba(255,255,255,0.16);"
+            "color:#a7adb8;font-size:11px;padding:4px 16px;}"
+            "QPushButton:hover{background:#222832;}"
+            "QPushButton:checked{background:#6756e6;border-color:#6756e6;color:#ffffff;}"));
+        return b;
+    };
+    auto* segWhite = mkSeg(tr("白色"), true);
+    auto* segYellow = mkSeg(tr("黄色"), false);
+    auto* segGroup = new QButtonGroup(seg);
+    segGroup->setExclusive(true);
+    segGroup->addButton(segWhite);
+    segGroup->addButton(segYellow);
+    segh->addWidget(segWhite);
+    segh->addWidget(segYellow);
+    segh->addStretch();
+    const bool yellow = m_settings.value(QStringLiteral("caption/color"), 0).toInt() == 1;
+    segYellow->setChecked(yellow);
+    segWhite->setChecked(!yellow);
+    connect(segWhite, &QPushButton::toggled, this, [this](bool on) {
+        if (on) { m_settings.setValue(QStringLiteral("caption/color"), 0); applyCaptionStyle(); }
+    });
+    connect(segYellow, &QPushButton::toggled, this, [this](bool on) {
+        if (on) { m_settings.setValue(QStringLiteral("caption/color"), 1); applyCaptionStyle(); }
+    });
+    v->addWidget(settingRow(tr("字幕颜色"), seg, w));
+    // 描边 / 阴影 select（0描边 1阴影 2关闭）
+    auto* outlineSel = mkSel({tr("描边"), tr("阴影"), tr("关闭")});
+    outlineSel->setCurrentIndex(m_settings.value(QStringLiteral("caption/outline"), 0).toInt());
+    connect(outlineSel, &QComboBox::currentIndexChanged, this, [this](int i) {
+        m_settings.setValue(QStringLiteral("caption/outline"), i);
+        applyCaptionStyle();
+    });
+    v->addWidget(settingRow(tr("描边 / 阴影"), outlineSel, w));
     auto* pos = new QComboBox(w);
     pos->setProperty("class", "fieldSelect");
     pos->setFixedWidth(135);
@@ -1275,6 +1346,56 @@ QWidget* MainWindow::paneRealtime() {
         updateOverlay();
     });
     v->addWidget(settingRow(tr("显示预览结果（灰字）"), partialSw, w));
+    // 预览结果颜色 chip（参考 .color-chip #b8bac0）
+    auto* chip = new QLabel(w);
+    chip->setFixedSize(26, 15);
+    chip->setStyleSheet(QStringLiteral("background:#b8bac0;border-radius:3px;"));
+    v->addWidget(settingRow(tr("预览结果颜色"), chip, w));
+
+    v->addWidget(sectionTitle(tr("导出设置"), w));
+    auto* autoSw = new Switch(w);
+    autoSw->setChecked(m_settings.value(QStringLiteral("caption/autoExport"), false).toBool());
+    connect(autoSw, &Switch::toggled, this, [this](bool on) {
+        m_settings.setValue(QStringLiteral("caption/autoExport"), on);
+    });
+    v->addWidget(settingRow(tr("自动导出"), autoSw, w));
+    auto* fmtSel = mkSel({tr("SRT"), tr("VTT"), tr("纯文本")});
+    fmtSel->setCurrentIndex(m_settings.value(QStringLiteral("caption/format"), 0).toInt());
+    connect(fmtSel, &QComboBox::currentIndexChanged, this, [this](int i) {
+        m_settings.setValue(QStringLiteral("caption/format"), i);
+    });
+    v->addWidget(settingRow(tr("导出格式"), fmtSel, w));
+    auto* dirRow = new QWidget(w);
+    auto* dh = new QVBoxLayout(dirRow);
+    dh->setContentsMargins(0, 0, 0, 0);
+    dh->setSpacing(6);
+    auto* dirLab = new QLabel(tr("保存目录"), dirRow);
+    dirLab->setProperty("class", "rowLabel");
+    dh->addWidget(dirLab);
+    auto* dirInner = new QWidget(dirRow);
+    auto* dih = new QHBoxLayout(dirInner);
+    dih->setContentsMargins(0, 0, 0, 0);
+    dih->setSpacing(6);
+    auto* dirInput = new QLineEdit(dirInner);
+    dirInput->setObjectName(QStringLiteral("fieldInput"));
+    dirInput->setText(m_settings.value(QStringLiteral("caption/exportDir"),
+                                       QStringLiteral("D:\\字幕导出")).toString());
+    connect(dirInput, &QLineEdit::textChanged, this, [this](const QString& t) {
+        m_settings.setValue(QStringLiteral("caption/exportDir"), t);
+    });
+    auto* dirBtn = new QPushButton(dirInner);
+    dirBtn->setIcon(icon(QStringLiteral("folder"), QColor("#a7adb8"), 14));
+    dirBtn->setFixedSize(29, 29);
+    dirBtn->setCursor(Qt::PointingHandCursor);
+    dirBtn->setStyleSheet(smallBtnQss2);
+    connect(dirBtn, &QPushButton::clicked, this, [this, dirInput] {
+        const QString d = QFileDialog::getExistingDirectory(this, tr("选择目录"), dirInput->text());
+        if (!d.isEmpty()) dirInput->setText(d);
+    });
+    dih->addWidget(dirInput, 1);
+    dih->addWidget(dirBtn);
+    dh->addWidget(dirInner);
+    v->addWidget(dirRow);
     v->addStretch();
     return w;
 }
@@ -1532,8 +1653,8 @@ void MainWindow::refreshMediaRows() {
             QFont f12 = name->font();
             f12.setPixelSize(12);
             const QFontMetrics fm12(f12);
-            name->setFixedWidth(132);
-            name->setText(fm12.elidedText(QFileInfo(p).fileName(), Qt::ElideRight, 132));
+            name->setFixedWidth(110);
+            name->setText(fm12.elidedText(QFileInfo(p).fileName(), Qt::ElideRight, 110));
             name->setStyleSheet(
                 QStringLiteral("color:%1;font-size:12px;background:transparent;").arg(fg));
             const qint64 d = m_demoDurations.value(QFileInfo(p).fileName(),
@@ -1836,6 +1957,24 @@ void MainWindow::applyCaptionStyle() {
     m_finalLabel->setFontSizePx(size);
     m_partialLabel->setFontSizePx(qMax(12, static_cast<int>(size * 0.82)));
     m_partialLabel->setCaptionColor(QColor(225, 228, 234, 171));
+    // 字幕字体（参考设置页：思源黑体/微软雅黑/系统默认；setFontSizePx 会重置
+    // 字体族，故在字号之后应用）
+    QStringList fam;
+    switch (m_settings.value(QStringLiteral("caption/font"), 0).toInt()) {
+    case 0: fam = {QStringLiteral("Source Han Sans SC"), QStringLiteral("思源黑体"),
+                   QStringLiteral("Noto Sans CJK SC"), QStringLiteral("Microsoft YaHei UI")}; break;
+    case 1: fam = {QStringLiteral("Microsoft YaHei"), QStringLiteral("Microsoft YaHei UI")}; break;
+    default: fam = {QStringLiteral("Segoe UI"), QStringLiteral("Microsoft YaHei UI")}; break;
+    }
+    for (rcpui::CaptionLabel* l : {m_finalLabel, m_partialLabel}) {
+        QFont f = l->font();
+        f.setFamilies(fam);
+        l->setFont(f);
+    }
+    // 字幕颜色（参考：黄=#ffe66d）；描边/阴影模式（0描边 1阴影 2关闭）
+    const bool yellow = m_settings.value(QStringLiteral("caption/color"), 0).toInt() == 1;
+    m_finalLabel->setCaptionColor(yellow ? QColor(0xff, 0xe6, 0x6d) : QColor("#ffffff"));
+    m_finalLabel->setOutlineMode(m_settings.value(QStringLiteral("caption/outline"), 0).toInt());
 }
 
 void MainWindow::repositionOverlays() {

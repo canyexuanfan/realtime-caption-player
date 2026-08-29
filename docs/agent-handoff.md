@@ -129,3 +129,17 @@ RCP_DEMO_ONLY=1 + RCP_SNAPSHOT + RCP_SNAP_T1/T2，统一 1280x800 逻辑尺寸�
 4. Waveform 对照（36 根 2px 渐变条 #a79cff→#6555ef 动画）。
 5. demo 海报：参考稿 stage 有 cover 图片（航拍中国剧照），demo 态放等价渐变。
 6. a11y 实测历史 tab 点击 + 全量 ctest + MSI 重打。
+
+### 已完成（2026-08-30 第二轮）
+- 播放列表行重影根除：demo 项把名字写进 QListWidgetItem 本身，默认委托把
+  条目文字画在透明行控件底下（全名+省略名叠加+横向滚动条）；条目文字留空、
+  只设 UserRole 后干净。rowName 定宽 110 裁剪 + 时长完整右对齐（49:12）。
+- 设置面板实时字幕页对齐参考稿：识别引擎/语言/模型大小/计算设备选项串逐字
+  同源；新增 显示设置（字幕字体/字幕颜色白黄segmented/描边阴影/预览结果颜色
+  chip）与 导出设置（自动导出/导出格式/保存目录），全部接入真实 settings 并
+  由 applyCaptionStyle 生效（黄=#ffe66d；思源黑体=Source Han Sans SC 族）。
+- 字号步长 ±1（参考 22..54）。
+
+### 仍余
+- 字幕定位 reposition trace 复验（行已加）；Waveform 细节对照；demo 海报图；
+  a11y 实测历史 tab 点击；MSI 重打。
