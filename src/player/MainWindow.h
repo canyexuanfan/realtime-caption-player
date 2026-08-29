@@ -120,6 +120,7 @@ private:
     QStringList m_mediaPaths;
     QVector<rcp::CaptionSegment> m_finals;   // 本窗口维护的 final 时间线
     QString m_partialText;
+    QString m_overlayFinalText;   // 叠加层当前定稿句：常驻直到下一句替换
     long long m_delayMs = 0;               // 字幕同步延迟
     long long m_lastFinalEndMs = 0;
     bool m_captionOn = true;

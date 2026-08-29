@@ -53,13 +53,18 @@ int main(int argc, char* argv[]) {
 
     MainWindow window;
     // 视觉自验证：RCP_SNAPSHOT=<png路径> 时正常显示窗口（真实 GL 渲染，
-    // 可验证视频画面），5s/16s 两次 grab 存 PNG 后退出。
+    // 可验证视频画面），默认 5s/16s 两次 grab 存 PNG 后退出；
+    // RCP_SNAP_T1/T2（毫秒）可覆盖（慢介质/晚开口的验证场景）。
     const QString snapPath = qEnvironmentVariable("RCP_SNAPSHOT");
     if (!snapPath.isEmpty()) {
-        QTimer::singleShot(5000, &window, [&window, snapPath] {
+        int t1 = qEnvironmentVariableIntValue("RCP_SNAP_T1");
+        if (t1 <= 0) t1 = 5000;
+        int t2 = qEnvironmentVariableIntValue("RCP_SNAP_T2");
+        if (t2 <= 0) t2 = 16000;
+        QTimer::singleShot(t1, &window, [&window, snapPath] {
             window.grab().save(snapPath);
         });
-        QTimer::singleShot(16000, &window, [&window, snapPath] {
+        QTimer::singleShot(t2, &window, [&window, snapPath] {
             const int dot = snapPath.lastIndexOf(QLatin1Char('.'));
             window.grab().save(snapPath.left(dot) + QStringLiteral(".b") + snapPath.mid(dot));
             QApplication::quit();

@@ -179,6 +179,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         m_finalCount = 0;
         m_finals.clear();
         m_partialText.clear();
+        m_overlayFinalText.clear();
         m_lastFinalEndMs = 0;
         m_statLines->setText(tr("字幕行数：0"));
     });
@@ -194,6 +195,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
                     m_captionCtl->onFinal(seg, seg.generation);
                     m_finals.append(seg);
                     m_partialText.clear();
+                    m_overlayFinalText = seg.text;   // 定稿常驻，直到下一句替换
                     if (seg.endMs > m_lastFinalEndMs) m_lastFinalEndMs = seg.endMs;
                     appendTranscriptFinal(seg.startMs, seg.text);
                     updateOverlay();
@@ -209,6 +211,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(m_player, &MpvPlayer::positionChanged, this, [this](double s) {
         if (qEnvironmentVariableIsEmpty("RCP_NO_OVERLAY"))   // 诊断开关：跳过字幕对齐/叠加
             m_captionCtl->setPlayheadMs(static_cast<long long>(s * 1000.0) + m_delayMs);
+        updateOverlay();   // 播放头推进时刷新定稿选择（与语音同步显示）
     });
 
     setAcceptDrops(true);
@@ -1655,14 +1658,21 @@ void MainWindow::updateOverlay() {
     const qreal fw = qMax<qreal>(320.0, m_finalLabel->width() - 8.0);
     m_partialLabel->setText(showPartial ? tailToFit(m_partialText, m_partialLabel->font(), pw, 1) : QString());
     m_partialLabel->setVisible(showPartial && !m_partialText.isEmpty());
+    // 定稿显示策略（双兜底）：
+    // 1) worker 离线提取音频通常跑赢播放头——只显示播放头已到达的句子
+    //    （startMs <= head+0.5s 的最后一条），字幕与语音同步；
+    // 2) worker 落后/seek/恢复会话时可能没有任何已到达句——退回常驻显示
+    //    最后到达的一句，不空窗（用户报"直接看不到字幕"的根因即定稿空窗）。
+    // 两种情况都不要求 head <= 句尾：句子显示到下一句开始（参考稿行为）。
     const double s = m_player->timePosition() + m_delayMs / 1000.0;
-    const long long head = static_cast<long long>(s * 1000.0);
-    QString active;
+    const long long head = static_cast<long long>(s * 1000.0) + 500;
+    QString activeFinal;
     for (const auto& seg : m_finals) {
-        if (head >= seg.startMs && head <= seg.endMs) { active = seg.text; break; }
+        if (seg.startMs <= head) activeFinal = seg.text;
     }
-    active = tailToFit(active, m_finalLabel->font(), fw, 2);
-    if (m_finalLabel->text() != active) m_finalLabel->setText(active);
+    if (activeFinal.isEmpty()) activeFinal = m_overlayFinalText;
+    const QString shownFinal = tailToFit(activeFinal, m_finalLabel->font(), fw, 2);
+    if (m_finalLabel->text() != shownFinal) m_finalLabel->setText(shownFinal);
     // 叠加文字变化时强制视频区整体重组：QOpenGLWidget 的子控件脏区合成
     // 在仅子控件重绘时可能残留下帧旧文字（重影），整块 update 一并消除。
     if (m_video && (m_partialLabel->text() != prevPartial || m_finalLabel->text() != prevFinal))
