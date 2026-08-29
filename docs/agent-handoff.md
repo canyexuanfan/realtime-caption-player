@@ -143,3 +143,14 @@ RCP_DEMO_ONLY=1 + RCP_SNAPSHOT + RCP_SNAP_T1/T2，统一 1280x800 逻辑尺寸�
 ### 仍余
 - 字幕定位 reposition trace 复验（行已加）；Waveform 细节对照；demo 海报图；
   a11y 实测历史 tab 点击；MSI 重打。
+
+### 已完成（2026-08-30 第三轮）
+- 字幕画面锚定 trace 实证：host=740x644, video=1280x720 → content=(0,114
+  740x416), 字幕盒 (52,295 636x180)（content.y+87%-180）。mediaLoaded 时
+  video-params 常未就绪 → positionChanged 里 m_videoRectValid 未就绪即重试。
+- MSI 重打 06307143…（含目录记忆/示例数据/设置页对齐），manifest 同步。
+
+### 仍余
+- Waveform 细节对照（36 根 2px 渐变动画——现有实现结构已同，仅微调观感）；
+  demo 海报图（参考稿为外部剧照资产，暂用黑底，可用渐变替代）；历史 tab 点击
+  a11y 实测（QButtonGroup 修复后逻辑确定，未做真机点击验证）。

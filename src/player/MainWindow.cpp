@@ -218,6 +218,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(m_player, &MpvPlayer::positionChanged, this, [this](double s) {
         if (qEnvironmentVariableIsEmpty("RCP_NO_OVERLAY"))   // 诊断开关：跳过字幕对齐/叠加
             m_captionCtl->setPlayheadMs(static_cast<long long>(s * 1000.0) + m_delayMs);
+        if (!m_videoRectValid) repositionOverlays();   // video-params 就绪后补一次画面锚定
         updateOverlay();   // 播放头推进时刷新定稿选择（与语音同步显示）
     });
 
@@ -1988,6 +1989,7 @@ void MainWindow::repositionOverlays() {
     // （否则宽高比不匹配时字幕落在黑边里，偏离参考效果）。
     QRect c(0, 0, vw, vh);
     const QSize vs = m_player ? m_player->videoSize() : QSize();
+    m_videoRectValid = vs.isValid();   // mediaLoaded 时 video-params 常未就绪：播放头事件里重试
     if (vs.isValid()) {
         const double scale = qMin(double(vw) / vs.width(), double(vh) / vs.height());
         const int cw = qMax(1, qRound(vs.width() * scale));
