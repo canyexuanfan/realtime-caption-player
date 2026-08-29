@@ -72,6 +72,12 @@ int main(int argc, char* argv[]) {
     }
     window.show();
     rcpMark("main:shown");
+    // 快照/示例模式：统一 1280x800 逻辑尺寸（与 Edge 无头渲染同宽，像素比对用），
+    // 不恢复上次的窗口几何/最大化状态。
+    if (!snapPath.isEmpty() || !qEnvironmentVariableIsEmpty("RCP_DEMO_ONLY")) {
+        window.showNormal();
+        window.resize(1280, 800);
+    }
     // 快照模式：5s 首验 + 16s 复验（证明持续播放非单帧）后退出。
     // （旧 2.5s 二分定时器已删：它 grab 后直接 quit，会截断 16s 复验。）
 

@@ -39,6 +39,7 @@
 #include <QShortcut>
 #include <QSlider>
 #include <QStackedWidget>
+#include <QButtonGroup>
 #include <QStandardPaths>
 #include <QStandardItemModel>
 #include <QTimer>
@@ -295,10 +296,128 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
                                   m_startupMedia.isEmpty() ? QStringLiteral("<none>") : QStringLiteral("<set>")));
                 // 命令行/拖放显式媒体优先：恢复会话直接让位，避免两个 loadfile 抢跑
                 // 造成 replace 重载（end-file reason=2 → 停止/重启风暴）。
-                if (!m_startupMedia.isEmpty() || !m_currentPath.isEmpty()) return;
+                // RCP_DEMO_ONLY=1：保持参考稿示例数据展示态（像素对比用）。
+                if (!m_startupMedia.isEmpty() || !m_currentPath.isEmpty() ||
+                    !qEnvironmentVariableIsEmpty("RCP_DEMO_ONLY")) return;
                 openFile(last);
             });
     }
+
+    // 参考稿复刻：断点响应 + 示例数据展示态（打开真实媒体即整体替换）。
+    applyBreakpoint(width());
+    fillDemoData();
+}
+
+void MainWindow::resizeEvent(QResizeEvent* event) {
+    QMainWindow::resizeEvent(event);
+    applyBreakpoint(width());
+    repositionOverlays();
+}
+
+// @media (max-width:1320px)：--left-w 238→218、--settings-w 344→322、
+// 标题动作钮 .label 隐藏（只留图标）。逐条对照参考 CSS。
+void MainWindow::applyBreakpoint(int w) {
+    const bool narrow = w <= 1320;
+    if (m_leftRail) m_leftRail->setFixedWidth(narrow ? 218 : 238);
+    if (m_settingsPanel) m_settingsPanel->setFixedWidth(narrow ? 322 : 344);
+    for (int i = 0; i < m_titleActions.size(); ++i) {
+        if (!m_titleActions.at(i)) continue;
+        m_titleActions.at(i)->setText(narrow ? QString() : m_titleActionTexts.at(i));
+    }
+}
+
+void MainWindow::fillDemoData() {
+    // ===== 05_Single_HTML_Frontend_Reference.html 示例数据逐项同源 =====
+    struct Demo { const char* name; int dur; };
+    const std::initializer_list<Demo> playlist = {
+        {"航拍中国 第三季 第01集.mp4", 2952}, {"典籍里的中国 第二季.mp4", 2706},
+        {"河西走廊 第01集.mp4", 2841}, {"大国崛起 第01集.mp4", 2793},
+        {"万里长城 第01集.mp4", 2897}};
+    for (const Demo& d : playlist) {
+        const QString name = QString::fromUtf8(d.name);
+        m_mediaPaths.append(name);
+        auto* item = new QListWidgetItem(name, m_mediaList);
+        item->setData(Qt::UserRole, name);   // decorate/onPlaylistActivated 从 UserRole 取路径
+        m_demoDurations.insert(name, qint64(d.dur) * 1000);   // decorate 按毫秒换算
+    }
+    const std::initializer_list<Demo> history = {
+        {"中国通史 第37集.mp4", 2860}, {"无字幕课程录播 04.mp4", 3925},
+        {"采访素材_未剪辑.mov", 1634}};
+    for (const Demo& d : history) {
+        const QString name = QString::fromUtf8(d.name);
+        m_historyList->addItem(name);
+        m_demoDurations.insert(name, d.dur);
+    }
+    refreshMediaRows();
+    // 转写面板：transcriptSegments 7 段（时间 + 灰字预览 + 白字定稿）
+    const struct { int start; const char* partial; const char* final; } segs[] = {
+        {12, "在广袤的土地之上", "山川河流交错相连"},
+        {18, "这里是中国", "美丽而辽阔的家园"},
+        {24, "从高空俯瞰", "一幅壮丽的画卷徐徐展开"},
+        {30, "每一寸土地都承载着", "自然与人文的故事"},
+        {37, "晨光穿过云层", "照亮群山之间的河谷"},
+        {45, "千百年来", "人们在这里繁衍生息"},
+        {52, "今天的旅程", "将从这片云海开始"}};
+    for (const auto& s : segs) {
+        auto* item = new QListWidgetItem(m_transcript);
+        auto* lab = new QLabel(QStringLiteral(
+            "<div style='color:rgba(167,173,184,0.72);font-size:11px;'>%1</div>"
+            "<div style='color:#757c88;'>%2</div><div>%3</div>")
+                .arg(formatTime(s.start),
+                     QString::fromUtf8(s.partial), QString::fromUtf8(s.final)));
+        lab->setObjectName(QStringLiteral("transcriptItem"));
+        lab->setTextFormat(Qt::RichText);
+        lab->setWordWrap(true);
+        item->setSizeHint(QSize(218, lab->heightForWidth(190) + 20));
+        m_transcript->setItemWidget(item, lab);
+    }
+    m_statLines->setText(tr("字幕行数：128"));
+    m_statLatency->setText(tr("实时延迟：1.2s"));
+    const QString demoTitle = QStringLiteral("航拍中国 第三季 第01集.mp4");
+    if (m_titleFile) m_titleFile->setText(demoTitle);
+    if (m_videoFileTitle) m_videoFileTitle->setText(demoTitle);
+    setWindowTitle(QStringLiteral("实时字幕播放器 — %1").arg(demoTitle));
+    m_demoCurrent = 1458;   // state.current = 24:18
+    m_seek->setRange(0, 2952);
+    m_seek->setValue(m_demoCurrent);
+    m_timeCur->setText(formatTime(1458));
+    m_timeDur->setText(formatTime(2952));
+    m_btnSpeed->setText(QStringLiteral("1.50x ⌄"));
+    m_volume->setValue(72);   // state.volume 0.72
+    m_demoTimer = new QTimer(this);
+    connect(m_demoTimer, &QTimer::timeout, this, &MainWindow::demoTick);
+    m_demoTimer->start(1000);
+    demoTick();
+}
+
+void MainWindow::demoTick() {
+    if (!m_demoMode) return;
+    m_demoCurrent = (m_demoCurrent + 1) % 2952;
+    m_seek->blockSignals(true);
+    m_seek->setValue(m_demoCurrent);
+    m_seek->blockSignals(false);
+    m_timeCur->setText(formatTime(m_demoCurrent));
+    // activeSegmentForTime 同源算法：秒数对 60 取模落段
+    const int rel = ((m_demoCurrent % 60) + 60) % 60;
+    const struct { int start; int end; const char* partial; const char* final; } segs[] = {
+        {12, 17, "在广袤的土地之上", "山川河流交错相连"},
+        {18, 23, "这里是中国", "美丽而辽阔的家园"},
+        {24, 29, "从高空俯瞰", "一幅壮丽的画卷徐徐展开"},
+        {30, 36, "每一寸土地都承载着", "自然与人文的故事"},
+        {37, 44, "晨光穿过云层", "照亮群山之间的河谷"},
+        {45, 51, "千百年来", "人们在这里繁衍生息"},
+        {52, 59, "今天的旅程", "将从这片云海开始"}};
+    int idx = -1;
+    for (int i = 0; i < 7; ++i)
+        if (rel >= segs[i].start && rel <= segs[i].end) { idx = i; break; }
+    if (idx < 0) idx = qBound(0, rel * 7 / 60, 6);
+    m_partialText = QString::fromUtf8(segs[idx].partial);
+    m_overlayFinalText = QString::fromUtf8(segs[idx].final);
+    if (!qEnvironmentVariableIsEmpty("RCP_NO_OVERLAY")) return;
+    m_partialLabel->setText(m_partialText);
+    m_partialLabel->setVisible(true);
+    m_finalLabel->setText(m_overlayFinalText);
+    if (m_video) m_video->update();
 }
 
 void MainWindow::applyTheme() { qApp->setStyleSheet(QString::fromUtf8(kAppQss)); }
@@ -345,6 +464,8 @@ void MainWindow::buildTitleBar(QWidget* parent) {
     auto* bOpenFile = mkTitle(QStringLiteral("folder-open"), tr("打开文件"));
     auto* bOpenFolder = mkTitle(QStringLiteral("folder"), tr("打开文件夹"));
     m_btnSettingsTitle = mkTitle(QStringLiteral("settings"), tr("设置"));
+    m_titleActions = {bOpenFile, bOpenFolder, m_btnSettingsTitle};
+    for (QPushButton* b : m_titleActions) m_titleActionTexts << b->text();
     connect(bOpenFile, &QPushButton::clicked, this, &MainWindow::onOpen);
     connect(bOpenFolder, &QPushButton::clicked, this, &MainWindow::onOpenFolder);
     connect(m_btnSettingsTitle, &QPushButton::clicked, this, &MainWindow::onToggleSettings);
@@ -393,6 +514,7 @@ void MainWindow::buildTitleBar(QWidget* parent) {
 QWidget* MainWindow::buildLeftRail(QWidget* parent) {
     auto* rail = new QFrame(parent);
     rail->setObjectName(QStringLiteral("leftRail"));
+    m_leftRail = rail;
     rail->setFixedWidth(238);
 
     auto* v = new QVBoxLayout(rail);
@@ -457,6 +579,12 @@ QWidget* MainWindow::buildLeftRail(QWidget* parent) {
     m_tabPlaylist->setChecked(true);
     m_tabPlaylist->setCursor(Qt::PointingHandCursor);
     m_tabHistory->setCursor(Qt::PointingHandCursor);
+    // 互斥组：checkable 按钮默认不互斥，点"历史记录"不会取消"播放列表"的选中，
+    // toggled 不触发、栈不切换（用户报"点击历史记录没有反应"根因）。
+    auto* tabGroup = new QButtonGroup(this);
+    tabGroup->setExclusive(true);
+    tabGroup->addButton(m_tabPlaylist);
+    tabGroup->addButton(m_tabHistory);
     th->addWidget(m_tabPlaylist);
     th->addWidget(m_tabHistory);
     v->addWidget(tabs);
@@ -464,6 +592,7 @@ QWidget* MainWindow::buildLeftRail(QWidget* parent) {
     connect(m_tabPlaylist, &QPushButton::toggled, this, [this](bool on) {
         m_mediaStack->setCurrentIndex(on ? 0 : 1);
         m_libTitle->setText(on ? tr("播放列表") : tr("历史记录"));
+        if (on) refreshMediaRows();
     });
 
     auto* trHead = new QWidget(rail);
@@ -1400,12 +1529,15 @@ void MainWindow::refreshMediaRows() {
             play->setText(current ? QStringLiteral("\u25B6") : QString());
             play->setStyleSheet(
                 QStringLiteral("color:%1;font-size:9px;background:transparent;").arg(fg));
-            const QFontMetrics fm(name->font());
-            name->setText(fm.elidedText(QFileInfo(p).fileName(), Qt::ElideRight, 130));
+            QFont f12 = name->font();
+            f12.setPixelSize(12);
+            const QFontMetrics fm12(f12);
+            name->setFixedWidth(132);
+            name->setText(fm12.elidedText(QFileInfo(p).fileName(), Qt::ElideRight, 132));
             name->setStyleSheet(
                 QStringLiteral("color:%1;font-size:12px;background:transparent;").arg(fg));
-            const qint64 d = m_settings.value(QStringLiteral("duration/") + QFileInfo(p).fileName(), 0)
-                                 .toLongLong();
+            const qint64 d = m_demoDurations.value(QFileInfo(p).fileName(),
+                m_settings.value(QStringLiteral("duration/") + QFileInfo(p).fileName(), 0).toLongLong());
             dur->setText(d > 999 ? formatTime(d / 1000.0) : QStringLiteral("--:--"));
             dur->setStyleSheet(QStringLiteral(
                 "color:rgba(255,255,255,0.78);font-size:11px;background:transparent;%1")
@@ -1417,7 +1549,7 @@ void MainWindow::refreshMediaRows() {
 }
 
 void MainWindow::onPlaylistActivated(QListWidgetItem* item) {
-    if (!item) return;
+    if (!item || m_demoMode) return;   // 示例数据为展示态，不触发真实加载
     const QString p = item->data(Qt::UserRole).toString();
     if (!p.isEmpty()) openFile(p);
 }
@@ -1425,6 +1557,17 @@ void MainWindow::onPlaylistActivated(QListWidgetItem* item) {
 // ================= 打开/播放 =================
 void MainWindow::openFile(const QString& path) {
     if (!m_player || !m_player->handle()) return;
+    if (m_demoMode) {
+        // 首个真实媒体：整体退出示例数据态（列表/转写/统计由真实数据重建）。
+        m_demoMode = false;
+        if (m_demoTimer) m_demoTimer->stop();
+        m_mediaPaths.clear();
+        m_mediaList->clear();
+        m_historyList->clear();
+        m_demoDurations.clear();
+        m_partialText.clear();
+        m_overlayFinalText.clear();
+    }
     rcpTrace(QStringLiteral("openFile -> %1").arg(path));
     m_currentPath = path;   // 先于 loadFile：durationChanged 可能先到
     if (m_player->loadFile(path)) {
@@ -1502,6 +1645,7 @@ void MainWindow::onPrevNext(int delta) {
 }
 
 void MainWindow::onSpeed(double v) {
+    if (m_demoMode) return;   // 示例态固定 1.50x（ctor 的速度恢复 singleShot 不得覆盖）
     m_player->setSpeed(v);
     m_btnSpeed->setText(QString::number(v, 'f', 2) + QStringLiteral("x ⌄"));
     m_settings.setValue(QStringLiteral("playback/speed"), v);
@@ -1591,6 +1735,7 @@ void MainWindow::onSeekReleased() {
 
 void MainWindow::onMediaLoaded() {
     m_playBtn->setIcon(icon(QStringLiteral("pause"), QColor("#ffffff"), 22));
+    repositionOverlays();   // video-params 就绪：字幕/徽标锚定画面矩形
 }
 
 void MainWindow::onMediaEnded() {
@@ -1699,19 +1844,34 @@ void MainWindow::repositionOverlays() {
     const int vw = host->width(), vh = host->height();
     m_vignette->setGeometry(0, 0, vw, vh);
     m_dropHint->setGeometry(18, 18, vw - 36, vh - 36);
-    const int ow = qMin(static_cast<int>(vw * 0.86), 920);
-    const int oh = qMin(vh / 2, 180);
+    // 参考稿 --caption-bottom: 13% 相对**视频画面**：mpv 保持纵横比 letterbox 时
+    // 按 contain-fit 求画面矩形，字幕/波形/徽标都锚定画面而非整个控件
+    // （否则宽高比不匹配时字幕落在黑边里，偏离参考效果）。
+    QRect c(0, 0, vw, vh);
+    const QSize vs = m_player ? m_player->videoSize() : QSize();
+    if (vs.isValid()) {
+        const double scale = qMin(double(vw) / vs.width(), double(vh) / vs.height());
+        const int cw = qMax(1, qRound(vs.width() * scale));
+        const int ch = qMax(1, qRound(vs.height() * scale));
+        c = QRect((vw - cw) / 2, (vh - ch) / 2, cw, ch);
+    }
+    const int ow = qMin(static_cast<int>(c.width() * 0.86), 920);
+    const int oh = qMin(c.height() / 2, 180);
     const int pos = m_settings.value(QStringLiteral("caption/position"), 0).toInt();
-    int oy = static_cast<int>(vh * 0.87) - oh;
-    if (1 == pos) oy = (vh - oh) / 2;
-    if (2 == pos) oy = static_cast<int>(vh * 0.10);
-    m_captionOverlay->setGeometry((vw - ow) / 2, qMax(0, oy), ow, oh);
-    m_waveform->setGeometry((vw - qMin(vw * 48 / 100, 520)) / 2,
-                            qMin(vh - 16, oy + oh + 17), qMin(vw * 48 / 100, 520), 14);
-    // 隐私徽标：top 17 right 18（参考稿 privacy-badge）
+    int oy = c.y() + static_cast<int>(c.height() * 0.87) - oh;
+    if (1 == pos) oy = c.y() + (c.height() - oh) / 2;
+    if (2 == pos) oy = c.y() + static_cast<int>(c.height() * 0.10);
+    m_captionOverlay->setGeometry(c.x() + (c.width() - ow) / 2, qMax(c.y(), oy), ow, oh);
+    rcpTrace(QStringLiteral("reposition host=%1x%2 video=%3x%4 content=(%5,%6 %7x%8) box=(%9,%10 %11x%12)")
+                 .arg(vw).arg(vh).arg(vs.width()).arg(vs.height())
+                 .arg(c.x()).arg(c.y()).arg(c.width()).arg(c.height())
+                 .arg(m_captionOverlay->x()).arg(m_captionOverlay->y()).arg(ow).arg(oh));
+    m_waveform->setGeometry(c.x() + (c.width() - qMin(c.width() * 48 / 100, 520)) / 2,
+                            qMin(c.bottom() - 16, oy + oh + 17), qMin(c.width() * 48 / 100, 520), 14);
+    // 隐私徽标：画面内 top 17 right 18（参考稿 privacy-badge）
     if (m_privacyBadge) {
         m_privacyBadge->adjustSize();
-        m_privacyBadge->move(vw - m_privacyBadge->width() - 18, 17);
+        m_privacyBadge->move(c.right() - m_privacyBadge->width() - 18, c.y() + 17);
     }
 }
 

@@ -10,6 +10,7 @@
 #include <QMainWindow>
 #include <QPointer>
 #include <QSettings>
+#include <QHash>
 #include <QVector>
 
 #include "captions/CaptionTypes.h"
@@ -51,6 +52,7 @@ protected:
     void dragLeaveEvent(QDragLeaveEvent* event) override;
     bool eventFilter(QObject* obj, QEvent* event) override;
     void closeEvent(QCloseEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
 
 private slots:
     void onOpen();
@@ -107,6 +109,9 @@ private:
     void saveHistory(const QString& path);
     void updateOverlay();
     void applyCaptionStyle();
+    void fillDemoData();
+    void demoTick();
+    void applyBreakpoint(int w);
     void repositionOverlays();
     void updateDeckForState();
 
@@ -189,4 +194,13 @@ private:
     double m_duration = 0.0;
     bool m_seeking = false;
     QPoint m_windowDrag;
+
+    // ---- 参考稿复刻：断点响应 + 示例数据模式 ----
+    QWidget* m_leftRail = nullptr;
+    QList<QPushButton*> m_titleActions;
+    QList<QString> m_titleActionTexts;
+    bool m_demoMode = true;          // 无真实媒体时展示参考稿示例数据
+    int m_demoCurrent = 1458;        // state.current 24:18
+    QTimer* m_demoTimer = nullptr;
+    QHash<QString, qint64> m_demoDurations;
 };

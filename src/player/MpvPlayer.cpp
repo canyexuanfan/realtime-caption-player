@@ -68,6 +68,15 @@ void MpvPlayer::applyInitialProperties() {
     setSpeed(m_speed);
 }
 
+QSize MpvPlayer::videoSize() const {
+    if (!m_handle) return {};
+    int64_t w = 0, h = 0;
+    if (mpv_get_property(m_handle, "video-params/w", MPV_FORMAT_INT64, &w) < 0) return {};
+    if (mpv_get_property(m_handle, "video-params/h", MPV_FORMAT_INT64, &h) < 0) return {};
+    if (w <= 0 || h <= 0) return {};
+    return QSize(static_cast<int>(w), static_cast<int>(h));
+}
+
 bool MpvPlayer::loadFile(const QString& path, bool replace) {
     if (!m_handle) return false;
     rcpTrace(QStringLiteral("loadFile replace=%1 -> %2").arg(replace ? 1 : 0).arg(path));

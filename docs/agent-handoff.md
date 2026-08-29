@@ -100,3 +100,32 @@ cp out/build/spikes2/bin/*.exe out/bundle/runtime/
 - 交互验证：非提权向导 a11y 驱动，Browse→Up 导航成功无 2812（旧包同操作必现）。
 - MSI 已重打，manifest 哈希已更新（tag v0.1.0 指向修复前状态，修复为 tag 后提交）。
 - 待用户重装复验完整链（Up/NewFolder/选目录/OK/安装）。
+
+## 前端像素级复现（进行中，2026-08-30）
+
+用户要求：以 05_Single_HTML_Frontend_Reference.html 源码为规格像素级复现前端，
+示例数据也同源。已建 Edge 同宽比对回路（--headless --screenshot vs
+RCP_DEMO_ONLY=1 + RCP_SNAPSHOT + RCP_SNAP_T1/T2，统一 1280x800 逻辑尺寸，
+注意用户屏幕 150% 缩放 → 快照物理像素 1.5x）。
+
+本轮已落地（未提交部分见 git status）：
+- 示例数据模式：fillDemoData/demoTick（demoPlaylist 5 项/historyPlaylist 3 项/
+  transcriptSegments 7 段/state 24:18、49:12、1.50x、音量 72、字幕行数 128、
+  延迟 1.2s），activeSegmentForTime 同源算法；开真实媒体整体退出示例态
+- 历史记录 tab 无反应根修：checkable 按钮无互斥组 → QButtonGroup exclusive
+- 字幕按视频画面矩形锚定（video-params contain-fit，repositionOverlays）
+- @media(max-width:1320px) 断点：左栏 218/设置 322/标题钮只留图标
+- CaptionLabel 对齐参考 CSS（字体族/字距/四向描边+模糊阴影缓存）
+- mpv sub-auto=no+sid=no 根除同目录 srt 双层字幕；手动加载 sub-add select
+
+### 下一轮清单（按此继续）
+1. 播放列表行绘制重叠：rowName setFixedWidth(132) 后仍溢出（怀疑 QLabel
+   stylesheet 字体与 fm12 不一致/行容器宽于 sizeHint 触发横向滚动条），需
+   row 级布局重做：play 18 + name elided(stretch) + dur 右对齐，行宽锁 218。
+2. 设置面板"实时字幕"页补参考稿缺失行：字幕字体 select(思源黑体)、字号
+   slider、字幕颜色 白/黄 segmented、描边/阴影 select、字幕位置 select、
+   预览结果颜色 chip、导出设置(自动导出 switch/导出格式 SRT/保存目录)。
+3. 字幕定位 trace 验证（reposition trace 行已加：RCP_TRACE 看 content/box 矩形）。
+4. Waveform 对照（36 根 2px 渐变条 #a79cff→#6555ef 动画）。
+5. demo 海报：参考稿 stage 有 cover 图片（航拍中国剧照），demo 态放等价渐变。
+6. a11y 实测历史 tab 点击 + 全量 ctest + MSI 重打。

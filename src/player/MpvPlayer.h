@@ -14,6 +14,7 @@
 #undef mpv_render_context_create
 
 #include <QString>
+#include <QSize>
 #include <QObject>
 #include <functional>
 
@@ -77,6 +78,7 @@ public:
     // ---- 查询 ----
     double duration() const { return m_duration; }
     double timePosition() const { return m_timePos; }
+    QSize videoSize() const;   // video-params（无媒体时返回无效值）
 
 signals:
     void durationChanged(double seconds);
