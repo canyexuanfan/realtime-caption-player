@@ -612,7 +612,7 @@ QWidget* MainWindow::buildAsrCard(QWidget* parent) {
         bv->addWidget(vl);
         if (out) *out = vl;
     };
-    miniVal(tr("引擎"), tr("本地（Zipformer2-CTC + SenseVoice）"), &m_asrEngine);
+    miniVal(tr("引擎"), tr("本地（双引擎）"), &m_asrEngine);
     miniVal(tr("语言"), tr("中文（auto）"), nullptr);
     miniVal(tr("模型"), tr("Balanced（中文通用）"), nullptr);
 
@@ -657,6 +657,7 @@ QWidget* MainWindow::buildAsrCard(QWidget* parent) {
     connect(ex, &QPushButton::clicked, this, &MainWindow::onExportSrt);
     bv->addWidget(ex);
     v->addWidget(body, 1);
+    card->adjustSize();   // 确定高度=内容 sizeHint（不依赖运行时 polish，快照/真机一致）
     return card;
 }
 
@@ -1415,7 +1416,7 @@ void MainWindow::refreshMediaRows() {
                 QStringLiteral("color:%1;font-size:12px;background:transparent;").arg(fg));
             const qint64 d = m_settings.value(QStringLiteral("duration/") + QFileInfo(p).fileName(), 0)
                                  .toLongLong();
-            dur->setText(d > 0 ? formatTime(d / 1000.0) : QStringLiteral("--:--"));
+            dur->setText(d > 999 ? formatTime(d / 1000.0) : QStringLiteral("--:--"));
             dur->setStyleSheet(QStringLiteral(
                 "color:rgba(255,255,255,0.78);font-size:11px;background:transparent;%1")
                                    .arg(current || selected ? QString() : QStringLiteral("color:#a7adb8;")));
@@ -1434,10 +1435,10 @@ void MainWindow::onPlaylistActivated(QListWidgetItem* item) {
 // ================= 打开/播放 =================
 void MainWindow::openFile(const QString& path) {
     if (!m_player || !m_player->handle()) return;
+    m_currentPath = path;   // 先于 loadFile：durationChanged 可能先到
     if (m_player->loadFile(path)) {
         addMediaPaths(QStringList{path});
         saveHistory(path);
-        m_currentPath = path;
         const int row = m_mediaPaths.indexOf(path);
         if (row >= 0) m_mediaList->setCurrentRow(row);
         refreshMediaRows();

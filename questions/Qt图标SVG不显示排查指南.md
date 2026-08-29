@@ -83,3 +83,11 @@ qrc 初始化对象（qrc_*_init.cpp.obj）无外部符号引用，被 MSVC 链�
 ### 流程更正（用户指出）
 违反 AGENTS.md 问题修复流程：失败后未先 ❌ 记录、未重读失败经验、把用户当验证工具。
 本指南即为补档；后续 UI 问题一律先快照自证、后交付。
+
+### 本轮自检修复（快照闭环首次实战）
+- ASR 卡高度从未显式确定（靠运行时 polish）→ buildAsrCard 末尾 adjustSize()，
+  快照实证完整渲染（快照模式与真机一致）。
+- 播放列表行时长脏数据（durationChanged 早于 m_currentPath 赋值）→
+  openFile 先设 m_currentPath；显示阈值 d>999。
+- 引擎值文案过长被 195px 卡截断 → 「本地（双引擎）」。
+- snap4/snap5 像素级确认以上全部生效。
