@@ -22,13 +22,18 @@
          have an empty required property. -->
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
 
-    <!-- Type 51: force INSTALLFOLDER (the real install directory) back to the default
-         ProgramFiles64Folder\RealtimeCaptionPlayer BEFORE CostInitialize, overriding any
-         stale registry path from a prior install (e.g. E:\Program\ without subfolder).
-         With Indirect="yes" on the Folder/DirectoryList controls, the dialog edits INSTALLFOLDER
-         directly, so we reset the directory here (NOT WIXUI_INSTALLDIR).
-         Built-in property assignment, NOT a script -> no Error 1721. -->
-    <SetProperty Id="INSTALLFOLDER" Value="[ProgramFiles64Folder]RealtimeCaptionPlayer" Before="CostInitialize" Sequence="ui" />
+    <!-- 升级检测/目录记忆：安装时把最终目录写入注册表；重装时 AppSearch 读回。
+         PREVINSTALLDIR 命中且以程序名子目录结尾（防陈旧脏路径）→ 预填旧目录；
+         否则回默认。此前"无条件重置默认"抹掉了记忆，用户报"重装连目录也是默认"。 -->
+    <Property Id="PREVINSTALLDIR">
+      <RegistrySearch Id="PrevInstallDirSearch" Root="HKLM"
+                      Key="SOFTWARE\Rcp\RealtimeCaptionPlayer" Name="InstallDir" Type="raw" />
+    </Property>
+    <!-- Type 51：目录预填（AppSearch 之后）。条件走序列行的 Condition 列。 -->
+    <CustomAction Id="SetInstallFolderDefault" Property="INSTALLFOLDER"
+                  Value="[ProgramFiles64Folder]RealtimeCaptionPlayer" Execute="immediate" />
+    <CustomAction Id="SetInstallFolderPrev" Property="INSTALLFOLDER"
+                  Value="[PREVINSTALLDIR]" Execute="immediate" />
 
     <UI>
       <Property Id="DefaultUIFont" Value="DlgFont" />
@@ -40,6 +45,11 @@
         </Control>
         <Control Id="Description" Type="Text" X="20" Y="70" Width="330" Height="80">
           <Text>Local-first offline realtime captioning player.\n\nClick Next to choose where to install, then Install.</Text>
+        </Control>
+        <!-- 检测到既往安装时显示升级提示（PREVINSTALLDIR 由 AppSearch 填充）。 -->
+        <Control Id="UpgradeDesc" Type="Text" X="20" Y="140" Width="330" Height="30">
+          <Text>An existing installation was detected. It will be upgraded in place (the previous version will be replaced).</Text>
+          <Condition Action="hide">NOT PREVINSTALLDIR</Condition>
         </Control>
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17">
           <Text>Next</Text>
@@ -236,6 +246,9 @@
         <Show Dialog="ExitDialog" OnExit="success" />
         <Show Dialog="UserExit" OnExit="cancel" />
         <Show Dialog="FatalError" OnExit="error" />
+        <AppSearch Before="CostInitialize" />
+        <Custom Action="SetInstallFolderDefault" After="AppSearch">NOT PREVINSTALLDIR</Custom>
+        <Custom Action="SetInstallFolderPrev" After="AppSearch">PREVINSTALLDIR &gt;&gt; &quot;RealtimeCaptionPlayer&quot;</Custom>
         <Show Dialog="WelcomeDlg" After="CostFinalize">1</Show>
         <Show Dialog="ProgressDlg" Before="ExecuteAction" />
       </InstallUISequence>
@@ -245,6 +258,7 @@
       <ComponentGroupRef Id="RcpRuntimeComponents" />
       <ComponentRef Id="StartMenuShortcut" />
       <ComponentRef Id="DesktopShortcut" />
+      <ComponentRef Id="InstallDirReg" />
     </Feature>
 
     <Directory Id="TARGETDIR" Name="SourceDir">
@@ -281,6 +295,13 @@
       <RegistryValue Root="HKLM"
                      Key="Software\Rcp\RealtimeCaptionPlayer" Name="desktop"
                      Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- 安装目录记忆：重装/升级时 AppSearch 据此预填目录（升级检测的落点）。 -->
+    <Component Id="InstallDirReg" Guid="*" Directory="INSTALLFOLDER">
+      <RegistryValue Root="HKLM"
+                     Key="Software\Rcp\RealtimeCaptionPlayer" Name="InstallDir"
+                     Value="[INSTALLFOLDER]" Type="string" KeyPath="yes" />
     </Component>
 
   </Product>

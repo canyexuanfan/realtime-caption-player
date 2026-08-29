@@ -251,3 +251,30 @@ FindRelatedProducts 忽略**同版本号**的相关产品。MVP 阶段 ProductVe
 
 注意：历史上 UpgradeCode 一直稳定（6E6B4C1A-… 各提交一致），老安装可被识别；
 若未来改 UpgradeCode，旧装将永远无法自动升级，只能手动卸载。
+
+## ✅ 追加 2：重装"连目录也是默认"——目录记忆实现（2026-08-30）
+
+上一轮为防陈旧路径（E:\Program\ 无子文件夹）把 Type51 改成**无条件重置默认**，
+把"记住上次安装位置"也抹掉了——方向性错误（❌ 教训：修脏数据问题不应删除
+正常功能，应校验后使用）。
+
+本轮实现（✅）：
+1. 安装时写 `HKLM\SOFTWARE\Rcp\RealtimeCaptionPlayer\InstallDir=[INSTALLFOLDER]`
+   （InstallDirReg 组件，KeyPath）。
+2. `Property PREVINSTALLDIR` + RegistrySearch 读回；UI 序列显式排
+   `<AppSearch Before="CostInitialize" />`（不显式排则该动作不运行——本项目
+   自定义 UI 的序列只含被引用的动作）。
+3. 两条 Type51 改 CustomAction+序列条件列（SetProperty 元素在 WiX3 不支持
+   Condition 子元素，CNDL0005）：
+   - `NOT PREVINSTALLDIR` → 默认 Program Files\RealtimeCaptionPlayer
+   - `PREVINSTALLDIR >> "RealtimeCaptionPlayer"`（MSI 条件 `>>`=以此结尾，
+     防陈旧脏路径）→ 沿用旧目录原位升级。
+4. Welcome 页条件显示 "An existing installation was detected…"。
+
+已知项：
+- 首次装本版时无处可读旧目录（旧版从未写过注册表），本次仍显示默认；装完本版
+  之后的所有重装都会自动定位旧目录。
+- 默认目录显示 C:\Program Files (x86)：MSI 是 32 位包（WiX3 默认，
+  未设 Platform="x64"），32 位包内 ProgramFiles64Folder 解析同 32 位 PF。
+  应用本体是 x64，装在 x86 PF 只是观感问题；迁移 x64 包留待版本号变化时一并做
+  （x86→x64 跨位宽升级链需单独验证）。
