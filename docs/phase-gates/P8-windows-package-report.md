@@ -173,3 +173,12 @@ trace 剥出四个根因（详见 questions/libmpv播放停滞排查指南.md �
 延迟 0.0s、ASR 运行中；trace 单次 loadFile、time-pos 实时推进、心跳无断流。
 MSI 重打（TEMP 重定向 F 盘——C 盘仅剩 75MB 致 WiX LGHT0297 ERROR_DISK_FULL），
 manifest 同步（MSI cf781e8e…、player_app 425f015e…）。提交 faadb35 已推送。
+
+### 补记 11（2026-08-29）：字幕叠加层"文字墙"根修（用户观感反馈）
+用户截图显示叠加层堆积数百字换行成文字墙。三处修复：partial 分支补
+updateOverlay（原缺失，叠加层 partial 仅 final 时刷新）；updateOverlay 尾部
+截断（partial 1 行 / final ≤2 行，超长取尾加省略号——对齐参考稿短句视觉）；
+文字变化时 m_video->update() 整块重组消除 QOpenGLWidget 子控件脏区残影。
+用用户实际课件（G 盘 40:44 提干网课）真机快照验证：单行灰字 partial、
+转写面板 final+partial 分行、播放≈实时。ctest 21/21。MSI 重打
+（36d94b86…），manifest 同步。提交 041d1b2。
