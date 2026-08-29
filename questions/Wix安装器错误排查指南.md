@@ -234,3 +234,20 @@ QSvgRenderer 渲染有效性写入 exe 旁 resource-check.txt（不可写则落 
 实测：4 资源全 OK、svg-render(play)=OK（227 字节解析成功）。
 排查教训：加自检时 QFile(...).readAll() 在未 open 的临时对象上返回空字节，
 会让"渲染级自检"假阴性——必须先 open。
+
+## ✅ 追加：重装不检测已安装版本（2026-08-30）
+
+现象：反复安装 0.1.0 系列 MSI，"程序与功能"出现并列条目/不提示已安装。
+
+根因：WiX `MajorUpgrade` 默认 `AllowSameVersionUpgrades="no"`——
+FindRelatedProducts 忽略**同版本号**的相关产品。MVP 阶段 ProductVersion 恒为
+0.1.0、ProductCode 每次构建都变（Id="*"），于是每次安装都互不相识。
+
+修复：`<MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="..."/>`。
+
+验证（不装机）：WindowsInstaller COM 读 MSI 的 `_Upgrade` 表，应有两行——
+`UpgradeCode | (空) | 0.1.0 | 513`（卸载旧版，0x200=VersionMinInclusive
+使同版本也命中）与 `UpgradeCode | 0.1.0 | (空) | 2`（OnlyDetect 降级保护）。
+
+注意：历史上 UpgradeCode 一直稳定（6E6B4C1A-… 各提交一致），老安装可被识别；
+若未来改 UpgradeCode，旧装将永远无法自动升级，只能手动卸载。

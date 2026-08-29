@@ -155,7 +155,7 @@ bool MpvPlayer::loadSubtitle(const QString& path) {
     const char* args[] = {
         "sub-add",
         p.constData(),
-        "auto",
+        "select",   // 手动加载立即显示（init 已 sid=no；auto 不会选中导致"加载没反应"）
         nullptr
     };
     return mpv_command(m_handle, args) >= 0;

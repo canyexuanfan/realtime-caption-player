@@ -166,3 +166,18 @@ Windows 事件日志无崩溃记录（Id=1000 为空）证明不是 crash。已�
 - trace：**单次** loadFile、无 end-file reason=2、stuck 仅切换瞬间 1 条、
   time-pos 实时推进（12.3s/12.7s 墙钟）、hb 心跳 30+ 连续无断流。
 - 全量 ctest 21/21 通过。
+
+## ✅ 追加 3：字幕"重影双层"——mpv 静默加载同目录 .srt（2026-08-30）
+
+现象：叠加层下方出现**第二条更大的字幕**，样式与 ASR 叠加不同，一直被误读为
+自己的 final 渲染。trace 决定性证据：`mpv[v] Using subtitle decoder srt` +
+`refresh track 0 (sub)`——mpv 自动加载了媒体同目录的历史导出 .srt（autoExport
+产物），当作字幕轨渲染（libass 大字号居中）。
+
+修复（产品字幕只走本地 ASR 叠加）：
+- mpv 初始化显式 `sub-auto=no` + `sid=no`；
+- 手动"加载外挂字幕"改 `sub-add select`（原先 auto 在 sid=no 下不选中，
+  表现为"加载了没反应"）。
+
+教训：mpv 对同目录 srt 的外挂行为必须在 init 显式关断；快照里"内容相同的
+两层文字"先查 mpv track 选择日志再怀疑自己的绘制。

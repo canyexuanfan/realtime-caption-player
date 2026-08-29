@@ -147,6 +147,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         m_player->setOption(QStringLiteral("screenshot-format"), QStringLiteral("png"));
         m_player->setOption(QStringLiteral("screenshot-directory"),
                             QStandardPaths::writableLocation(QStandardPaths::PicturesLocation));
+        // 产品字幕只走本地 ASR 叠加层：禁用 mpv 外挂字幕自动加载与默认字幕轨。
+        // 否则媒体同目录的历史导出 .srt 会被 mpv 渲染成第二层大字
+        // （与 ASR 叠加重影，用户见"字幕重复/样式不对"）。手动加载走
+        // loadSubtitle（sub-add select 立即显示）。
+        m_player->setOption(QStringLiteral("sub-auto"), QStringLiteral("no"));
+        m_player->setOption(QStringLiteral("sid"), QStringLiteral("no"));
         m_player->initialize();
     }
 
@@ -1646,7 +1652,8 @@ void MainWindow::updateOverlay() {
     auto tailToFit = [](const QString& t, const QFont& f, qreal maxW, int maxLines) {
         if (t.isEmpty()) return t;
         const QFontMetrics fm(f);
-        const qreal unit = qMax<qreal>(4.0, fm.averageCharWidth());
+        // 用 CJK 字宽做单位（averageCharWidth 被 Latin 拉低 → 截断失效换行成墙）
+        const qreal unit = qMax<qreal>(4.0, fm.horizontalAdvance(QChar(0x6D4B)));
         const int perLine = qMax(6, static_cast<int>(maxW / unit));
         const int maxChars = perLine * qMax(1, maxLines);
         if (t.size() <= maxChars) return t;

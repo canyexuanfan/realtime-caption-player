@@ -13,6 +13,7 @@
 #include <QFile>
 #include <QFontMetrics>
 #include <QIcon>
+#include <QImage>
 #include <QLabel>
 #include <QPainter>
 #include <QPainterPath>
@@ -20,7 +21,9 @@
 #include <QSvgRenderer>
 #include <QTimer>
 #include <QVector>
+#include <QtMath>
 #include <cmath>
+#include <vector>
 
 namespace rcpui {
 
@@ -92,10 +95,69 @@ public:
         QFont f = font();
         f.setPixelSize(px);
         f.setWeight(Final == m_style ? QFont::DemiBold : QFont::Normal);
+        // 参考 HTML font-family: Inter, "Segoe UI", "Microsoft YaHei UI", ...
+        // 中文回退微软雅黑 UI；letter-spacing .02em(final)/.01em(partial)
+        f.setFamilies({QStringLiteral("Segoe UI"), QStringLiteral("Microsoft YaHei UI"),
+                       QStringLiteral("Microsoft YaHei")});
+        f.setLetterSpacing(QFont::AbsoluteSpacing, px * (Final == m_style ? 0.02 : 0.01));
         setFont(f);
         update();
     }
 protected:
+    // 两趟盒式模糊近似高斯（CSS text-shadow blur）：只作用于 alpha（纯黑影子）。
+    static void boxBlurAlpha(QImage& img, int r) {
+        if (r <= 0 || img.isNull()) return;
+        const int w = img.width(), h = img.height();
+        QImage tmp(img.size(), img.format());
+        std::vector<quint8> acc;
+        // 水平
+        for (int y = 0; y < h; ++y) {
+            const QRgb* src = reinterpret_cast<const QRgb*>(img.constScanLine(y));
+            QRgb* dst = reinterpret_cast<QRgb*>(tmp.scanLine(y));
+            for (int x = 0; x < w; ++x) {
+                int sum = 0, n = 0;
+                for (int k = -r; k <= r; ++k) {
+                    const int xx = x + k;
+                    if (xx >= 0 && xx < w) { sum += qAlpha(src[xx]); ++n; }
+                }
+                dst[x] = qRgba(0, 0, 0, static_cast<int>(sum / n));
+            }
+        }
+        // 垂直
+        for (int x = 0; x < w; ++x) {
+            for (int y = 0; y < h; ++y) {
+                int sum = 0, n = 0;
+                for (int k = -r; k <= r; ++k) {
+                    const int yy = y + k;
+                    if (yy >= 0 && yy < h) {
+                        sum += qAlpha(reinterpret_cast<const QRgb*>(tmp.constScanLine(yy))[x]);
+                        ++n;
+                    }
+                }
+                reinterpret_cast<QRgb*>(img.scanLine(y))[x] =
+                    qRgba(0, 0, 0, static_cast<int>(sum / n));
+            }
+        }
+        Q_UNUSED(acc);
+    }
+    // 把文字路径渲染成纯黑模糊阴影图（pad 防裁边）。
+    static QImage makeBlurredShadow(const QPainterPath& path, const QRectF& bb, int radius) {
+        const int pad = radius * 2 + 4;
+        QImage img(qCeil(bb.width()) + 2 * pad, qCeil(bb.height()) + 2 * pad,
+                   QImage::Format_ARGB32_Premultiplied);
+        img.fill(Qt::transparent);
+        QPainter ip(&img);
+        ip.setRenderHint(QPainter::Antialiasing);
+        ip.setRenderHint(QPainter::TextAntialiasing);
+        ip.translate(pad - bb.left(), pad - bb.top());
+        ip.setPen(Qt::NoPen);
+        ip.setBrush(Qt::black);
+        ip.drawPath(path);
+        ip.end();
+        boxBlurAlpha(img, radius);
+        boxBlurAlpha(img, radius);   // 两趟更接近高斯
+        return img;
+    }
     void paintEvent(QPaintEvent*) override {
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing);
@@ -104,10 +166,7 @@ protected:
         if (t.isEmpty()) return;
         QFont f = font();
         const qreal wrapW = width() - 8;
-        QTextOption opt;
-        opt.setWrapMode(QTextOption::WordWrap);
-        opt.setAlignment(Qt::AlignHCenter);
-        // 简单换行：按像素宽度手工断行
+        // 按像素宽度手工断行，整体垂直居中（CSS line-height 1.24/1.2）
         QStringList lines;
         {
             QString cur;
@@ -125,35 +184,56 @@ protected:
         const qreal lineH = fm.height() * (Final == m_style ? 1.24 : 1.2);
         qreal y = (height() - lines.size() * lineH) / 2.0;
         if (y < 0) y = 0;
+        QPainterPath allPath;
         for (const QString& line : lines) {
             const qreal x = (width() - fm.horizontalAdvance(line)) / 2.0;
-            QPainterPath path;
-            path.addText(QPointF(x, y + fm.ascent()), f, line);
-            if (Partial == m_style) {
-                QColor c = m_color;
-                p.setBrush(c);
-                // 投影
-                QPainterPath shadow = path;
-                shadow.translate(0, 2);
-                p.setBrush(QColor(0, 0, 0, 230));
-                p.drawPath(shadow);
-                p.setBrush(c);
-                p.drawPath(path);
-            } else {
-                if (2 != m_outline) {  // 描边或阴影
-                    QPainterPath outline = path;
-                    if (1 == m_outline) outline.translate(0, 4);
-                    QPen pen(QColor(0, 0, 0, 240), 2 != m_outline ? 3 : 5);
-                    pen.setJoinStyle(Qt::RoundJoin);
-                    p.setPen(pen);
-                    p.setBrush(Qt::NoBrush);
-                    p.drawPath(outline);
-                }
-                p.setPen(Qt::NoPen);
-                p.setBrush(m_color);
-                p.drawPath(path);
-            }
+            allPath.addText(QPointF(x, y + fm.ascent()), f, line);
             y += lineH;
+        }
+        const QRectF bb = allPath.boundingRect();
+        // 参考 CSS 阴影堆栈（blur 半径近似：CSS blur/2 × 2 趟盒模糊）：
+        // partial: 0 2px 3px rgba(0,0,0,.95) + 0 0 8px rgba(0,0,0,.9)
+        // final:   四向 ±2px 实体 rgba(0,0,0,.94) + 0 4px 13px rgba(0,0,0,.85)
+        const QString key = QStringLiteral("%1|%2|%3|%4").arg(t, QString::number(width()),
+                            QString::number(int(m_style)), f.key());
+        const int shadowR = Partial == m_style ? 4 : 9;
+        if (key != m_shadowKey) {
+            m_shadowKey = key;
+            m_shadowImg = makeBlurredShadow(allPath, bb, shadowR);
+        }
+        auto drawShadow = [&](qreal dx, qreal dy, int alphaScale) {
+            if (m_shadowImg.isNull()) return;
+            p.drawImage(QPointF(bb.left() - m_shadowImg.width() / 2.0 + dx,
+                                bb.top() - m_shadowImg.height() / 2.0 + dy),
+                        m_shadowImg);
+            Q_UNUSED(alphaScale);
+        };
+        if (Partial == m_style) {
+            drawShadow(0, 2, 242);   // 0 2px 3px .95
+            drawShadow(0, 0, 230);   // 0 0 8px .90（同图叠加近似双影）
+            p.setPen(Qt::NoPen);
+            p.setBrush(m_color);
+            p.drawPath(allPath);
+        } else {
+            if (2 != m_outline) {
+                if (0 == m_outline) {
+                    // 描边：四对角 2px 实体（CSS -2/2px 0 .94）
+                    static const QPointF diag[] = {{-2, -2}, {2, -2}, {-2, 2}, {2, 2}};
+                    p.setPen(Qt::NoPen);
+                    p.setBrush(QColor(0, 0, 0, 240));
+                    for (const QPointF& o : diag) {
+                        QPainterPath t2 = allPath;
+                        t2.translate(o);
+                        p.drawPath(t2);
+                    }
+                    drawShadow(0, 4, 217);   // 0 4px 13px .85
+                } else {   // 1 == 阴影模式
+                    drawShadow(0, 4, 217);
+                }
+            }
+            p.setPen(Qt::NoPen);
+            p.setBrush(m_color);
+            p.drawPath(allPath);
         }
     }
 private:
@@ -167,6 +247,8 @@ private:
     Style m_style = Final;
     QColor m_color = QColor("#ffffff");
     int m_outline = 0;
+    QString m_shadowKey;    // 阴影图缓存键（文本+宽+样式+字体）
+    QImage m_shadowImg;
 };
 
 // .waveform 复刻：36 根 2px 圆角条，渐变 #a79cff→#6555ef，识别活动驱动。

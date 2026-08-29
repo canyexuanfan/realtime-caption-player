@@ -9,7 +9,10 @@
       UpgradeCode="6E6B4C1A-2F3A-4B8C-9D1E-5A7B2C3D4E5F">
 
     <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of RealtimeCaptionPlayer is already installed." />
+    <!-- AllowSameVersionUpgrades：MVP 阶段版本号恒为 0.1.0；默认（no）时
+         FindRelatedProducts 忽略同版本相关产品，重装被当成新产品并列安装
+         （用户报"再次安装没有检测到已安装"根因）。yes = 每次新构建顶替旧装。 -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of RealtimeCaptionPlayer is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
     <!-- Custom minimal UI: Welcome -> InstallDir -> VerifyReady -> Exit.
