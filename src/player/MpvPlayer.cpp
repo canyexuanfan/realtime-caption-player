@@ -52,7 +52,9 @@ bool MpvPlayer::initialize() {
     mpv_set_wakeup_callback(m_handle, &MpvPlayer::wakeupCallback, this);
 
     // 诊断：把 mpv 内部日志引入事件流（v 级别可定位 GL 报错组件）。
-    mpv_request_log_messages(m_handle, "v");
+    // 诊断开关：verbose 日志会在播放时产生海量事件（二分挂死用）。
+    if (qEnvironmentVariableIsEmpty("RCP_NO_LOG"))
+        mpv_request_log_messages(m_handle, "v");
     rcpTrace(QStringLiteral("mpv initialized"));
 
     applyInitialProperties();
@@ -75,7 +77,10 @@ bool MpvPlayer::loadFile(const QString& path, bool replace) {
         replace ? "replace" : "append",
         nullptr
     };
-    m_loaded = (mpv_command(m_handle, args) == 0);
+    // 异步命令：网盘挂载路径（如 X:/）的源打开可能耗时数十秒，
+    // 同步 mpv_command 会阻塞 GUI 线程（实测 19.5s 卡死）。异步把耗时
+    // 移到 mpv 核心线程，命令回复（MPV_EVENT_COMMAND_REPLY）可忽略。
+    m_loaded = (mpv_command_async(m_handle, 0, args) >= 0);
     return m_loaded;
 }
 

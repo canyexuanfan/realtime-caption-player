@@ -71,3 +71,33 @@ Intel Iris Xe（GL 4.6 compat）下 mpv 建视频纹理时偶报一次，渲染�
 
 - 2026-08-28 首次记录：MPV_FORMAT_FLAG 误用 + osd-overlay 语法修复，
   真机完整播放验证通过；INVALID_ENUM 记为已知非致命问题。
+
+## ✅ 追加（黑屏最终根治，2026-08-29 深夜）
+
+用户报"视频没有画面、没有实时字幕"。快照自验证 + PID trace 层层剥出**五个叠加缺陷**：
+
+1. **VO 竞态（黑屏主因）**：show() 后立即 loadfile，渲染上下文未创建 →
+   `mpv[fatal] No render context set / Video: no video` → 纯音频黑屏，时钟正常走。
+   修复：argv/恢复会话的打开延迟 1.5s/1.6s（窗口首次绘制后）。
+2. **resume 顶替**：恢复会话 loadfile(X:/网盘文件) 用 replace 顶掉显式媒体。
+   修复：m_currentPath 非空时跳过恢复。
+3. **构造函数同步 exists(X:/) 阻塞 20s**：恢复检查 QFile::exists 打在离线
+   rclone 挂载路径上。修复：删同步检查，失败交给播放器。
+4. **INVALID_ENUM 纹理创建失败（Intel 驱动兼容）**：高级渲染管线建视频纹理
+   报 INVALID_ENUM → 帧永不显示。修复：`gpu-dumb-mode=yes`（固定 rgba8 管线），
+   实测该错误归零。
+5. **同步 loadfile 阻塞 GUI 19.5s**：mpv_command(loadfile) 打开网盘源时阻塞
+   主线程。修复：`mpv_command_async`。
+
+**附带发现并修复**：UI 重写时 startCaptioningFor 调用丢失 → worker 从未启动
+（字幕"未运行"直接原因）。
+
+**验证工具升级**：rcpTrace 改为每次调用独立开关文件（Append+PID）——inline
+静态 QFile 在 MSVC 多编译单元下行为不确定，trace 行随机丢失（三轮误诊根源）；
+新增 rcpMark（C 标准库直写标记）定位构造路径卡点。
+
+**遗留**：RCP_SNAPSHOT 模式 16s 的 .b 快照偶发缺失（grab/save 偶发失败），
+自检手段问题非产品问题，待查。
+
+验证：无 trace 纯净运行 479 个 time-pos 事件持续流动、INVALID_ENUM=0、
+worker 运行中、用户界面交互（暂停/恢复）正常响应。

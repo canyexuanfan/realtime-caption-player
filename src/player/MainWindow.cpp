@@ -6,6 +6,7 @@
 #include "MainWindow.h"
 #include "MpvPlayer.h"
 #include "MpvRenderWidget.h"
+#include "MpvTrace.h"
 #include "UiKit.h"
 #include "WorkerSupervisor.h"
 #include "captions/CaptionController.h"
@@ -140,6 +141,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         m_player->setOption(QStringLiteral("vo"), QStringLiteral("libmpv"));
         m_player->setOption(QStringLiteral("hwdec"),
                             m_settings.value(QStringLiteral("playback/hwdec"), QStringLiteral("no")).toString());
+        // Intel 驱动兼容：高级渲染管线建视频纹理报 INVALID_ENUM（纹理创建失败
+        // → 帧永远不显示 → 黑屏，播放时钟正常）。dumb 模式用固定 rgba8 管线绕开。
+        m_player->setOption(QStringLiteral("gpu-dumb-mode"), QStringLiteral("yes"));
         m_player->setOption(QStringLiteral("screenshot-format"), QStringLiteral("png"));
         m_player->setOption(QStringLiteral("screenshot-directory"),
                             QStandardPaths::writableLocation(QStandardPaths::PicturesLocation));
@@ -148,8 +152,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
     m_captionCtl = new rcp::captions::CaptionController(this);
     m_worker = new rcp::player::WorkerSupervisor(this);
+    rcpMark("ctor:player-initialized");
 
+    rcpMark("ctor:applyTheme-begin");
     applyTheme();
+    rcpMark("ctor:applyTheme-done");
 
     connect(m_player, &MpvPlayer::positionChanged, this, &MainWindow::onPositionChanged);
     connect(m_player, &MpvPlayer::durationChanged, this, &MainWindow::onDurationChanged);
@@ -194,7 +201,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         setAsrStatus(tr("识别进程退出"), QColor("#69717d").name());
     });
     connect(m_player, &MpvPlayer::positionChanged, this, [this](double s) {
-        m_captionCtl->setPlayheadMs(static_cast<long long>(s * 1000.0) + m_delayMs);
+        if (qEnvironmentVariableIsEmpty("RCP_NO_OVERLAY"))   // 诊断开关：跳过字幕对齐/叠加
+            m_captionCtl->setPlayheadMs(static_cast<long long>(s * 1000.0) + m_delayMs);
     });
 
     setAcceptDrops(true);
@@ -206,7 +214,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     auto* root = new QVBoxLayout(central);
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
+    rcpMark("ctor:buildTitleBar-begin");
     buildTitleBar(central);
+    rcpMark("ctor:buildTitleBar-done");
     root->addWidget(m_titleBar);
 
     auto* workspace = new QWidget(central);
@@ -223,9 +233,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     wh->addWidget(m_settingsPanel);
     root->addWidget(workspace, 1);
 
+    rcpMark("ctor:setCentralWidget");
     setCentralWidget(central);
     m_titleBar->installEventFilter(this);
+    rcpMark("ctor:loadHistory-begin");
     loadHistory();
+    rcpMark("ctor:loadHistory-done");
     resize(1280, 800);
     setMinimumSize(1024, 660);
 
@@ -250,8 +263,13 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     applyCaptionStyle();
     if (m_settings.value(QStringLiteral("general/resumeSession"), true).toBool()) {
         const QString last = m_settings.value(QStringLiteral("history/paths")).toStringList().value(0);
-        if (!last.isEmpty() && QFile::exists(last))
-            QTimer::singleShot(100, this, [this, last] { openFile(last); });
+        if (!last.isEmpty())
+            // 存在性交给播放器：同步 exists() 会阻塞在离线网盘挂载路径（实测 20s 卡死）。
+            // 若启动媒体（argv/拖放）已打开则跳过恢复，避免网盘 loadfile 顶掉显式媒体。
+            QTimer::singleShot(1600, this, [this, last] {
+                if (!m_currentPath.isEmpty()) return;
+                openFile(last);
+            });
     }
 }
 
@@ -491,20 +509,16 @@ QWidget* MainWindow::buildVideoArea(QWidget* parent) {
     auto* grid = new QGridLayout(surface);
     grid->setContentsMargins(0, 0, 0, 0);
 
-    // 离屏快照模式（RCP_SNAPSHOT）：跳过 GL 部件（offscreen 平台会挂住），
-    // 用黑色占位——图标/logo/布局验证不受影响。
-    const bool snapshotMode = !qEnvironmentVariableIsEmpty("RCP_SNAPSHOT");
-    if (!snapshotMode) {
-        m_video = new MpvRenderWidget(surface);
-        m_video->setMinimumSize(320, 240);
-        if (m_player && m_player->handle()) m_video->attachPlayer(m_player);
-        m_video->installEventFilter(this);
-        grid->addWidget(m_video, 0, 0);
-    } else {
-        auto* placeholder = new QWidget(surface);
-        placeholder->setStyleSheet(QStringLiteral("background:#10151d;"));
-        grid->addWidget(placeholder, 0, 0);
-    }
+    // 真实 GL 视频部件（RCP_SNAPSHOT 快照也走真实渲染，用于验证视频画面）。
+    rcpMark("buildVideoArea:pre-m_video");
+    m_video = new MpvRenderWidget(surface);
+    rcpMark("buildVideoArea:m_video-created");
+    m_video->setMinimumSize(320, 240);
+    if (m_player && m_player->handle()) m_video->attachPlayer(m_player);
+    rcpMark("buildVideoArea:attached");
+    m_video->installEventFilter(this);
+    grid->addWidget(m_video, 0, 0);
+
     m_videoHost = surface;
     surface->installEventFilter(this);
 
@@ -1289,7 +1303,7 @@ void MainWindow::loadHistory() {
     m_historyList->clear();
     const QStringList hist = m_settings.value(QStringLiteral("history/paths")).toStringList();
     for (const QString& p : hist) {
-        if (!QFile::exists(p)) continue;
+        // 绝不同步 QFile::exists()：历史可能含网盘挂载路径（如 X:/），离线时阻塞 UI（启动卡死实测）。
         auto* it = new QListWidgetItem(QFileInfo(p).fileName(), m_historyList);
         it->setToolTip(p);
         it->setData(Qt::UserRole, p);
@@ -1302,7 +1316,9 @@ void MainWindow::saveHistory(const QString& path) {
     hist.prepend(path);
     while (hist.size() > 30) hist.removeLast();
     m_settings.setValue(QStringLiteral("history/paths"), hist);
+    rcpMark("ctor:loadHistory-begin");
     loadHistory();
+    rcpMark("ctor:loadHistory-done");
 }
 
 void MainWindow::addMediaPaths(const QStringList& paths) {
@@ -1396,8 +1412,32 @@ void MainWindow::openFile(const QString& path) {
         }
         if (m_settings.value(QStringLiteral("general/autoPlay"), true).toBool()) m_player->play();
         m_waveform->pulse(0.8);
+        startCaptioningFor(path);
         repositionOverlays();
     }
+}
+
+// 启动字幕 worker（诊断开关 RCP_NO_CAPTION=1 可跳过）。
+void MainWindow::startCaptioningFor(const QString& path) {
+    if (!qEnvironmentVariableIsEmpty("RCP_NO_CAPTION")) return;
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QString workerExe = appDir + QStringLiteral("/caption_worker.exe");
+    // 打包布局（bundle/MSI）模型在 <appDir>/models；开发机布局在 <appDir>/.tools/models。
+    QString modelsRoot = appDir + QStringLiteral("/models");
+    if (!QFileInfo::exists(modelsRoot))
+        modelsRoot = appDir + QStringLiteral("/.tools/models");
+
+    if (m_worker->isRunning()) m_worker->shutdown();
+    m_transcript->clear();
+    m_lastPartialLabel = nullptr;
+    m_finalCount = 0;
+    m_statLines->setText(tr("字幕行数：0"));
+
+    if (!QFile::exists(workerExe)) {
+        setAsrStatus(tr("缺少 caption_worker"), QStringLiteral("#ff6b79"));
+        return;
+    }
+    m_worker->start(workerExe, QFileInfo(path).absoluteFilePath(), modelsRoot);
 }
 
 void MainWindow::onOpen() {
@@ -1570,6 +1610,7 @@ void MainWindow::onToggleFullscreen() { isFullScreen() ? showNormal() : showFull
 // ================= 字幕叠加/样式 =================
 void MainWindow::updateOverlay() {
     if (!m_captionOn) return;
+    if (!qEnvironmentVariableIsEmpty("RCP_NO_OVERLAY")) return;   // 诊断开关
     const bool showPartial = m_settings.value(QStringLiteral("caption/showPartial"), true).toBool();
     m_partialLabel->setText(m_partialText);
     m_partialLabel->setVisible(showPartial && !m_partialText.isEmpty());

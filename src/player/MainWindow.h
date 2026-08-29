@@ -37,7 +37,10 @@ public:
     explicit MainWindow(QWidget* parent = nullptr);
 
 public slots:
-    void openFile(const QString& path);
+    void openFile(const QString& path);   // 渲染上下文未就绪时挂起，就绪后加载
+
+private:
+    void startCaptioningFor(const QString& path);
 
 protected:
     void dragEnterEvent(QDragEnterEvent* event) override;

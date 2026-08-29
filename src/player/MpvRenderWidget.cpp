@@ -25,6 +25,10 @@ MpvRenderWidget::~MpvRenderWidget() {
 bool MpvRenderWidget::attachPlayer(MpvPlayer* player) {
     m_player = player;
     m_attached = (player != nullptr);
+    rcpTrace(QStringLiteral("attachPlayer attached=%1 hasHandle=%2 hasCtx=%3")
+                 .arg(m_attached)
+                 .arg(m_player && m_player->handle() ? 1 : 0)
+                 .arg(context() && context()->isValid() ? 1 : 0));
     // 若 GL 上下文已存在（如重新绑定），立即建立渲染上下文。
     if (m_attached && m_player->handle() && context() && context()->isValid() && !m_mpvGL) {
         createRenderContextNow();
@@ -68,6 +72,7 @@ void MpvRenderWidget::createRenderContextNow() {
         return;
     }
     rcpTrace(QStringLiteral("mpv_render_context_create OK"));
+    emit renderContextReady();
     mpv_render_context_set_update_callback(m_mpvGL, &MpvRenderWidget::onUpdate, this);
 }
 
@@ -78,6 +83,7 @@ void MpvRenderWidget::onUpdate(void* ctx) {
 }
 
 void MpvRenderWidget::initializeGL() {
+    rcpTrace(QStringLiteral("initializeGL attached=%1").arg(m_attached));
     if (m_attached && m_player && m_player->handle()) {
         createRenderContextNow();
     }

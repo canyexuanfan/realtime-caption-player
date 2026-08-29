@@ -8,6 +8,7 @@
 #include <QSvgRenderer>
 #include <QTimer>
 #include "MainWindow.h"
+#include "MpvTrace.h"
 
 int main(int argc, char* argv[]) {
     // libmpv 的 GL 渲染器依赖兼容 profile 的旧式 GL；Qt6 默认在支持的
@@ -51,11 +52,21 @@ int main(int argc, char* argv[]) {
     }
 
     MainWindow window;
-    // 离屏视觉自验证：RCP_SNAPSHOT=<png路径> 时以 WA_DontShowOnScreen 显示
-    // （布局照常激活、屏幕上无窗口），渲染主窗口存 PNG 并退出。
+    // 视觉自验证：RCP_SNAPSHOT=<png路径> 时正常显示窗口（真实 GL 渲染，
+    // 可验证视频画面），5s/16s 两次 grab 存 PNG 后退出。
     const QString snapPath = qEnvironmentVariable("RCP_SNAPSHOT");
-    if (!snapPath.isEmpty()) window.setAttribute(Qt::WA_DontShowOnScreen, true);
+    if (!snapPath.isEmpty()) {
+        QTimer::singleShot(5000, &window, [&window, snapPath] {
+            window.grab().save(snapPath);
+        });
+        QTimer::singleShot(16000, &window, [&window, snapPath] {
+            const int dot = snapPath.lastIndexOf(QLatin1Char('.'));
+            window.grab().save(snapPath.left(dot) + QStringLiteral(".b") + snapPath.mid(dot));
+            QApplication::quit();
+        });
+    }
     window.show();
+    rcpMark("main:shown");
     if (!snapPath.isEmpty()) {
         QTimer::singleShot(2500, &window, [&window, snapPath] {
             // 二分定位标记：fire=定时器已触发（接下来 grab）
@@ -71,8 +82,10 @@ int main(int argc, char* argv[]) {
     }
 
     if (argc > 1) {
-        // 命令行传入媒体路径（本地 8-bit 路径）。
-        window.openFile(QString::fromLocal8Bit(argv[1]));
+        // 命令行传入媒体路径。延迟 1.5s：等窗口完成首次绘制（渲染上下文就绪），
+        // 否则 loadfile 的 VO 初始化会因 "No render context set" 失败 → 永久黑屏。
+        const QString mediaPath = QString::fromLocal8Bit(argv[1]);
+        QTimer::singleShot(1500, &window, [&window, mediaPath] { window.openFile(mediaPath); });
     }
 
     return app.exec();

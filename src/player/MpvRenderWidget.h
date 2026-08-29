@@ -18,6 +18,12 @@ public:
     // 若 GL 上下文已就绪则立即建立渲染上下文，否则在 initializeGL() 中建立。
     bool attachPlayer(MpvPlayer* player);
 
+    bool isRenderContextReady() const { return m_mpvGL != nullptr; }
+
+signals:
+    // 渲染上下文创建成功——此后 loadfile 的 VO 初始化才不会失败（黑屏竞态根因）。
+    void renderContextReady();
+
 protected:
     void initializeGL() override;
     void paintGL() override;
