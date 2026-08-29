@@ -70,6 +70,7 @@ void MpvPlayer::applyInitialProperties() {
 
 bool MpvPlayer::loadFile(const QString& path, bool replace) {
     if (!m_handle) return false;
+    rcpTrace(QStringLiteral("loadFile replace=%1 -> %2").arg(replace ? 1 : 0).arg(path));
     const QByteArray p = path.toUtf8();
     const char* args[] = {
         "loadfile",
@@ -251,6 +252,9 @@ void MpvPlayer::handleEvent(mpv_event* event) {
         rcpTrace(QStringLiteral("end-file reason=%1").arg(ef ? static_cast<int>(ef->reason) : -1));
         if (ef && ef->reason == MPV_END_FILE_REASON_EOF) {
             emit mediaEnded();
+        } else if (ef && ef->reason == MPV_END_FILE_REASON_ERROR) {
+            // 打开/读取失败（文件不存在、挂载盘离线等）：显式上报，不再无声无息。
+            emit mediaError(tr("无法打开媒体文件（文件不存在、无法读取或挂载盘离线）"));
         }
         break;
     }

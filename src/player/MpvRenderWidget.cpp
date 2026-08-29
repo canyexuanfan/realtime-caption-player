@@ -4,6 +4,7 @@
 #include "MpvTrace.h"
 
 #include <QOpenGLContext>
+#include <QOpenGLFunctions>
 #include <QSurfaceFormat>
 #include <QMetaObject>
 
@@ -17,7 +18,9 @@ MpvRenderWidget::MpvRenderWidget(QWidget* parent) : QOpenGLWidget(parent) {
 MpvRenderWidget::~MpvRenderWidget() {
     if (m_mpvGL) {
         mpv_render_context_set_update_callback(m_mpvGL, nullptr, nullptr);
+        makeCurrent();
         mpv_render_context_free(m_mpvGL);
+        doneCurrent();
         m_mpvGL = nullptr;
     }
 }
@@ -78,8 +81,21 @@ void MpvRenderWidget::createRenderContextNow() {
 
 void MpvRenderWidget::onUpdate(void* ctx) {
     auto* w = static_cast<MpvRenderWidget*>(ctx);
-    // mpv 请求重绘：线程安全地触发 Qt 重绘（update 为 QWidget 槽，跨线程安全）。
-    QMetaObject::invokeMethod(w, "update", Qt::QueuedConnection);
+    // mpv 线程请求重绘：转投 GUI 线程执行 maybeUpdate。
+    QMetaObject::invokeMethod(w, "maybeUpdate", Qt::QueuedConnection);
+}
+
+void MpvRenderWidget::maybeUpdate() {
+    // 窗口最小化时 QWidget::update() 会被 Qt 跳过，mpv render API 会因
+    // 渲染超时产生间歇卡顿——此时手动驱动一次完整绘制（官方示例同款兜底）。
+    if (window() && window()->isMinimized()) {
+        makeCurrent();
+        paintGL();
+        context()->swapBuffers(context()->surface());
+        doneCurrent();
+    } else {
+        update();
+    }
 }
 
 void MpvRenderWidget::initializeGL() {
@@ -101,10 +117,14 @@ void MpvRenderWidget::paintGL() {
         glClear(GL_COLOR_BUFFER_BIT);
         return;
     }
+    // QOpenGLWidget 的绘制目标是 Qt 内部 FBO，不是 0 号默认帧缓冲：
+    // 传 0 会画进被 Qt 合成流程丢弃的表面 → 永久黑屏（官方 qt_opengl 示例
+    // 用 defaultFramebufferObject()）。尺寸需用物理像素（FBO 含 DPR 缩放）。
+    const qreal dpr = devicePixelRatioF();
     mpv_opengl_fbo fbo{};
-    fbo.fbo = 0; // 默认帧缓冲
-    fbo.w = width();
-    fbo.h = height();
+    fbo.fbo = static_cast<int>(defaultFramebufferObject());
+    fbo.w = static_cast<int>(width() * dpr);
+    fbo.h = static_cast<int>(height() * dpr);
     fbo.internal_format = 0;
 
     int flipY = 1; // QOpenGLWidget 默认帧缓冲需垂直翻转
@@ -114,6 +134,19 @@ void MpvRenderWidget::paintGL() {
         {MPV_RENDER_PARAM_INVALID, nullptr},
     };
     mpv_render_context_render(m_mpvGL, params);
+
+    // 诊断（一次性）：FBO 绑定 + 中心像素回读——区分"mpv 画了黑"vs"画错目标"。
+    static bool diagDone = false;
+    if (!diagDone && qEnvironmentVariableIsSet("RCP_DIAG_PIXEL")) {
+        diagDone = true;
+        QOpenGLFunctions* gl = context()->functions();
+        GLint bound = -1;
+        gl->glGetIntegerv(GL_FRAMEBUFFER_BINDING, &bound);
+        unsigned char px[4] = {0, 0, 0, 0};
+        gl->glReadPixels(width() / 2, height() / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, px);
+        rcpTrace(QStringLiteral("diag fbo-bound=%1 center-px=%2,%3,%4,%5")
+                     .arg(bound).arg(px[0]).arg(px[1]).arg(px[2]).arg(px[3]));
+    }
 }
 
 void MpvRenderWidget::resizeGL(int /*w*/, int /*h*/) {

@@ -84,6 +84,7 @@ signals:
     void pauseStateChanged(bool paused);
     void mediaLoaded();
     void mediaEnded();
+    void mediaError(const QString& message);   // 打开/读取失败（含挂载盘离线）
     void playbackError(const QString& message);
     void eventAvailable();            // mpv 唤醒：主线程应调用 processEvents()
 

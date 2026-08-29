@@ -29,6 +29,11 @@ protected:
     void paintGL() override;
     void resizeGL(int w, int h) override;
 
+private slots:
+    // mpv update 回调的 GUI 线程落点；窗口不可见时手动绘制，
+    // 否则 mpv render API 会因渲染超时导致间歇性卡顿（官方 qt_opengl 示例同款）。
+    void maybeUpdate();
+
 private:
     static void getProcAddrThunk(void* ctx, const char* name);
     static void onUpdate(void* ctx);

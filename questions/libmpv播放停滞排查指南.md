@@ -101,3 +101,68 @@ Intel Iris Xe（GL 4.6 compat）下 mpv 建视频纹理时偶报一次，渲染�
 
 验证：无 trace 纯净运行 479 个 time-pos 事件持续流动、INVALID_ENUM=0、
 worker 运行中、用户界面交互（暂停/恢复）正常响应。
+
+## ✅ 追加 2（画面+字幕端到端根治，2026-08-29 深夜 II）
+
+上轮五缺陷修复后 mpv 内部已正常播放（time-pos 流动）但**画面仍黑**。
+对照官方 mpv-examples/libmpv/qt_opengl 逐行比对，剥出三个新根因：
+
+### 根因 6（黑屏真正主因）：paintGL 把帧画进 FBO 0
+
+QOpenGLWidget 的绘制目标是 **Qt 内部 FBO**（Qt 之后把该纹理合成到屏幕），
+`mpv_opengl_fbo.fbo = 0` 会画进 0 号默认帧缓冲——该内容被 Qt 合成流程
+完全丢弃 → mpv 明明画了、屏幕永远黑。官方示例：
+
+```cpp
+mpv_opengl_fbo mpfbo{static_cast<int>(defaultFramebufferObject()), ...};
+```
+
+修复时一并传**物理像素**尺寸（`width()*devicePixelRatioF()`，FBO 含 DPR 缩放）。
+教训：`GL_FRAMEBUFFER_BINDING=0` 的像素诊断结果把排查引向"绑定正常"歧路——
+QOpenGLWidget 下 0 号绑定本身就是错误信号。
+
+### 根因 7（重绘链脆弱）：invokeMethod(w,"update") → 官方 maybeUpdate 模式
+
+改用官方 `on_update → invokeMethod("maybeUpdate")` + maybeUpdate 槽：
+窗口最小化时 QWidget::update() 被 Qt 跳过，mpv render API 会因渲染超时
+产生间歇卡顿（官方注释原话），此时需手动 makeCurrent+paintGL+swapBuffers 兜底。
+
+### 根因 8（重载风暴）：argv 与 resume 两个打开定时器抢跑双 loadfile
+
+ctor 注册的恢复定时器（1600ms）与 main 注册的 argv 定时器（1500ms）几乎同时
+到期；先触发者打开文件，后触发者无条件再 openFile → loadfile replace →
+`end-file reason=2`（STOP）→ 停止/重启风暴，mpv 刷
+`mpv_render_context_render() not being called or stuck`。
+原"m_currentPath 非空跳过"守卫只防得住 argv 先行，防不住 resume 先行。
+修复：`setStartupMedia()` 成员——argv 媒体存在时恢复会话**直接让位**
+（不是比谁快，而是根本不并发）。
+
+### 工具坑（差点误诊为崩溃）：RCP_SNAPSHOT 残留 2.5s quit 定时器
+
+快照模式里还留着二分时代定时器：2.5s grab 保存后**直接 QApplication::quit()**。
+启动慢时它迟到触发 → "trace 突然中断 + 进程消失 + 16s .b 快照缺失"，
+Windows 事件日志无崩溃记录（Id=1000 为空）证明不是 crash。已删除该定时器，
+快照模式现在干净地 5s 首验 + 16s 复验后退出。
+
+### ✅ 可复用调试手段
+
+- **GUI 心跳**：QTimer(500ms) → trace `hb N`——心跳断流的时间窗即 GUI 线程
+  被阻塞的窗口（本轮证明 GUI 没堵，堵的是渲染消费）。
+- **调用点标签**：openFile/loadFile 入口 + `open-timer[argv]/[resume]` 标签，
+  一次运行即可定位"谁开的文件"。
+- **排除崩溃**：`Get-WinEvent -FilterHashtable @{LogName='Application';Id=1000}`
+  为空 = 非 WER 崩溃，优先怀疑提前退出/挂起。
+- **概念模型**：vo=libmpv 是**拉模型**——客户端不持续调用
+  mpv_render_context_render，VO 队列满后整个核心冻结在第一帧（音频、时钟全停）；
+  "渲染问题"和"播放停滞"在这种情况下是同一个 bug。
+
+### 最终验证（2026-08-29，真机双快照）
+
+- `vidU.png`(5s)：testsrc2 彩条帧 + 时间码 00:00:01.480 + 字幕叠加
+  「欢迎使用实时字幕播放器。」+ 波形 + 进度 00:01/00:21。
+- `vidU.b.png`(16s)：时间码 00:00:12.380（持续播放）+ 叠加 partial 长句 +
+  final 白字「人工智能正在改变世界，字幕让视频更容易理解。」+
+  转写面板 2 条 final + 字幕行数 2 + 实时延迟 0.0s + ASR 运行中。
+- trace：**单次** loadFile、无 end-file reason=2、stuck 仅切换瞬间 1 条、
+  time-pos 实时推进（12.3s/12.7s 墙钟）、hb 心跳 30+ 连续无断流。
+- 全量 ctest 21/21 通过。

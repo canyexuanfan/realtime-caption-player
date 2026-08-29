@@ -36,6 +36,9 @@ class MainWindow : public QMainWindow {
 public:
     explicit MainWindow(QWidget* parent = nullptr);
 
+    // 命令行/外部传入的启动媒体；非空时恢复会话让位（避免双 loadfile 竞态）。
+    void setStartupMedia(const QString& path) { m_startupMedia = path; }
+
 public slots:
     void openFile(const QString& path);   // 渲染上下文未就绪时挂起，就绪后加载
 
@@ -155,6 +158,7 @@ private:
     QLabel* m_vignette = nullptr;
     QLabel* m_dropHint = nullptr;
     QString m_currentPath;
+    QString m_startupMedia;   // argv 显式媒体：非空则恢复会话不抢跑
 
     // ---- 控制台 ----
     QSlider* m_seek = nullptr;

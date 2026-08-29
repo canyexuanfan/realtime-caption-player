@@ -67,25 +67,18 @@ int main(int argc, char* argv[]) {
     }
     window.show();
     rcpMark("main:shown");
-    if (!snapPath.isEmpty()) {
-        QTimer::singleShot(2500, &window, [&window, snapPath] {
-            // 二分定位标记：fire=定时器已触发（接下来 grab）
-            QFile m1(QCoreApplication::applicationDirPath() + QStringLiteral("/snap-fire.txt"));
-            m1.open(QIODevice::WriteOnly | QIODevice::Truncate);
-            m1.write("fire");
-            m1.close();
-            const QPixmap pm = window.grab();
-            pm.save(snapPath);
-            QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/snap-fire.txt"));
-            QApplication::quit();
-        });
-    }
+    // 快照模式：5s 首验 + 16s 复验（证明持续播放非单帧）后退出。
+    // （旧 2.5s 二分定时器已删：它 grab 后直接 quit，会截断 16s 复验。）
 
     if (argc > 1) {
         // 命令行传入媒体路径。延迟 1.5s：等窗口完成首次绘制（渲染上下文就绪），
         // 否则 loadfile 的 VO 初始化会因 "No render context set" 失败 → 永久黑屏。
         const QString mediaPath = QString::fromLocal8Bit(argv[1]);
-        QTimer::singleShot(1500, &window, [&window, mediaPath] { window.openFile(mediaPath); });
+        window.setStartupMedia(mediaPath);   // 恢复会话让位，杜绝双 loadfile 竞态
+        QTimer::singleShot(1500, &window, [&window, mediaPath] {
+            rcpTrace(QStringLiteral("open-timer[argv] fire"));
+            window.openFile(mediaPath);
+        });
     }
 
     return app.exec();

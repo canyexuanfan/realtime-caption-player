@@ -162,6 +162,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(m_player, &MpvPlayer::durationChanged, this, &MainWindow::onDurationChanged);
     connect(m_player, &MpvPlayer::mediaLoaded, this, &MainWindow::onMediaLoaded);
     connect(m_player, &MpvPlayer::mediaEnded, this, &MainWindow::onMediaEnded);
+    connect(m_player, &MpvPlayer::mediaError, this, [this](const QString& msg) {
+        // 打开/读取失败（文件不存在、挂载盘离线等）：显式提示，不再无声无息。
+        appendTranscriptFinal(-1, tr("[打开失败] %1").arg(msg));
+        setAsrStatus(tr("打开失败"), QStringLiteral("#ff6b79"));
+    });
     connect(m_player, &MpvPlayer::pauseStateChanged, this, [this](bool paused) {
         m_playBtn->setIcon(icon(paused ? QStringLiteral("play") : QStringLiteral("pause"),
                                 QColor("#ffffff"), 22));
@@ -208,6 +213,14 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setAcceptDrops(true);
     setWindowFlag(Qt::FramelessWindowHint, true);
     setWindowIcon(QIcon(QStringLiteral(":/logo.png")));
+
+    // GUI 线程心跳：500ms 一跳。trace 心跳断流 = GUI 线程被阻塞的时间窗。
+    {
+        auto* hb = new QTimer(this);
+        int* n = new int(0);
+        connect(hb, &QTimer::timeout, this, [n] { rcpTrace(QStringLiteral("hb %1").arg(++*n)); });
+        hb->start(500);
+    }
 
 
     auto* central = new QWidget(this);
@@ -267,7 +280,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
             // 存在性交给播放器：同步 exists() 会阻塞在离线网盘挂载路径（实测 20s 卡死）。
             // 若启动媒体（argv/拖放）已打开则跳过恢复，避免网盘 loadfile 顶掉显式媒体。
             QTimer::singleShot(1600, this, [this, last] {
-                if (!m_currentPath.isEmpty()) return;
+                rcpTrace(QStringLiteral("open-timer[resume] fire cur=%1 argv=%2")
+                             .arg(m_currentPath.isEmpty() ? QStringLiteral("<empty>") : m_currentPath,
+                                  m_startupMedia.isEmpty() ? QStringLiteral("<none>") : QStringLiteral("<set>")));
+                // 命令行/拖放显式媒体优先：恢复会话直接让位，避免两个 loadfile 抢跑
+                // 造成 replace 重载（end-file reason=2 → 停止/重启风暴）。
+                if (!m_startupMedia.isEmpty() || !m_currentPath.isEmpty()) return;
                 openFile(last);
             });
     }
@@ -1243,6 +1261,7 @@ QWidget* MainWindow::settingRow(const QString& text, QWidget* editor, QWidget* p
 
 // ================= 转写/统计 =================
 void MainWindow::appendTranscriptPartial(const QString& text) {
+    rcpTrace(QStringLiteral("caption-partial %1").arg(text.left(30)));
     if (text.isEmpty()) return;
     const QString html = QStringLiteral(
         "<span style='color:#757c88;'>… </span><span>%1</span>").arg(text.toHtmlEscaped());
@@ -1263,6 +1282,8 @@ void MainWindow::appendTranscriptPartial(const QString& text) {
 }
 
 void MainWindow::appendTranscriptFinal(long long startMs, const QString& text) {
+    // 字幕证据输出到 trace（RCP_TRACE 启用时）——验证实时字幕链路。
+    rcpTrace(QStringLiteral("caption-final #%1 [%2ms] %3").arg(m_finalCount + 1).arg(startMs).arg(text));
     const int last = m_transcript->count() - 1;
     if (last >= 0 && m_lastPartialLabel &&
         m_transcript->itemWidget(m_transcript->item(last)) == m_lastPartialLabel.data()) {
@@ -1394,6 +1415,7 @@ void MainWindow::onPlaylistActivated(QListWidgetItem* item) {
 // ================= 打开/播放 =================
 void MainWindow::openFile(const QString& path) {
     if (!m_player || !m_player->handle()) return;
+    rcpTrace(QStringLiteral("openFile -> %1").arg(path));
     m_currentPath = path;   // 先于 loadFile：durationChanged 可能先到
     if (m_player->loadFile(path)) {
         addMediaPaths(QStringList{path});
@@ -1407,7 +1429,7 @@ void MainWindow::openFile(const QString& path) {
         setWindowTitle(QStringLiteral("实时字幕播放器 — %1").arg(name));
         if (m_settings.value(QStringLiteral("general/rememberPosition"), true).toBool()) {
             const qint64 saved = m_settings.value(QStringLiteral("position/") + name, 0).toLongLong();
-            if (saved > 5000)
+            if (saved > 5000 && saved < m_duration * 1000.0 - 2000)   // 接近片尾不恢复（避免立即 EOF）
                 QTimer::singleShot(300, this, [this, saved] { m_player->seek(saved / 1000.0, false); });
         }
         if (m_settings.value(QStringLiteral("general/autoPlay"), true).toBool()) m_player->play();
@@ -1448,7 +1470,7 @@ void MainWindow::onOpen() {
 }
 
 void MainWindow::onOpenFolder() {
-    const QString dir = QFileDialog::getExistingDirectory(this, tr("打开包含视频的文件夹"));
+    const QString dir = QFileDialog::getExistingDirectory(this, tr("打开包含视频的文件夹"), QStandardPaths::writableLocation(QStandardPaths::HomeLocation));
     if (dir.isEmpty()) return;
     QStringList found;
     for (const QFileInfo& fi : QDir(dir).entryInfoList(
@@ -1564,6 +1586,8 @@ void MainWindow::onMediaLoaded() {
 void MainWindow::onMediaEnded() {
     m_playBtn->setIcon(icon(QStringLiteral("play"), QColor("#ffffff"), 22));
     m_worker->stop();
+    // 播完清除记忆位置：否则下次打开自动 seek 到片尾 → 立即 EOF → 黑屏死循环。
+    m_settings.remove(QStringLiteral("position/") + m_titleFile->text());
     if (m_settings.value(QStringLiteral("playback/folderContinue"), true).toBool()
         && m_mediaPaths.size() > 1) {
         onPrevNext(1);
@@ -1581,7 +1605,7 @@ void MainWindow::onMediaEnded() {
 
 // ================= 字幕开关/导出 =================
 void MainWindow::onExportSrt() {
-    const QString path = QFileDialog::getSaveFileName(this, tr("导出字幕 SRT"), QString(),
+    const QString path = QFileDialog::getSaveFileName(this, tr("导出字幕 SRT"), QStandardPaths::writableLocation(QStandardPaths::HomeLocation),
                                                       tr("SubRip (*.srt)"));
     if (path.isEmpty()) return;
     QList<rcp::CaptionSegment> list;
