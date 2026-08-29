@@ -154,3 +154,5 @@ RCP_DEMO_ONLY=1 + RCP_SNAPSHOT + RCP_SNAP_T1/T2，统一 1280x800 逻辑尺寸�
 - Waveform 细节对照（36 根 2px 渐变动画——现有实现结构已同，仅微调观感）；
   demo 海报图（参考稿为外部剧照资产，暂用黑底，可用渐变替代）；历史 tab 点击
   a11y 实测（QButtonGroup 修复后逻辑确定，未做真机点击验证）。
+- a11y 实测历史 tab 点击通过（标题联动+真实历史列表切换）；Waveform 对照通过
+  （36 根/2px/间距2/渐变/动画同源）；无媒体底色改参考 .video-surface #10151d。

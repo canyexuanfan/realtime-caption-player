@@ -112,8 +112,8 @@ void MpvRenderWidget::paintGL() {
         rcpTrace(QStringLiteral("paintGL: first frame (mpvGL=%1)").arg(m_mpvGL ? 1 : 0));
     }
     if (!m_mpvGL) {
-        // 尚无渲染上下文：清为黑屏。
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        // 尚无渲染上下文：清为参考 .video-surface 底色（非纯黑）。
+        glClearColor(0x10 / 255.0f, 0x15 / 255.0f, 0x1d / 255.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         return;
     }
