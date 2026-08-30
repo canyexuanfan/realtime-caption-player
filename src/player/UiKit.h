@@ -261,7 +261,7 @@ public:
         auto* t = new QTimer(this);
         connect(t, &QTimer::timeout, this, [this, t] {
             if (m_level > 0.02) {
-                m_level *= 0.92;
+                m_level *= 0.85;   // 快速衰减：说话间隙条回落，保持离散条形不连片
                 update();
             }
         });
@@ -279,8 +279,8 @@ protected:
         const qint64 t = QDateTime::currentMSecsSinceEpoch();
         for (int i = 0; i < n; ++i) {
             const qreal phase = std::sin((t / 260.0) + i * 0.55) * 0.5 + 0.5;
-            qreal h = 3 + (m_bars[i % m_bars.size()]) * 9 * (0.35 + 0.65 * phase) * (0.25 + 0.75 * m_level);
-            h = qBound<qreal>(2.0, h, 14.0);
+            qreal h = 3 + (m_bars[i % m_bars.size()]) * 7 * (0.35 + 0.65 * phase) * (0.25 + 0.75 * m_level);
+            h = qBound<qreal>(2.0, h, 11.0);
             QLinearGradient g(x, 0, x, h);
             g.setColorAt(0, QColor("#a79cff"));
             g.setColorAt(1, QColor("#6555ef"));

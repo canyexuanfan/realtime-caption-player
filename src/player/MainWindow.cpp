@@ -1586,8 +1586,8 @@ void MainWindow::loadHistory() {
     const QStringList hist = m_settings.value(QStringLiteral("history/paths")).toStringList();
     for (const QString& p : hist) {
         // 绝不同步 QFile::exists()：历史可能含网盘挂载路径（如 X:/），离线时阻塞 UI（启动卡死实测）。
-        auto* it = new QListWidgetItem(QFileInfo(p).fileName(), m_historyList);
-        it->setToolTip(p);
+        auto* it = new QListWidgetItem(m_historyList);   // 文字留空：条目自带文字会被
+        it->setToolTip(p);                               // 默认委托画在透明行控件底下（重影）
         it->setData(Qt::UserRole, p);
     }
 }
@@ -1945,7 +1945,8 @@ void MainWindow::updateOverlay() {
         if (seg.startMs <= head) activeFinal = seg.text;
     }
     if (activeFinal.isEmpty()) activeFinal = m_overlayFinalText;
-    const QString shownFinal = tailToFit(activeFinal, m_finalLabel->font(), fw, 2);
+    // 参考稿 final 恒为单行短句：超宽取尾加省略号（2 行会顶压 partial 行）。
+    const QString shownFinal = tailToFit(activeFinal, m_finalLabel->font(), fw, 1);
     if (m_finalLabel->text() != shownFinal) m_finalLabel->setText(shownFinal);
     // 叠加文字变化时强制视频区整体重组：QOpenGLWidget 的子控件脏区合成
     // 在仅子控件重绘时可能残留下帧旧文字（重影），整块 update 一并消除。

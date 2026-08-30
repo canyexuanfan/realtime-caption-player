@@ -156,3 +156,8 @@ RCP_DEMO_ONLY=1 + RCP_SNAPSHOT + RCP_SNAP_T1/T2，统一 1280x800 逻辑尺寸�
   a11y 实测（QButtonGroup 修复后逻辑确定，未做真机点击验证）。
 - a11y 实测历史 tab 点击通过（标题联动+真实历史列表切换）；Waveform 对照通过
   （36 根/2px/间距2/渐变/动画同源）；无媒体底色改参考 .video-surface #10151d。
+- 第三处同类重影根除：loadHistory 也把文件名写进 QListWidgetItem 本身（用户
+  截图历史行重影），已改为条目文字留空+UserRole（与 demo 行同款修复）。
+- final 字幕改单行省略（参考稿 final 恒单行；2 行会顶压 partial 行），
+  a11y 实测 live 播放中 partial/final 均单行省略。
+- Waveform 峰值 14→11、衰减 0.92→0.85：说话时常满格导致的"连成实块"消除。
