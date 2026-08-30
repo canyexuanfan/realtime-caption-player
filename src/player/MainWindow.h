@@ -202,6 +202,7 @@ private:
     bool m_demoMode = true;          // 无真实媒体时展示参考稿示例数据
     bool m_videoRectValid = false;   // 画面矩形已按 video-params 锚定
     int m_demoCurrent = 1458;        // state.current 24:18
+    int m_demoSegIdx = -1;           // 转写面板当前高亮段
     QTimer* m_demoTimer = nullptr;
     QHash<QString, qint64> m_demoDurations;
 };

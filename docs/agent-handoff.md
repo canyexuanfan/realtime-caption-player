@@ -161,3 +161,16 @@ RCP_DEMO_ONLY=1 + RCP_SNAPSHOT + RCP_SNAP_T1/T2，统一 1280x800 逻辑尺寸�
 - final 字幕改单行省略（参考稿 final 恒单行；2 行会顶压 partial 行），
   a11y 实测 live 播放中 partial/final 均单行省略。
 - Waveform 峰值 14→11、衰减 0.92→0.85：说话时常满格导致的"连成实块"消除。
+
+### 已完成（2026-08-30 第四轮：同尺寸并排比对逐项消差）
+比对方法：Edge 无头 1280x800 渲染参考 HTML vs RCP_DEMO_ONLY 快照 scale=1280:800
+后 vstack 拼图，逐区找差异。本轮修复：
+- 播放列表选中紫色渐变胶囊（参考 .playlist-item.active 135deg #5147aa→#6254cb）：
+  行控件动态上色（current||selected），QSS 里原有规则被子行控件遮挡从未生效；
+  fillDemoData 补 setCurrentRow(0)（参考 state.activeIndex=0）
+- 转写面板当前句高亮 + 居中滚动跟随（参考 .transcript-item.active），demo 按
+  activeSegmentForTime 段序刷新样式（真实媒体暂无逐句 UI 高亮，仅叠加层对齐）
+- 对照确认已同源：倍速弹窗按钮组、音量条、时间码、字幕统计、标题栏、设置面板
+- 剩余已知差异（低优先）：demo 海报（参考用外部剧照，我们黑底+渐晕）；波形
+  连续动画的相位感；参考底部 showcase 特性卡区（属于产品宣传页非应用窗口，
+  不在复现范围）

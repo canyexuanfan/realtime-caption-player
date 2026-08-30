@@ -351,6 +351,7 @@ void MainWindow::fillDemoData() {
         m_demoDurations.insert(name, qint64(d.dur) * 1000);
     }
     refreshMediaRows();
+    m_mediaList->setCurrentRow(0);   // 参考 state.activeIndex=0：首项紫色胶囊选中
     // 转写面板：transcriptSegments 7 段（时间 + 灰字预览 + 白字定稿）
     const struct { int start; const char* partial; const char* final; } segs[] = {
         {12, "在广袤的土地之上", "山川河流交错相连"},
@@ -420,6 +421,18 @@ void MainWindow::demoTick() {
     m_partialLabel->setVisible(true);
     m_finalLabel->setText(m_overlayFinalText);
     if (m_video) m_video->update();
+    // 转写面板当前句高亮（参考 .transcript-item.active 紫底）+ 滚动跟随
+    if (idx != m_demoSegIdx) {
+        m_demoSegIdx = idx;
+        for (int r = 0; r < m_transcript->count(); ++r) {
+            QWidget* wgt = m_transcript->itemWidget(m_transcript->item(r));
+            if (wgt) wgt->setStyleSheet(r == idx
+                ? QStringLiteral("background:#4a3f9c;border-radius:6px;")
+                : QStringLiteral("background:transparent;"));
+        }
+        if (QListWidgetItem* cur = m_transcript->item(idx))
+            m_transcript->scrollToItem(cur, QAbstractItemView::PositionAtCenter);
+    }
 }
 
 void MainWindow::applyTheme() { qApp->setStyleSheet(QString::fromUtf8(kAppQss)); }
@@ -1643,6 +1656,11 @@ void MainWindow::refreshMediaRows() {
             }
             const bool current = (p == m_currentPath);
             const bool selected = (list->currentItem() == it);
+            // 参考 .playlist-item.active：选中项紫色渐变胶囊铺满行
+            w->setStyleSheet(current || selected
+                ? QStringLiteral("background:qlineargradient(x1:0,y1:0,x2:1,y2:1,"
+                                 "stop:0 #5147aa, stop:1 #6254cb);border-radius:8px;")
+                : QStringLiteral("background:transparent;"));
             const QString fg = (current || selected) ? QStringLiteral("#ffffff")
                                                      : QStringLiteral("#a7adb8");
             auto* play = w->findChild<QLabel*>(QStringLiteral("rowPlay"));
