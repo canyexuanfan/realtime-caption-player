@@ -211,7 +211,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(m_worker, &rcp::player::WorkerSupervisor::ready, this,
             [this] { setAsrStatus(tr("运行中"), kSuccess.name()); });
     connect(m_worker, &rcp::player::WorkerSupervisor::workerError, this,
-            [this](const QString&) { setAsrStatus(tr("字幕错误"), kDanger.name()); });
+            [this](const QString& msg) {
+                rcpTrace(QStringLiteral("workerError: %1").arg(msg));
+                setAsrStatus(tr("字幕错误"), kDanger.name());
+            });
     connect(m_worker, &rcp::player::WorkerSupervisor::workerFinished, this, [this] {
         setAsrStatus(tr("识别进程退出"), QColor("#69717d").name());
     });

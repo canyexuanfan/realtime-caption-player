@@ -24,6 +24,7 @@ bool WorkerSupervisor::start(const QString& workerExe, const QString& mediaPath,
     m_openSent = false;
     m_connected = false;
     m_connectTries = 0;
+    m_lastSocketError.clear();
     m_serverName = QStringLiteral("rcp-caption-") + QUuid::createUuid().toString(QUuid::WithoutBraces);
 
     m_proc = new QProcess(this);
@@ -49,21 +50,30 @@ void WorkerSupervisor::onProcessStarted() {
     tryConnect();
 }
 
+// IPC 连接重试：复用同一 socket（反复销毁重建会在连接中打断 pipe），
+// 最多重试 60s（600 × 100ms）。worker 冷启动（杀软扫描/磁盘慢/主线程忙）时
+// 监听耗时可能远超 5s，窗口太短会被误判为永久失败。
 void WorkerSupervisor::tryConnect() {
     if (m_connected) return;
-    if (m_sock) { m_sock->deleteLater(); m_sock = nullptr; }
-    m_sock = new QLocalSocket(this);
-    connect(m_sock, &QLocalSocket::connected, this, &WorkerSupervisor::onConnected);
-    connect(m_sock, &QLocalSocket::readyRead, this, &WorkerSupervisor::onReadyRead);
-    connect(m_sock, &QLocalSocket::errorOccurred, this, &WorkerSupervisor::onSocketError);
+    if (m_proc && m_proc->state() != QProcess::Running) {
+        emit workerError(QStringLiteral("worker 进程在 IPC 连接前退出"));
+        return;
+    }
+    if (!m_sock) {
+        m_sock = new QLocalSocket(this);
+        connect(m_sock, &QLocalSocket::connected, this, &WorkerSupervisor::onConnected);
+        connect(m_sock, &QLocalSocket::readyRead, this, &WorkerSupervisor::onReadyRead);
+        connect(m_sock, &QLocalSocket::errorOccurred, this, &WorkerSupervisor::onSocketError);
+    }
     m_sock->connectToServer(m_serverName);
     if (m_sock->state() == QLocalSocket::ConnectedState) {
         onConnected();
-    } else if (m_connectTries++ < 50) {
-        // worker 尚未 listen；每 100ms 重试，最多 ~5s。
+    } else if (m_connectTries++ < 600) {
+        // worker 尚未 listen（或连接仍在建立中）；每 100ms 重试，最多 ~60s。
         QTimer::singleShot(100, this, &WorkerSupervisor::tryConnect);
     } else {
-        emit workerError(QStringLiteral("无法连接到 worker IPC（超时）"));
+        emit workerError(QStringLiteral("无法连接到 worker IPC（超时）：%1")
+                         .arg(m_lastSocketError));
     }
 }
 
@@ -73,7 +83,9 @@ void WorkerSupervisor::onConnected() {
     sendCommand(rcp::ipc::CommandType::Hello, QJsonObject{});
 }
 
-void WorkerSupervisor::onSocketError(QLocalSocket::LocalSocketError /*err*/) {
+void WorkerSupervisor::onSocketError(QLocalSocket::LocalSocketError err) {
+    m_lastSocketError = m_sock ? m_sock->errorString() : QString();
+    Q_UNUSED(err);
     // 连接阶段的错误由 tryConnect 的定时器重试覆盖；运行期断开则报错。
     if (m_connected && m_proc && m_proc->state() != QProcess::Running) {
         emit workerError(QStringLiteral("worker IPC 连接断开"));

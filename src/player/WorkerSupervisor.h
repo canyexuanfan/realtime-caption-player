@@ -64,6 +64,7 @@ private:
     bool m_openSent = false;
     bool m_connected = false;
     int m_connectTries = 0;
+    QString m_lastSocketError;
 };
 
 } // namespace rcp::player
