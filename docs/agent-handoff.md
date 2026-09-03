@@ -1,20 +1,21 @@
 # Agent Handoff
 
-- **Last updated:** 2026-09-04 晚（字幕错误稳定复现根因修复 654d7c2 + MSI 重打；此前为字幕字号修复 3991a9b）
+- **Last updated:** 2026-09-04 深夜（字幕样式与参考不一致修复 413ea32；此前 654d7c2 字幕错误、3991a9b 字幕字号）
 - **Branch:** `main`
-- **HEAD:** 654d7c2（worker IPC 连接超时修复）；之前链 0ab66c9(P7第5轮)→c2c56eb(P8重打)→3991a9b(字幕字号)→57fa54d(文档回填)
+- **HEAD:** 413ea32（字幕被暗角压暗修复）；链 0ab66c9→c2c56eb→3991a9b→57fa54d→654d7c2→d818c59
 - **远程：** origin/main 已同步（github.com/canyexuanfan/realtime-caption-player，私有）
 
 ## Current Phase
 
-**MVP v0.1.0 RELEASE READY**。P0 已签署、P8 报告 PASS、P9 发布产物齐（发布说明/SBOM/SHA-256 manifest）。tag：`v0.1.0`。本会话在 Release 基础上继续完成第 5 轮像素复刻、字幕字号修复、字幕错误根因修复。
+**MVP v0.1.0 RELEASE READY**。本会话在 Release 基础上完成第 5 轮像素复刻、字幕字号修复、字幕错误根因修复、字幕样式（暗角层叠）修复。
 
 ## Last Completed Task（本会话主线）
 
-0. **第 5 轮像素复刻（0ab66c9）**：同尺寸并排比对法修复 4 项差异（视频标题去扩展名/选项卡补 list+history 图标/控制条字幕轨按钮归位/AB 字号），全清单清零。唯一保留偏差：设计图视频区字幕设置小窗口已并入设置页，不复刻。
-1. **重打安装包（c2c56eb）**：runtime 原为 8/30 旧版，同步最新构建并重打 MSI。
-2. **字幕字号修复（3991a9b）**：根因=全局 QSS `QWidget{font-size:14px}` 覆盖 setFont(36px)；CaptionLabel 自身 stylesheet 声明 font-size。真实 G 盘视频验证 final≈36px/partial≈29.5px 与参考一致。
-3. **字幕错误稳定复现修复（654d7c2）**：根因=worker IPC 连接 5s 超时窗口过脆 + 重试销毁重建 socket 打断连接；修复=复用 socket + 60s 窗口 + 进程退出提前报错 + 错误带 socket error。真实 G 盘视频验证运行中/9 行字幕/partial+final 正常。
+0. **第 5 轮像素复刻（0ab66c9）**：修复 4 项差异（标题去扩展名/选项卡图标/字幕轨按钮归位/AB 字号）清零。
+1. **重打安装包（c2c56eb）**：runtime 同步最新并重打 MSI。
+2. **字幕字号修复（3991a9b）**：全局 QSS 覆盖 setFont 根因，CaptionLabel 自身 stylesheet 声明字号。
+3. **字幕错误修复（654d7c2）**：worker IPC 连接 5s 超时窗口过脆+重建 socket，复用 socket+60s 窗口。真实 G 盘视频验证运行中/9 行字幕。
+4. **字幕样式修复（413ea32）**：vignette 后创建叠在字幕上压暗（255→207），lower() 后 final 恢复纯白 (255,255,255)、partial rgba(225,228,234,.67) 精确匹配参考。
 
 ## Current Task
 

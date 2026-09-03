@@ -146,6 +146,15 @@
 - **验证**：G 盘提干课真实播放，运行状态=运行中、字幕 9 行、画面 partial+final 双行字幕正常、无 workerError。
 - **MSI 重打（02:00:12）**：runtime 已同步最新 player_app（427520B，build/runtime 哈希一致）；打包曾因测试遗留 caption_worker 占着 runtime/tst_err.txt 失败，清理后成功（709,808,128B）。**教训：测试 worker 务必确认 Kill，测试文件勿写进 runtime。**
 
+## 本会话补充（2026-09-04 深夜：字幕样式与参考不一致——暗角层叠压暗字幕，commit 413ea32）
+
+用户："我要求的是跟设计图、参考 HTML 一模一样，这字幕样式还不一样呢，你就不改了？"
+
+- **根因**：`m_vignette` 渐晕暗角在 `m_captionOverlay`/`m_waveform` 之后创建，Qt 后创建的子控件叠在上层 → 把字幕文字整体压暗（final 纯白 255→207≈81% 白）。参考 DOM 中 `.video-vignette` 位于 caption-overlay 之前且无 z-index（auto=0），caption/waveform 为 z-index 5 叠其上，字幕保持纯白。
+- **修复**：`m_vignette->lower()`，只压视频画面。
+- **验证**：demo 与真实视频 final 字幕核心恢复 (255,255,255) 与参考一致；partial 核心 (151,153,157)=rgba(225,228,234,.67) 精确匹配；并排图 out/ui-snap/caption_vs2.png 无可见样式差异。
+- **MSI 已重打**（含此修复）；commit 413ea32 已 push。
+
 ## Last Agent Summary
 
 本会话（续跑）完成：
