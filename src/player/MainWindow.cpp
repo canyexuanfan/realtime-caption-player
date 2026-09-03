@@ -741,6 +741,11 @@ QWidget* MainWindow::buildVideoArea(QWidget* parent) {
         "background:qlineargradient(x1:0,y1:0,x2:0,y2:1,"
         " stop:0 rgba(5,7,10,0.20), stop:0.18 rgba(5,7,10,0),"
         " stop:0.65 rgba(5,7,10,0), stop:1 rgba(5,7,10,0.43));"));
+    // 参考 DOM 中 video-vignette 位于 caption-overlay 之前且无 z-index（auto=0），
+    // caption/waveform 为 z-index 5 叠在其上；Qt 后创建的子控件叠在上层，若把
+    // 暗角放在字幕之后会把字幕/波形整体压暗（实测白字 255→198）。lower() 让暗角
+    // 只压视频画面，字幕保持纯白。
+    m_vignette->lower();
 
     // 拖放提示（.drop-hint）
     m_dropHint = new QLabel(tr("松开即可打开视频"), overlayParent);
