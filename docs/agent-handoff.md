@@ -1,48 +1,29 @@
 # Agent Handoff
 
-- **Last updated:** 2026-09-04（字幕字号修复 + 真实视频字幕验证 + MSI 重打 + 唯一字幕路径清理待决）
+- **Last updated:** 2026-09-04 晚（字幕错误稳定复现根因修复 654d7c2 + MSI 重打；此前为字幕字号修复 3991a9b）
 - **Branch:** `main`
-- **HEAD:** 本会话最终提交（948f86d 之后的发布提交，见 git log）
+- **HEAD:** 654d7c2（worker IPC 连接超时修复）；之前链 0ab66c9(P7第5轮)→c2c56eb(P8重打)→3991a9b(字幕字号)→57fa54d(文档回填)
 - **远程：** origin/main 已同步（github.com/canyexuanfan/realtime-caption-player，私有）
 
 ## Current Phase
 
-**MVP v0.1.0 RELEASE READY**。P0 已签署、P8 报告 PASS、P9 发布产物齐（发布说明/SBOM/SHA-256 manifest）。tag：`v0.1.0`。
+**MVP v0.1.0 RELEASE READY**。P0 已签署、P8 报告 PASS、P9 发布产物齐（发布说明/SBOM/SHA-256 manifest）。tag：`v0.1.0`。本会话在 Release 基础上继续完成第 5 轮像素复刻、字幕字号修复、字幕错误根因修复。
 
 ## Last Completed Task（本会话主线）
 
-1. **真实中文 ASR 端到端真机验证**：TTS 固定语料（Microsoft Huihui，4 句）→ FFmpeg 合成
-   21.5s mp4 → caption_worker 全链路：65 个实时 partial、4 个 final **逐字正确**、SRT 正确。
-   修复 4 个真实缺陷：VAD `Empty()/Detected()` API 误用（真实语音首句必崩）、
-   字幕时间戳误用缓冲区局部索引、drainVad use-after-free、BoundedQueue 容量失效
-   （ctest 21/21 稳定通过）。commit d5059cd。
-2. **按 HTML 前端参考复刻 UI**（用户指出未用参考稿后重做）：自绘无边框标题栏、
-   238px 左侧栏（播放列表+实时字幕转写面板）、浮动 ASR 状态卡、控制台
-   （±10s/上下曲/倍速/音量/字幕开关/全屏/SRT 导出）、暗色 QSS 主题、快捷键。
-   无假按钮（截图/AB 循环/设置页未实装即不放）。commit 948f86d。
-3. **mpv 真机三缺陷修复**：`MPV_FORMAT_FLAG` 传 char* 导致 play() 实为暂停
-   （播放停滞 0.00 的根因，verbose 日志 `video=playing (paused)` 证据）、
-   osd-overlay 正确语法 `osd-overlay <id:int> <format> <data>`（移除用 none）、
-   事件端 pause 按 int 读。修复后真机 613 进度事件完整播放至 EOF、osd 0 报错。
-4. **MSI 真机闭环**：`ninja package_msi` 出包（677MB）→ UAC 静默安装到
-   `F:\rcp-app-test`（exit 0）→ 安装目录一键运行（player_app+caption_worker 自动
-   从安装目录启动、模型解析 `<appDir>/models` 修复生效、转写 4 句正确）→
-   卸载（exit 0、目录清理）。
-5. **阶段门/发布产物**：P0 报告签署（T0016 渲染/T0020/T0022 真实语音回填完成，
-   T0019 rclone 断网、T0023 FunASR CER/WER 维持 PARTIAL——外部依赖）；
-   P8 报告 PASS；`docs/release/`（RELEASE-NOTES-v0.1.0.md、SBOM.md、
-   release-manifest-v0.1.0.txt）。
+0. **第 5 轮像素复刻（0ab66c9）**：同尺寸并排比对法修复 4 项差异（视频标题去扩展名/选项卡补 list+history 图标/控制条字幕轨按钮归位/AB 字号），全清单清零。唯一保留偏差：设计图视频区字幕设置小窗口已并入设置页，不复刻。
+1. **重打安装包（c2c56eb）**：runtime 原为 8/30 旧版，同步最新构建并重打 MSI。
+2. **字幕字号修复（3991a9b）**：根因=全局 QSS `QWidget{font-size:14px}` 覆盖 setFont(36px)；CaptionLabel 自身 stylesheet 声明 font-size。真实 G 盘视频验证 final≈36px/partial≈29.5px 与参考一致。
+3. **字幕错误稳定复现修复（654d7c2）**：根因=worker IPC 连接 5s 超时窗口过脆 + 重试销毁重建 socket 打断连接；修复=复用 socket + 60s 窗口 + 进程退出提前报错 + 错误带 socket error。真实 G 盘视频验证运行中/9 行字幕/partial+final 正常。
 
 ## Current Task
 
-**NONE（MVP v0.1.0 完成并打 tag）**。
+**NONE（等待用户）**：唯一字幕路径清理待用户拍板（死代码 CaptionController/CaptionStateMachine/AssEscaper：a 断开接线 b 维持现状 c 授权删除，用户此前拒绝 Remove-Item）。
 
 ## Next Exact Action
 
-MVP v0.1.0 已 Release Ready 并打 tag。后续版本（T0500+）需用户/PRD 明确授权后启动；
-候选方向（均在 docs 中有记录）：文件关联 UserChoice（T0219–T0227）、代码签名、
-rclone 断网回归（T0019）、FunASR CER/WER 评测（T0023）、播放头跟随抽音的流水线同步调优、
-设置页（T0202+）。
+- 等用户确认唯一字幕路径清理方式；确认后执行并回填。
+- 若用户重测仍报字幕错误：抓 `RCP_TRACE` 里 `workerError:` 具体消息（已加 trace），按 6 类错误定位。
 
 ## 本会话新增坑位（详见 questions/）
 

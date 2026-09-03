@@ -137,6 +137,15 @@
 - **清理状态**：拟删除 CaptionController/CaptionStateMachine/AssEscaper（含其单测）收敛单一路径——**用户拒绝删除确认，未删任何文件**。待用户决定：a) 保留文件仅断开 MainWindow 接线；b) 维持现状；c) 授权后删除。
 - **安装包已重打（2026-09-04 01:26）**：runtime 同步最新 player_app（427008B，哈希一致）→ heat 重生成 files.wxs → `package_msi` 出包 709,808,128B。注意 ninja 不在 PATH，需绝对路径 `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe`。
 
+## 本会话补充（2026-09-04 晚：字幕错误稳定复现根因修复，commit 654d7c2）
+
+用户实测 G 盘提干课稳定报「字幕错误」，纠正"这是偶发"的判断。
+
+- **根因**：`WorkerSupervisor::tryConnect` 固定 50×100ms=5s 内未连上 worker IPC 即永久报「字幕错误」；每次重试销毁重建 QLocalSocket 可能打断正在建立的 pipe 连接；worker 冷启动（杀软/磁盘/主线程忙）监听耗时可能远超 5s。worker 独立启动实测仅 0.73s 即监听，模型在 OpenMedia 后才加载——排除"模型慢"。
+- **修复**：复用同一 socket 重连、超时放宽至 60s（600×100ms）、worker 连接前退出则提前报错、最终错误带上 socket error；MainWindow workerError 处理器加 rcpTrace 输出真实错误消息（UI 只显示「字幕错误」不显示原因）。
+- **验证**：G 盘提干课真实播放，运行状态=运行中、字幕 9 行、画面 partial+final 双行字幕正常、无 workerError。
+- **MSI 重打（02:00:12）**：runtime 已同步最新 player_app（427520B，build/runtime 哈希一致）；打包曾因测试遗留 caption_worker 占着 runtime/tst_err.txt 失败，清理后成功（709,808,128B）。**教训：测试 worker 务必确认 Kill，测试文件勿写进 runtime。**
+
 ## Last Agent Summary
 
 本会话（续跑）完成：
