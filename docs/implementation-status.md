@@ -115,6 +115,17 @@
 
 **MVP 同步模型（诚实声明）**：worker 以全速预识别整段媒体并打绝对时间戳，主进程 CaptionController 按播放头挑选覆盖当前时刻的 final 段叠加显示；真实中文准确率与"播放头跟随抽音"实时同步留待真机调优（沙箱无法验证播放）。实时逐字 partial（用户硬要求、不可降级）在引擎层已由 Zipformer2-CTC 真机 rc=0 证明可用（见 BLOCKER-2）。
 
+## 本会话补充（2026-09-03，P7 像素复刻第 5 轮：4 项差异清零）
+
+沿用「同尺寸并排截图比对法」（快照 `RCP_DEMO_ONLY+RCP_SNAPSHOT` → LANCZOS 缩放 1280x800 → 与参考 `ref-1280.png` 逐区并排 → PIL 像素采样）。本轮修复（commit 见 git log，`[P7] 像素复刻第5轮...`）：
+- **视频区标题去扩展名**：标题栏保留原名，画面内标题用 `completeBaseName()`。
+- **左轨选项卡补图标**：播放列表/历史记录 tab 加 15px list/history 图标，激活态随文字变 `#7868ff`，toggled 同步（`syncTabIcons`）。
+- **控制条字幕轨归位**：先回 HTML 源码核对，参考稿右组确有 `#trackButton`（subtitle 图标，OCR 曾漏读）；将 `m_btnTrack` 图标改 subtitle、从左组移到右组音量与设置之间。
+- **AB 按钮字号**：`font-size:12px;font-weight:700`（参考 AB 12px/700）。
+- 验证：构建 `player_app` rc=0；快照 `out/ui-snap/round5_fixed.png`；并排比对标题/选项卡/控制条逐区一致；AB 字形 11px→9px（参考 8px，子像素差异可接受）。
+- 排查经验沉淀至 `questions/前端像素复刻排查指南.md`（❌/✅ 记录）。
+- 唯一允许保留偏差：设计图视频区「实时字幕设置小窗口」已并入设置页，不复刻小窗口本体。
+
 ## Last Agent Summary
 
 本会话（续跑）完成：

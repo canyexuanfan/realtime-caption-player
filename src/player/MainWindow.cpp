@@ -378,7 +378,8 @@ void MainWindow::fillDemoData() {
     m_statLatency->setText(tr("实时延迟：1.2s"));
     const QString demoTitle = QStringLiteral("航拍中国 第三季 第01集.mp4");
     if (m_titleFile) m_titleFile->setText(demoTitle);
-    if (m_videoFileTitle) m_videoFileTitle->setText(demoTitle);
+    // 参考稿 .video-file-title = stripExtension(fileName)，标题栏保留扩展名、画面内标题去除
+    if (m_videoFileTitle) m_videoFileTitle->setText(QStringLiteral("航拍中国 第三季 第01集"));
     setWindowTitle(QStringLiteral("实时字幕播放器 — %1").arg(demoTitle));
     m_demoCurrent = 1458;   // state.current = 24:18
     m_seek->setRange(0, 2952);
@@ -594,6 +595,17 @@ QWidget* MainWindow::buildLeftRail(QWidget* parent) {
     m_tabPlaylist->setChecked(true);
     m_tabPlaylist->setCursor(Qt::PointingHandCursor);
     m_tabHistory->setCursor(Qt::PointingHandCursor);
+    // 参考稿 rail-tab 带 15px list/history 图标，激活态随文字变 accent 色
+    const auto syncTabIcons = [this] {
+        const QColor accent(QStringLiteral("#7868ff"));
+        m_tabPlaylist->setIcon(icon(QStringLiteral("list"),
+                                    m_tabPlaylist->isChecked() ? accent : kMuted, 15));
+        m_tabHistory->setIcon(icon(QStringLiteral("history"),
+                                   m_tabHistory->isChecked() ? accent : kMuted, 15));
+        m_tabPlaylist->setIconSize(QSize(15, 15));
+        m_tabHistory->setIconSize(QSize(15, 15));
+    };
+    syncTabIcons();
     // 互斥组：checkable 按钮默认不互斥，点"历史记录"不会取消"播放列表"的选中，
     // toggled 不触发、栈不切换（用户报"点击历史记录没有反应"根因）。
     auto* tabGroup = new QButtonGroup(this);
@@ -604,9 +616,16 @@ QWidget* MainWindow::buildLeftRail(QWidget* parent) {
     th->addWidget(m_tabHistory);
     v->addWidget(tabs);
 
-    connect(m_tabPlaylist, &QPushButton::toggled, this, [this](bool on) {
+    connect(m_tabPlaylist, &QPushButton::toggled, this, [this, syncTabIcons](bool on) {
         m_mediaStack->setCurrentIndex(on ? 0 : 1);
         m_libTitle->setText(on ? tr("播放列表") : tr("历史记录"));
+        syncTabIcons();
+        if (on) refreshMediaRows();
+    });
+    connect(m_tabHistory, &QPushButton::toggled, this, [this, syncTabIcons](bool on) {
+        m_mediaStack->setCurrentIndex(on ? 1 : 0);
+        m_libTitle->setText(on ? tr("历史记录") : tr("播放列表"));
+        syncTabIcons();
         if (on) refreshMediaRows();
     });
 
@@ -811,12 +830,12 @@ QWidget* MainWindow::buildControlDeck(QWidget* parent) {
     m_btnAb->setFixedSize(34, 34);
     m_btnAb->setToolTip(tr("设置 AB 循环"));
     m_btnAb->setCursor(Qt::PointingHandCursor);
-    // 幽灵按钮修复：此前创建临时 play 按钮只为偷样式，未入布局成幽灵 ▶。
+    // 参考稿 AB 文本 12px/700
     m_btnAb->setStyleSheet(QStringLiteral(
-        "QPushButton{background:transparent;border:none;border-radius:17px;}"
+        "QPushButton{background:transparent;border:none;border-radius:17px;font-size:12px;font-weight:700;}"
         "QPushButton:hover{background:rgba(255,255,255,0.08);}"
         "QPushButton:checked{background:rgba(121,105,255,0.22);}"));
-    m_btnTrack = cbtn(QStringLiteral("monitor"), tr("切换字幕轨"));
+    m_btnTrack = cbtn(QStringLiteral("subtitle"), tr("切换字幕轨"));
 
     m_btnB10 = cbtn(QStringLiteral("rewind"), tr("后退 10 秒"));
     m_btnPrev = cbtn(QStringLiteral("prev"), tr("上一个"));
@@ -855,7 +874,6 @@ QWidget* MainWindow::buildControlDeck(QWidget* parent) {
     ll->addWidget(m_btnCam);
     ll->addWidget(m_btnAb);
     ll->addWidget(m_btnCaption);
-    ll->addWidget(m_btnTrack);
     cc->addWidget(m_btnB10);
     cc->addWidget(m_btnPrev);
     cc->addWidget(m_playBtn);
@@ -864,6 +882,7 @@ QWidget* MainWindow::buildControlDeck(QWidget* parent) {
     rr->addWidget(m_btnSpeed);
     rr->addWidget(volIcon);
     rr->addWidget(m_volume);
+    rr->addWidget(m_btnTrack);   // 参考稿右组：倍速/音量/字幕轨(subtitle 图标)/设置/全屏
     rr->addWidget(m_btnSettings);
     rr->addWidget(m_btnFs);
 
@@ -1718,7 +1737,8 @@ void MainWindow::openFile(const QString& path) {
         refreshMediaRows();
         const QString name = QFileInfo(path).fileName();
         m_titleFile->setText(name);
-        m_videoFileTitle->setText(name);
+        // 画面内标题去扩展名（参考 .video-file-title stripExtension），标题栏保留原名
+        m_videoFileTitle->setText(QFileInfo(path).completeBaseName());
         setWindowTitle(QStringLiteral("实时字幕播放器 — %1").arg(name));
         if (m_settings.value(QStringLiteral("general/rememberPosition"), true).toBool()) {
             const qint64 saved = m_settings.value(QStringLiteral("position/") + name, 0).toLongLong();
