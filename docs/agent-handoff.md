@@ -1,6 +1,6 @@
 # Agent Handoff
 
-- **Last updated:** 2026-08-28（真机回填 + UI 复刻 + MSI 闭环轮）
+- **Last updated:** 2026-09-04（字幕字号修复 + 真实视频字幕验证 + MSI 重打 + 唯一字幕路径清理待决）
 - **Branch:** `main`
 - **HEAD:** 本会话最终提交（948f86d 之后的发布提交，见 git log）
 - **远程：** origin/main 已同步（github.com/canyexuanfan/realtime-caption-player，私有）
@@ -192,3 +192,33 @@ RCP_DEMO_ONLY=1 + RCP_SNAPSHOT + RCP_SNAP_T1/T2，统一 1280x800 逻辑尺寸�
   runtime demo 冒烟退出 0、快照正常。`out/` 已 gitignore。
 - 运行方式：开发机直接跑 `out\bundle\runtime\player_app.exe`（零安装，DLL/模型同目录）；
   分发给他人装 `out\package\RealtimeCaptionPlayer-0.1.0.msi`。
+
+### 字幕字号修复 + 真实视频字幕验证（2026-09-04，commit 3991a9b）
+- **用户质疑**："还是和设计图不一样，起码视频播放的字幕就不对"；"不要只看样例视频，还要
+  打开我历史播放测试的视频，这两个字幕居然还能不一样"；"这两个都是字幕，怎么能有两个路径？
+  不应该只有一个字幕路径吗"。
+- **字号根因**：kAppQss 第 67 行 `QWidget{font-size:14px}` 覆盖程序 setFont(36px)
+  （样式表字号优先于 setFont），字幕被压成 14px。修复：`CaptionLabel::setFontSizePx`
+  （src/player/UiKit.h）在控件自身 stylesheet 声明 `font-size:%1px`（自身规则优先于
+  应用级规则）。参考 final 36px / partial≈29.5px，已通过并排比对 + PIL 采样确认
+  demo 与真实一致（cap_strip_v3 / cap_final_v2 图见 out/ui-snap/）。
+- **真实视频验证方法（关键）**：main.cpp 支持 argv[1] 打开媒体（1.5s 后 openFile，
+  `setStartupMedia` 让恢复会话让位）；`RCP_SNAPSHOT=<png>` 在 T1/T2 两帧 grab 后 quit。
+  用 `out\bundle\runtime\player_app.exe "<G盘视频>"`（worker+模型同目录）+ RCP_SNAPSHOT
+  即可对真实媒体出字幕并截图。注意：**真实字幕验证不能设 RCP_NO_CAPTION**（会跳过 worker）。
+- **已验证**：显式打开 G 盘 `01.考点1：统计术语和增长率.mp4`（trace 确认 openFile 路径），
+  worker 全速预识别出 29 行字幕，画面 partial（灰半透明）+final（白粗四向描边）两行正常，
+  与参考稿/样例一致；波形在字幕下方。**上次运行报『字幕错误』为偶发**（同命令重跑成功，
+  无残留 worker 进程）。
+- **『两个字幕两个路径』结论**：实际渲染仅 CaptionLabel 一条（worker → MainWindow
+  onPartial/onFinal → updateOverlay → CaptionLabel）；`CaptionController::overlayChanged/
+  currentAssEvents` + `MpvPlayer::showSubtitleOverlay/clearSubtitleOverlay`（mpv osd-overlay
+  ass-events）为 P6 遗留**无调用者死代码**，连同 CaptionStateMachine/AssEscaper 构成
+  废弃的第二条字幕实现。
+- **清理被用户拒绝**：拟删除 CaptionController/CaptionStateMachine/AssEscaper（含其单测）
+  以收敛单一路径，用户拒绝确认删除 → **未删除任何文件**。等用户决定：a) 保留但断开
+  MainWindow 里 m_captionCtl 接线（编辑不动文件）；b) 维持现状；c) 之后按用户授权再删。
+- **安装包已重打**（2026-09-04 01:26）：runtime 同步最新 player_app（427008B，哈希一致），
+  heat 从 runtime 重新生成 files.wxs 后 package_msi 出包 709,808,128B。ninja 不在 PATH，
+  需用绝对路径
+  `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe`。

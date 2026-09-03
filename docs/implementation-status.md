@@ -11,7 +11,7 @@
 - **Last completed task:** P9 发布产物（RELEASE-NOTES / SBOM / release manifest SHA-256）
 - **Last verified commit:** 948f86d → 本会话最终提交
 - **Last phase gate:** P0 SIGNED（2026-08-28）/ P8 PASS（P8-windows-package-report.md）
-- **Last update:** 2026-08-28（真机回填轮）
+- **Last update:** 2026-09-04（字幕字号修复 3991a9b + 真实视频字幕验证 + MSI 重打 + 唯一字幕路径清理待决）
 
 ## 环境事实（诚实记录）
 
@@ -126,6 +126,16 @@
 - 排查经验沉淀至 `questions/前端像素复刻排查指南.md`（❌/✅ 记录）。
 - 唯一允许保留偏差：设计图视频区「实时字幕设置小窗口」已并入设置页，不复刻小窗口本体。
 - **安装包重打（2026-09-03）**：`out/bundle/runtime/player_app.exe` 原为 8/30 旧版（缺本轮 4 项修复），已从 `out/build/ui/bin/` 同步最新版（427008B，哈希与构建产物一致）；`ninja -C out/build/ui package_msi` 重打 `out/package/RealtimeCaptionPlayer-0.1.0.msi`（≈709,808,128B，OLE 头 `D0CF11E0` 校验通过）；msiexec /a 解包核验 MSI 内 player_app.exe=427008B（新版本）。runtime 冒烟运行：demo 模式启动退出 0，快照 `out/ui-snap/rt_smoke.png` 正常产出。`out/` 受 .gitignore 管理，未入版本库。
+
+## 本会话补充（2026-09-04：字幕字号修复 + 真实视频字幕验证，commit 3991a9b）
+
+用户连续质疑字幕：①"还是和设计图不一样，起码视频播放的字幕就不对"；②"不要只看样例视频，还要打开我历史播放测试的视频，这两个字幕居然还能不一样"；③"这两个都是字幕，怎么能有两个路径？不应该只有一个字幕路径吗"。
+
+- **字号根因（①）**：全局 QSS `kAppQss` 第 67 行 `QWidget{font-size:14px}` 覆盖程序 `setFont(36px)`——Qt 样式表字号优先于 setFont，字幕被压成 14px。修复：`CaptionLabel::setFontSizePx`（src/player/UiKit.h）在控件自身 stylesheet 声明 `font-size:%1px`（自身规则优先于应用级规则），其余字体属性仍由 setFont 提供。参考规格：final 36px 白字四向 ±2px 描边、partial≈29.5px 半透明灰、两行间距 5px、画面底部 13% 锚定、波形在字幕下方。
+- **真实视频验证（②）**：显式打开 G 盘提干课 `01.考点1：统计术语和增长率.mp4`（main.cpp argv[1] → openFile；`RCP_SNAPSHOT` 双帧截图；worker+模型用 `out\bundle\runtime`），trace 确认 openFile 路径，worker 全速预识别出 29 行字幕。画面 partial+final 两行经同逻辑比例并排（out/ui-snap/cap_strip_v3.png、cap_final_v2.png）确认与参考稿/样例一致（final≈36px、partial≈29.5px、白/灰、描边）。**验证要点：真实字幕必须让 worker 跑起来——不能设 `RCP_NO_CAPTION`；'字幕错误'出现过一次为偶发，同命令重跑成功。**
+- **两个字幕路径核查（③）**：实际渲染仅 `CaptionLabel` 一条（worker → MainWindow onPartial/onFinal → `updateOverlay()`）；`CaptionController::overlayChanged/currentAssEvents` + `MpvPlayer::showSubtitleOverlay/clearSubtitleOverlay`（mpv `osd-overlay` ass-events）为 P6 遗留**无调用者死代码**，连同 CaptionStateMachine/AssEscaper 构成废弃的第二条字幕实现（违反 AGENTS.md「同一职责只允许一个实现入口」）。
+- **清理状态**：拟删除 CaptionController/CaptionStateMachine/AssEscaper（含其单测）收敛单一路径——**用户拒绝删除确认，未删任何文件**。待用户决定：a) 保留文件仅断开 MainWindow 接线；b) 维持现状；c) 授权后删除。
+- **安装包已重打（2026-09-04 01:26）**：runtime 同步最新 player_app（427008B，哈希一致）→ heat 重生成 files.wxs → `package_msi` 出包 709,808,128B。注意 ninja 不在 PATH，需绝对路径 `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe`。
 
 ## Last Agent Summary
 
