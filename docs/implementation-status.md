@@ -125,6 +125,7 @@
 - 验证：构建 `player_app` rc=0；快照 `out/ui-snap/round5_fixed.png`；并排比对标题/选项卡/控制条逐区一致；AB 字形 11px→9px（参考 8px，子像素差异可接受）。
 - 排查经验沉淀至 `questions/前端像素复刻排查指南.md`（❌/✅ 记录）。
 - 唯一允许保留偏差：设计图视频区「实时字幕设置小窗口」已并入设置页，不复刻小窗口本体。
+- **安装包重打（2026-09-03）**：`out/bundle/runtime/player_app.exe` 原为 8/30 旧版（缺本轮 4 项修复），已从 `out/build/ui/bin/` 同步最新版（427008B，哈希与构建产物一致）；`ninja -C out/build/ui package_msi` 重打 `out/package/RealtimeCaptionPlayer-0.1.0.msi`（≈709,808,128B，OLE 头 `D0CF11E0` 校验通过）；msiexec /a 解包核验 MSI 内 player_app.exe=427008B（新版本）。runtime 冒烟运行：demo 模式启动退出 0，快照 `out/ui-snap/rt_smoke.png` 正常产出。`out/` 受 .gitignore 管理，未入版本库。
 
 ## Last Agent Summary
 

@@ -183,3 +183,12 @@ RCP_DEMO_ONLY=1 + RCP_SNAPSHOT + RCP_SNAP_T1/T2，统一 1280x800 逻辑尺寸�
 - 排查经验入 `questions/前端像素复刻排查指南.md`（含"控件有无必须回 HTML 源码核对，
   勿信 OCR"关键纠偏）。
 - 5 轮像素复刻后唯一保留偏差：设计图视频区「实时字幕设置小窗口」已并入设置页。
+
+### 安装包重打（2026-09-03）
+- 用户指出 runtime 未更新：`out/bundle/runtime/player_app.exe` 是 8/30 旧版。已将
+  `out/build/ui/bin/player_app.exe`（427008B，含本轮 4 项修复）同步进 runtime（哈希一致），
+  并 `ninja -C out/build/ui package_msi` 重打 `out/package/RealtimeCaptionPlayer-0.1.0.msi`
+  （≈709,808,128B，OLE 头 D0CF11E0 通过）。msiexec /a 解包核验包内 player_app.exe=427008B。
+  runtime demo 冒烟退出 0、快照正常。`out/` 已 gitignore。
+- 运行方式：开发机直接跑 `out\bundle\runtime\player_app.exe`（零安装，DLL/模型同目录）；
+  分发给他人装 `out\package\RealtimeCaptionPlayer-0.1.0.msi`。
