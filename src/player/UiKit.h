@@ -101,6 +101,11 @@ public:
                        QStringLiteral("Microsoft YaHei")});
         f.setLetterSpacing(QFont::AbsoluteSpacing, px * (Final == m_style ? 0.02 : 0.01));
         setFont(f);
+        // 全局 QSS `QWidget{font-size:14px}` 会覆盖 setFont 的字号（样式表字号优先于
+        // 程序 setFont），导致字幕被压成 14px。必须在控件自身 stylesheet 里显式声明
+        // font-size，自身规则优先级高于应用级规则；其余字体属性（族/字重/字距）仍由
+        // setFont 提供，Qt 只覆盖样式表指明的 font-size 一项。
+        setStyleSheet(QStringLiteral("background:transparent; font-size:%1px;").arg(px));
         update();
     }
 protected:
