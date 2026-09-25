@@ -50,7 +50,7 @@ P9  全量 QA、安全、性能、合规、Release
 - 每个任务都有验证；任务级验收先于勾选。
 - 实时回填 TODO、implementation-status、agent-handoff。
 - 每个任务一个独立 Git commit，标题格式 `[Txxxx] 中文动作描述`。
-- 完成的任务立即 `git push` 到私有远程（PRIVATE，禁止公开仓库）。
+- 完成的任务立即 `git push` 到远程 origin。仓库已于 2026-09-25 经用户明确授权转为 **PUBLIC**（canyexuanfan/realtime-caption-player），历史已用 git-filter-repo 清除个人路径；此后任何提交严禁引入 Windows 用户名、本机绝对路径与密钥/Token。
 - 外部阻塞（缺工具链/模型/签名/网络）如实记录 `BLOCKED` / `PUSH_PENDING`，
   继续不依赖该阻塞的可执行工作，**不得假装成功**。
 - 隐私：默认离线、无遥测、无云上传；日志默认不记录完整字幕正文与完整路径。

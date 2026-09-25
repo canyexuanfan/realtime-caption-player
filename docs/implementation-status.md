@@ -190,3 +190,12 @@
 - **重打真实 MSI**：`out/bundle/runtime` 拷入新双 exe + `windeployqt` 收齐 Qt6 Widgets/OpenGL/Network + platforms；`ninja package_msi` 产出 `RealtimeCaptionPlayer-0.1.0.msi`（≈677MB，OLE 校验通过），含真实播放器+worker+原生 DLL+四套模型+Qt6 全套。
 - 提交 `088a79d` 并推送 `28364b0..088a79d`。
 - **诚实标注 PARTIAL**：沙箱无显示器/GPU/语料，以下仍待用户本机回填——(1) mpv 真实渲染出图与字幕叠加可见性；(2) 真实中文语音 ASR 准确率（Zipformer2-CTC partial + SenseVoice 终稿）；(3) worker 全速预识别 vs 播放头跟随抽音 的实时同步打磨；(4) MSI 真机安装与一键运行。
+
+## 本会话补充（2026-09-25，仓库转公开 + 历史隐私清理）
+- 用户明确授权将远程仓库转为 **PUBLIC**（canyexuanfan/realtime-caption-player）。
+- 发布前检查：全历史密钥/Token 扫描 0 命中；LICENSE=GPL-3.0、NOTICE 齐备；但 5 个文件（AGENTS.md、dependencies.lock.json、docs/agent-handoff.md、docs/development/setup-windows.md、tools/fix_blocker2_zh_streaming.bat）含 Windows 用户名路径 `wzm33`，波及 7 个历史提交。
+- 用 `git filter-repo --replace-text`（`wzm33`→`<你的用户名>`）重写全部 90 个提交；重写后全历史 `wzm33` 计数 = 0。**所有提交哈希改变**（如 [协议] 59c36d4→11bb99f），文档/聊天中引用的旧哈希自此失效。
+- force-push `main`（6080e88→f1bb336）与 `v0.1.0`（241a117→9170207）覆盖远程，随后 `gh repo edit --visibility public`，gh 验证 `visibility=PUBLIC`。
+- 重写前完整备份：`out/history-backup-pre-publication.bundle`（仅本地，含旧路径，禁止推送或公开）。
+- 期间并行会话推进的 P7 字幕修复轮（第5轮像素/字号/IPC 超时/暗角等）全部保留于重写后历史，无内容丢失。
+- 防复发：AGENTS.md 铁律同步更新——仓库现为 PUBLIC，任何提交严禁引入 Windows 用户名、本机绝对路径与密钥/Token。
