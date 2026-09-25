@@ -109,6 +109,7 @@ P9  全量 QA、安全、性能、合规、Release
 
 - OS：Windows（win32）。编译器：`cl.exe`（VS2022 BuildTools，MSVC 14.44 为主）可用。
 - `cmake`(4.4.2) / `ninja`(1.13.0) / `Qt 6.8.1`（仓库内 `.qt6/6.8.1/msvc2022_64`，含 Core/Gui/Widgets/Test/Sql）已就绪。
+- Python 一直可用：venv 解释器在 `.workbuddy/binaries/python/envs/default/Scripts/python.exe`（3.13；venv 根目录没有 python.exe，勿据根目录列表断言缺失）；系统另有 `py` 启动器（3.10.9）。
 - `libmpv` / `FFmpeg` / `sherpa-onnx` / `WiX` 缺失（BLOCKED）；原生库就绪前依赖它们的模块不实装、不伪造通过。
 - 沙箱构建必须用 `Ninja` generator（CMakePresets 默认 VS2022 generator 在 `project()` 阶段崩溃），详见 `docs/implementation-status.md` → Known Issues。
 - `git` / `gh`（已登录 github.com）/ 互联网 可用。
