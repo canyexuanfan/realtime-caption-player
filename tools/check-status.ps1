@@ -1,4 +1,4 @@
-# tools/check-status.ps1 - todolist / implementation-status consistency audit (D5).
+﻿# tools/check-status.ps1 - todolist / implementation-status consistency audit (D5).
 # Checks:
 #   1. implementation-status snapshot must NOT claim RELEASE READY unless todolist
 #      phases are all checked (currently always expected OFF before MVP re-baseline).
