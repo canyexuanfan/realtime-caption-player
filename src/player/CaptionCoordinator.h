@@ -61,6 +61,7 @@ signals:
     void stateChanged(rcp::player::CaptionCoordinator::State state, const QString& message);
     void transcriptPartial(const QString& text);
     void transcriptFinal(long long startMs, const QString& text);
+    void transcriptActiveChanged(int row);   // 播放头所在 final 的行序（-1=无）——C4 当前句高亮
     void statsChanged(int finalCount, long long coveredUntilMs);
 
 private:
@@ -79,6 +80,7 @@ private:
     long long m_coveredUntilMs = 0;
     quint64 m_generation = 0;
     State m_state = State::Disabled;
+    int m_activeRow = -1;          // 当前播放头所在 final 的行序（transcriptActiveChanged 去重用）
     QString m_lastError;
     QString m_workerExe;
     QString m_modelsRoot;

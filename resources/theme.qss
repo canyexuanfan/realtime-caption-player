@@ -21,8 +21,12 @@ QListWidget#playlist::item, QListWidget#history::item { min-height:40px; }
 QListWidget::item { color:#a7adb8; border-radius:5px; padding:4px 9px; margin:0 0 1px 0; }
 QListWidget::item:hover { background:#222832; color:#f4f6fb; }
 QListWidget::item:selected { background:qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #5147aa, stop:1 #6254cb); color:#fff; }
-QListWidget#transcript { padding:0 9px 10px 9px; }
-QLabel#transcriptItem { background:transparent; color:#a7adb8; font-size:12px; }
+/* 条目自身 padding 承担缩进（列表不再叠加左右 padding，防双重 9px 缩进） */
+QListWidget#transcript { padding:0 0 10px 0; }
+/* 参考 .transcript-item：padding 9/10/10 + 圆角 6 + hover 背景（审查 §2.4） */
+QLabel#transcriptItem { background:transparent; color:#a7adb8; font-size:12px;
+                        padding:9px 10px 10px; border-radius:6px; }
+QLabel#transcriptItem:hover { background:#222832; }
 QLineEdit#searchBox {
   background:#20252d; border:1px solid rgba(255,255,255,0.105); border-radius:6px;
   color:#f4f6fb; font-size:12px; min-height:31px; padding:0 8px; selection-background-color:#5c4bd5;

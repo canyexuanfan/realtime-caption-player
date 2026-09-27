@@ -165,6 +165,20 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
             });
     connect(m_coordinator, &rcp::player::CaptionCoordinator::statsChanged,
             this, &MainWindow::onCaptionStats);
+    // C4：真实媒体转写面板当前句高亮（参考 .transcript-item.active 紫渐变）。
+    connect(m_coordinator, &rcp::player::CaptionCoordinator::transcriptActiveChanged,
+            this, [this](int row) {
+                if (m_liveActiveRow == row) return;
+                m_liveActiveRow = row;
+                for (int r = 0; r < m_transcript->count(); ++r) {
+                    if (QWidget* wgt = m_transcript->itemWidget(m_transcript->item(r)))
+                        wgt->setStyleSheet(r == row
+                            ? QStringLiteral("background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 rgba(89,76,184,0.8),stop:1 rgba(67,58,145,0.76));border-radius:6px;color:#ffffff;padding:9px 10px 10px;")
+                            : QStringLiteral("background:transparent;padding:9px 10px 10px;"));
+                }
+                if (row >= 0)
+                    m_transcript->scrollToItem(m_transcript->item(row), QAbstractItemView::PositionAtCenter);
+            });
     connect(m_coordinator, &rcp::player::CaptionCoordinator::stateChanged, this,
             [this](rcp::player::CaptionCoordinator::State st, const QString& msg) {
                 switch (st) {
@@ -363,7 +377,8 @@ void MainWindow::fillDemoData() {
         lab->setObjectName(QStringLiteral("transcriptItem"));
         lab->setTextFormat(Qt::RichText);
         lab->setWordWrap(true);
-        item->setSizeHint(QSize(218, lab->heightForWidth(190) + 20));
+        // +19 = QSS padding(9/10/10) 垂直合计，缺裁文字下缘（并排对比实证）
+    item->setSizeHint(QSize(218, lab->heightForWidth(190) + 27));
         m_transcript->setItemWidget(item, lab);
     }
     m_statLines->setText(tr("字幕行数：128"));
@@ -420,8 +435,8 @@ void MainWindow::demoTick() {
         for (int r = 0; r < m_transcript->count(); ++r) {
             QWidget* wgt = m_transcript->itemWidget(m_transcript->item(r));
             if (wgt) wgt->setStyleSheet(r == idx
-                ? QStringLiteral("background:#4a3f9c;border-radius:6px;")
-                : QStringLiteral("background:transparent;"));
+                ? QStringLiteral("background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 rgba(89,76,184,0.8),stop:1 rgba(67,58,145,0.76));border-radius:6px;color:#ffffff;padding:9px 10px 10px;")
+                : QStringLiteral("background:transparent;padding:9px 10px 10px;"));
         }
         if (QListWidgetItem* cur = m_transcript->item(idx))
             m_transcript->scrollToItem(cur, QAbstractItemView::PositionAtCenter);
@@ -1785,8 +1800,9 @@ QWidget* MainWindow::settingRow(const QString& text, QWidget* editor, QWidget* p
 void MainWindow::appendTranscriptPartial(const QString& text) {
     rcpTrace(QStringLiteral("caption-partial %1").arg(text.left(30)));
     if (text.isEmpty()) return;
+    // 参考 .transcript-line：partial 行同样 muted 色、行距 1.55（无前缀装饰）。
     const QString html = QStringLiteral(
-        "<span style='color:#757c88;'>… </span><span>%1</span>").arg(text.toHtmlEscaped());
+        "<div style='line-height:155%;'>%1</div>").arg(text.toHtmlEscaped());
     if (m_lastPartialLabel) {
         m_lastPartialLabel->setText(html);
         m_transcript->scrollToBottom();
@@ -1815,12 +1831,12 @@ void MainWindow::appendTranscriptFinal(long long startMs, const QString& text) {
     auto* item = new QListWidgetItem(m_transcript);
     auto* lab = new QLabel(QStringLiteral(
         "<div style='color:rgba(167,173,184,0.72);font-size:11px;'>%1</div>"
-        "<div>%2</div>").arg(startMs >= 0 ? formatTime(startMs / 1000.0) : QString(),
-                             text.toHtmlEscaped()));
+        "<div style='line-height:155%;'>%2</div>").arg(startMs >= 0 ? formatTime(startMs / 1000.0) : QString(),
+                                                       text.toHtmlEscaped()));
     lab->setObjectName(QStringLiteral("transcriptItem"));
     lab->setTextFormat(Qt::RichText);
     lab->setWordWrap(true);
-    item->setSizeHint(QSize(218, lab->heightForWidth(190) + 22));
+    item->setSizeHint(QSize(218, lab->heightForWidth(190) + 29));
     m_transcript->setItemWidget(item, lab);
     ++m_finalCount;
     m_statLines->setText(tr("字幕行数：%1").arg(m_finalCount));

@@ -186,6 +186,12 @@ void CaptionCoordinator::recompute() {
     QString finalText;
     auto it = std::upper_bound(m_finals.cbegin(), m_finals.cend(), head + 500,
                                [](long long v, const rcp::CaptionSegment& s) { return v < s.startMs; });
+    const int activeRow = (it != m_finals.cbegin())
+                              ? static_cast<int>((it - 1) - m_finals.cbegin()) : -1;
+    if (activeRow != m_activeRow) {
+        m_activeRow = activeRow;
+        emit transcriptActiveChanged(activeRow);   // C4：转写面板当前句高亮跟随播放头
+    }
     if (it != m_finals.cbegin()) finalText = (it - 1)->text;
     if (finalText.isEmpty()) finalText = m_lastFinalText;
 

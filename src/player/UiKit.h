@@ -160,8 +160,10 @@ protected:
         }
         Q_UNUSED(acc);
     }
-    // 把文字路径渲染成纯黑模糊阴影图（pad 防裁边）。
-    static QImage makeBlurredShadow(const QPainterPath& path, const QRectF& bb, int radius) {
+    // 把文字路径渲染成纯黑模糊阴影图（pad 防裁边）；maxAlpha 为 CSS rgba 的
+    // 不透明度（255 制）——影子中心不得满格，否则比设计浓、出现"磨砂玻璃"观感。
+    static QImage makeBlurredShadow(const QPainterPath& path, const QRectF& bb,
+                                    int radius, int maxAlpha = 255) {
         const int pad = radius * 2 + 4;
         QImage img(qCeil(bb.width()) + 2 * pad, qCeil(bb.height()) + 2 * pad,
                    QImage::Format_ARGB32_Premultiplied);
@@ -176,6 +178,15 @@ protected:
         ip.end();
         boxBlurAlpha(img, radius);
         boxBlurAlpha(img, radius);   // 两趟更接近高斯
+        if (maxAlpha < 255) {
+            for (int y = 0; y < img.height(); ++y) {
+                QRgb* line = reinterpret_cast<QRgb*>(img.scanLine(y));
+                for (int x = 0; x < img.width(); ++x) {
+                    const int a = qAlpha(line[x]);
+                    if (a > 0) line[x] = qRgba(0, 0, 0, a * maxAlpha / 255);
+                }
+            }
+        }
         return img;
     }
     void paintEvent(QPaintEvent*) override {
@@ -211,26 +222,29 @@ protected:
             y += lineH;
         }
         const QRectF bb = allPath.boundingRect();
-        // 参考 CSS 阴影堆栈（blur 半径近似：CSS blur/2 × 2 趟盒模糊）：
-        // partial: 0 2px 3px rgba(0,0,0,.95) + 0 0 8px rgba(0,0,0,.9)
+        // 参考 CSS 阴影堆栈（逐层复刻，含各自 alpha——影子浓度不得高于设计）：
+        // partial: 0 2px 3px rgba(0,0,0,.95)（紧贴层） + 0 0 8px rgba(0,0,0,.9)（扩散晕）
         // final:   四向 ±2px 实体 rgba(0,0,0,.94) + 0 4px 13px rgba(0,0,0,.85)
         const QString key = QStringLiteral("%1|%2|%3|%4").arg(t, QString::number(width()),
                             QString::number(int(m_style)), f.key());
-        const int shadowR = Partial == m_style ? 4 : 9;
         if (key != m_shadowKey) {
             m_shadowKey = key;
-            m_shadowImg = makeBlurredShadow(allPath, bb, shadowR);
+            if (Partial == m_style) {
+                m_shadowImg = makeBlurredShadow(allPath, bb, 2, 242);    // 3px 层 .95
+                m_shadowImg2 = makeBlurredShadow(allPath, bb, 4, 230);   // 8px 层 .90
+            } else {
+                m_shadowImg = makeBlurredShadow(allPath, bb, 9, 217);    // 13px 层 .85
+                m_shadowImg2 = QImage();
+            }
         }
-        auto drawShadow = [&](qreal dx, qreal dy, int alphaScale) {
-            if (m_shadowImg.isNull()) return;
-            p.drawImage(QPointF(bb.left() - m_shadowImg.width() / 2.0 + dx,
-                                bb.top() - m_shadowImg.height() / 2.0 + dy),
-                        m_shadowImg);
-            Q_UNUSED(alphaScale);
+        auto drawShadow = [&](qreal dx, qreal dy, const QImage& img) {
+            if (img.isNull()) return;
+            p.drawImage(QPointF(bb.left() - img.width() / 2.0 + dx,
+                                bb.top() - img.height() / 2.0 + dy), img);
         };
         if (Partial == m_style) {
-            drawShadow(0, 2, 242);   // 0 2px 3px .95
-            drawShadow(0, 0, 230);   // 0 0 8px .90（同图叠加近似双影）
+            drawShadow(0, 0, m_shadowImg2);   // 0 0 8px .90（扩散晕，无偏移）
+            drawShadow(0, 2, m_shadowImg);    // 0 2px 3px .95（紧贴层后画，叠于晕上）
             p.setPen(Qt::NoPen);
             p.setBrush(m_color);
             p.drawPath(allPath);
@@ -246,10 +260,8 @@ protected:
                         t2.translate(o);
                         p.drawPath(t2);
                     }
-                    drawShadow(0, 4, 217);   // 0 4px 13px .85
-                } else {   // 1 == 阴影模式
-                    drawShadow(0, 4, 217);
                 }
+                drawShadow(0, 4, m_shadowImg);   // 0 4px 13px .85
             }
             p.setPen(Qt::NoPen);
             p.setBrush(m_color);
@@ -268,7 +280,8 @@ private:
     QColor m_color = QColor("#ffffff");
     int m_outline = 0;
     QString m_shadowKey;    // 阴影图缓存键（文本+宽+样式+字体）
-    QImage m_shadowImg;
+    QImage m_shadowImg;     // 主影子层
+    QImage m_shadowImg2;    // partial 第二层（8px 晕）
 };
 
 // .waveform 复刻：36 根 2px 圆角条，渐变 #a79cff→#6555ef，识别活动驱动。

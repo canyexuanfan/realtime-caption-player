@@ -219,4 +219,5 @@ private:
     QHash<QString, QString> m_mediaKeyCache;  // 文件名 -> 缓存键（后台解析结果）
     QString m_currentKey;                     // 当前媒体缓存键（空=未解析）
     bool m_resumeApplied = false;             // 续播每次打开只应用一次
+    int m_liveActiveRow = -1;                 // C4：真实媒体当前高亮行
 };
