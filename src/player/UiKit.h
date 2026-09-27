@@ -48,14 +48,23 @@ inline QIcon svgIcon(const QString& name, const QColor& color, int px) {
 }
 
 // .switch/.switch-track 复刻：35x20 轨道 + 14px 圆钮，选中紫色渐变。
+// C1：Tab 可聚焦 + hover 反馈 + 紫色 focus ring（审查 §2.4）。
 class Switch : public QAbstractButton {
 public:
     explicit Switch(QWidget* parent = nullptr) : QAbstractButton(parent) {
         setCheckable(true);
         setCursor(Qt::PointingHandCursor);
         setFixedSize(35, 20);
+        setFocusPolicy(Qt::TabFocus);
+        setAttribute(Qt::WA_Hover, true);
     }
 protected:
+    void enterEvent(QEnterEvent* e) override {
+        m_hover = true; update(); QAbstractButton::enterEvent(e);
+    }
+    void leaveEvent(QEvent* e) override {
+        m_hover = false; update(); QAbstractButton::leaveEvent(e);
+    }
     void paintEvent(QPaintEvent*) override {
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing);
@@ -67,15 +76,21 @@ protected:
             p.setPen(Qt::NoPen);
             p.setBrush(g);
         } else {
-            p.setPen(QPen(QColor(255, 255, 255, 51), 1));
-            p.setBrush(QColor("#4b515b"));
+            p.setPen(QPen(m_hover ? QColor(255, 255, 255, 102) : QColor(255, 255, 255, 51), 1));
+            p.setBrush(m_hover ? QColor("#575e6a") : QColor("#4b515b"));
         }
         p.drawRoundedRect(track, 10, 10);
         const qreal kx = isChecked() ? 2 + 15 : 2;
         p.setPen(Qt::NoPen);
         p.setBrush(QColor("#e9ebf0"));
         p.drawEllipse(QPointF(kx + 7, 10), 7, 7);
+        if (hasFocus()) {   // Tab 聚焦：紫色 focus ring
+            p.setBrush(Qt::NoBrush);
+            p.setPen(QPen(QColor("#7868ff"), 2));
+            p.drawRoundedRect(track.adjusted(-3, -3, 3, 3), 12, 12);
+        }
     }
+    bool m_hover = false;
 };
 
 // .caption-final（白字四向描边+投影）/ .caption-partial（灰字投影）复刻。

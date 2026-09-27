@@ -35,6 +35,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSettings>
+#include <memory>
 #include <QShortcut>
 #include <QSlider>
 #include <QStackedWidget>
@@ -63,6 +64,12 @@ QIcon icon(const QString& name, const QColor& c = kIcon, int px = 17) {
 // 参考设计 :root 令牌 → QSS
 const char* kAppQss = R"(
 * { outline: none; }
+/* C1 键盘可达性：交互控件 :focus-visible 紫色描边（参考稿 73-76 行 focus ring），
+   非交互态外观不变。 */
+QPushButton:focus-visible, QComboBox:focus-visible, QLineEdit:focus-visible,
+QSlider:focus-visible, QListWidget:focus-visible, QAbstractButton:focus-visible {
+    outline: 2px solid #7868ff; outline-offset: -1px;
+}
 QWidget { background: #090b0f; color: #f4f6fb; font-family: "Segoe UI","Microsoft YaHei UI"; font-size: 14px; }
 
 QWidget#titleBar { background: #111419; border-bottom: 1px solid rgba(255,255,255,0.105); }
@@ -230,10 +237,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setWindowIcon(QIcon(QStringLiteral(":/logo.png")));
 
     // GUI 线程心跳：500ms 一跳。trace 心跳断流 = GUI 线程被阻塞的时间窗。
-    {
+    // C1 修复：仅在显式开启 RCP_TRACE 诊断时运行（原先正式版常驻 500ms 唤醒
+    // 且 new int 永不释放），计数用 shared_ptr 随连接自动释放。
+    if (!qEnvironmentVariableIsEmpty("RCP_TRACE")) {
         auto* hb = new QTimer(this);
-        int* n = new int(0);
-        connect(hb, &QTimer::timeout, this, [n] { rcpTrace(QStringLiteral("hb %1").arg(++*n)); });
+        auto counter = std::make_shared<int>(0);
+        connect(hb, &QTimer::timeout, this, [counter] { rcpTrace(QStringLiteral("hb %1").arg(++*counter)); });
         hb->start(500);
     }
 
@@ -308,8 +317,18 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     }
 
     // 参考稿复刻：断点响应 + 示例数据展示态（打开真实媒体即整体替换）。
+    // C1：示例数据仅显式 RCP_DEMO_ONLY=1 时注入；正常启动为空状态 +
+    // 拖放/打开引导（不再虚构播放列表/历史/字幕）。
     applyBreakpoint(width());
-    fillDemoData();
+    if (!qEnvironmentVariableIsEmpty("RCP_DEMO_ONLY")) {
+        fillDemoData();
+    } else {
+        m_demoMode = false;
+        if (m_dropHint) {
+            m_dropHint->setText(tr("拖放视频文件到此处\n或按 Ctrl+O 打开"));
+            m_dropHint->show();
+        }
+    }
 }
 
 void MainWindow::resizeEvent(QResizeEvent* event) {
@@ -878,6 +897,30 @@ QWidget* MainWindow::buildControlDeck(QWidget* parent) {
     m_volume->setCursor(Qt::PointingHandCursor);
     m_btnFs = cbtn(QStringLiteral("fullscreen"), tr("全屏（F）"));
 
+    // C1 无障碍：主要控件 accessibleName（读屏器文本替身）+ Tab 焦点顺序修正。
+    m_seek->setAccessibleName(tr("播放进度条"));
+    m_volume->setAccessibleName(tr("音量"));
+    m_playBtn->setAccessibleName(tr("播放/暂停"));
+    m_btnCaption->setAccessibleName(tr("开关实时字幕"));
+    m_btnCam->setAccessibleName(tr("截图"));
+    m_btnAb->setAccessibleName(tr("AB 循环"));
+    m_btnTrack->setAccessibleName(tr("切换字幕轨"));
+    m_btnB10->setAccessibleName(tr("后退 10 秒"));
+    m_btnF10->setAccessibleName(tr("前进 10 秒"));
+    m_btnPrev->setAccessibleName(tr("上一个"));
+    m_btnNext->setAccessibleName(tr("下一个"));
+    m_btnSpeed->setAccessibleName(tr("倍速"));
+    m_btnSettings->setAccessibleName(tr("设置"));
+    m_btnFs->setAccessibleName(tr("全屏"));
+    setTabOrder(m_btnB10, m_btnPrev);
+    setTabOrder(m_btnPrev, m_playBtn);
+    setTabOrder(m_playBtn, m_btnNext);
+    setTabOrder(m_btnNext, m_btnF10);
+    setTabOrder(m_btnSpeed, m_volume);
+    setTabOrder(m_volume, m_btnTrack);
+    setTabOrder(m_btnTrack, m_btnSettings);
+    setTabOrder(m_btnSettings, m_btnFs);
+
     ll->addWidget(btnLib);
     ll->addWidget(m_btnCam);
     ll->addWidget(m_btnAb);
@@ -1097,7 +1140,15 @@ QWidget* MainWindow::panePlayback() {
     v->addWidget(title);
     v->addWidget(sectionTitle(tr("播放行为"), w));
     auto* pitch = new Switch(w);
-    pitch->setChecked(true);
+    pitch->setChecked(m_settings.value(QStringLiteral("playback/pitchCorrection"), true).toBool());
+    connect(pitch, &Switch::toggled, this, [this](bool on) {
+        // C1：接通 mpv audio-pitch-correction（原先无任何连接的假开关）。
+        m_settings.setValue(QStringLiteral("playback/pitchCorrection"), on);
+        if (m_player && m_player->handle()) {
+            int flag = on ? 1 : 0;
+            mpv_set_property(m_player->handle(), "audio-pitch-correction", MPV_FORMAT_FLAG, &flag);
+        }
+    });
     v->addWidget(settingRow(tr("保留音调"), pitch, w));
     auto* folderCont = new Switch(w);
     folderCont->setChecked(m_settings.value(QStringLiteral("playback/folderContinue"), true).toBool());
@@ -1168,6 +1219,11 @@ QWidget* MainWindow::paneSubtitle() {
         m_delayMs = qBound(-5000LL, m_delayMs + qRound64(d * 1000), 5000LL);
         val->setText(tr("%1 秒").arg(m_delayMs / 1000.0, 0, 'f', 1));
         if (m_coordinator) m_coordinator->setDelayMs(m_delayMs);
+        // C1：字幕延迟同时作用于外挂字幕（mpv sub-delay，秒）。
+        if (m_player && m_player->handle()) {
+            double sd = m_delayMs / 1000.0;
+            mpv_set_property(m_player->handle(), "sub-delay", MPV_FORMAT_DOUBLE, &sd);
+        }
     };
     connect(minus, &QPushButton::clicked, this, [apply] { apply(-0.1); });
     connect(plus, &QPushButton::clicked, this, [apply] { apply(0.1); });
@@ -1177,6 +1233,10 @@ QWidget* MainWindow::paneSubtitle() {
         m_delayMs = 0;
         val->setText(tr("0.0 秒"));
         if (m_coordinator) m_coordinator->setDelayMs(0);
+        if (m_player && m_player->handle()) {
+            double sd = 0.0;
+            mpv_set_property(m_player->handle(), "sub-delay", MPV_FORMAT_DOUBLE, &sd);
+        }
     });
     connect(loadSub, &QPushButton::clicked, this, [this] {
         const QString p = QFileDialog::getOpenFileName(this, tr("加载字幕"), QString(),
@@ -1754,6 +1814,7 @@ void MainWindow::openFile(const QString& path) {
     }
     rcpTrace(QStringLiteral("openFile -> %1").arg(path));
     m_currentPath = path;   // 先于 loadFile：durationChanged 可能先到
+    if (m_dropHint) m_dropHint->hide();   // C1：空状态引导在真实媒体打开后隐藏
     if (m_player->loadFile(path)) {
         addMediaPaths(QStringList{path});
         saveHistory(path);
@@ -1931,6 +1992,11 @@ void MainWindow::onSeekReleased() {
 void MainWindow::onMediaLoaded() {
     m_playBtn->setIcon(icon(QStringLiteral("pause"), QColor("#ffffff"), 22));
     repositionOverlays();   // video-params 就绪：字幕/徽标锚定画面矩形
+    // C1：保留音调设置在每次媒体加载后生效（mpv 属性不跨 loadfile 保留失败时兜底）。
+    if (m_player->handle()) {
+        int flag = m_settings.value(QStringLiteral("playback/pitchCorrection"), true).toBool() ? 1 : 0;
+        mpv_set_property(m_player->handle(), "audio-pitch-correction", MPV_FORMAT_FLAG, &flag);
+    }
 }
 
 void MainWindow::onMediaEnded() {
@@ -1951,13 +2017,31 @@ void MainWindow::onMediaEnded() {
 }
 
 // 自动导出：把当前媒体的 final 时间线写到 <媒体>.srt（修复连播分支永不导出）。
+// C1：导出格式（SRT/VTT/TXT）与保存目录设置真实生效。
 void MainWindow::exportFinalsSrt() {
     if (!m_coordinator || m_coordinator->finals().isEmpty()) return;
     const QString path = m_mediaPaths.value(qMax(0, m_mediaList->currentRow()));
     if (path.isEmpty()) return;
     QList<rcp::CaptionSegment> list;
     for (const auto& s : m_coordinator->finals()) list.append(s);
-    rcp::captions::SrtExporter::writeSrt(path + QStringLiteral(".srt"), list);
+
+    const QString baseName = QFileInfo(path).completeBaseName();
+    QString dir = m_settings.value(QStringLiteral("caption/exportDir"),
+                                   QStringLiteral("D:\\字幕导出")).toString();
+    QDir().mkpath(dir);
+    if (!QDir(dir).exists()) dir = QFileInfo(path).absolutePath();   // 目录建不出则回退媒体旁
+    const QString base = dir + QStringLiteral("/") + baseName;
+
+    const int fmt = m_settings.value(QStringLiteral("caption/format"), 0).toInt();
+    QString outPath;
+    rcp::Result<void> res = rcp::Result<void>::ok();
+    switch (fmt) {
+    case 1:  outPath = base + QStringLiteral(".vtt"); res = rcp::captions::SrtExporter::writeVtt(outPath, list); break;
+    case 2:  outPath = base + QStringLiteral(".txt"); res = rcp::captions::SrtExporter::writeTxt(outPath, list); break;
+    default: outPath = base + QStringLiteral(".srt"); res = rcp::captions::SrtExporter::writeSrt(outPath, list); break;
+    }
+    appendTranscriptFinal(-1, res.isError() ? tr("[导出失败] %1").arg(outPath)
+                                            : tr("[已导出] %1").arg(outPath));
 }
 
 // ================= 字幕开关/导出 =================

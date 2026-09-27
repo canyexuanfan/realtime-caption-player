@@ -19,6 +19,14 @@ public:
 
     /// Write SRT atomically (temp file + atomic rename) with UTF-8 BOM.
     static Result<void> writeSrt(const QString& path, const QList<CaptionSegment>& segments);
+
+    /// WebVTT 导出（C1：自动导出格式设置真实生效）。
+    static QString exportVtt(const QList<CaptionSegment>& segments);
+    static Result<void> writeVtt(const QString& path, const QList<CaptionSegment>& segments);
+
+    /// 纯文本导出（仅句子文本，无时间轴）。
+    static QString exportTxt(const QList<CaptionSegment>& segments);
+    static Result<void> writeTxt(const QString& path, const QList<CaptionSegment>& segments);
 };
 
 } // namespace rcp::captions
