@@ -19,9 +19,7 @@ set(RCP_UNIT_TESTS
     test_bounded_queue
     test_segment_assembler
     test_caption_types
-    test_caption_state_machine
     test_media_identity
-    test_ass_escaper
     test_srt_exporter
     test_default_settings
 )

@@ -13,6 +13,8 @@ add_library(rcp_player STATIC
     MainWindow.cpp
     MainWindow.h
     UiKit.h
+    CaptionCoordinator.cpp
+    CaptionCoordinator.h
     WorkerSupervisor.cpp
     WorkerSupervisor.h
 )

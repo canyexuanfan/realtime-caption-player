@@ -14,13 +14,14 @@ namespace rcp::player {
 WorkerSupervisor::WorkerSupervisor(QObject* parent) : QObject(parent) {}
 
 bool WorkerSupervisor::start(const QString& workerExe, const QString& mediaPath,
-                             const QString& modelsRoot, int audioTrack) {
+                             const QString& modelsRoot, int audioTrack, quint64 generation) {
     if (isRunning()) shutdown();
 
     m_mediaPath = mediaPath;
     m_modelsRoot = modelsRoot;
     m_audioTrack = audioTrack;
-    m_generation += 1;
+    // generation 以协调器为权威（B3）：不再自增，命令/事件原样携带。
+    m_generation = generation;
     m_openSent = false;
     m_connected = false;
     m_connectTries = 0;
@@ -184,6 +185,46 @@ void WorkerSupervisor::sendCommand(rcp::ipc::CommandType t, const QJsonObject& p
     env.payload = payload;
     const QByteArray frame = rcp::ipc::JsonMessageCodec::serialize(env);
     m_sock->write(frame);
+}
+
+void WorkerSupervisor::setPlayheadMs(qint64 ms) {
+    QJsonObject p; p[QStringLiteral("playhead_ms")] = static_cast<qint64>(ms);
+    sendCommand(rcp::ipc::CommandType::SetPlayhead, p);
+}
+
+void WorkerSupervisor::setPaused(bool paused) {
+    QJsonObject p; p[QStringLiteral("paused")] = paused;
+    sendCommand(rcp::ipc::CommandType::SetPaused, p);
+}
+
+void WorkerSupervisor::setSpeed(double speed) {
+    QJsonObject p; p[QStringLiteral("speed")] = speed;
+    sendCommand(rcp::ipc::CommandType::SetSpeed, p);
+}
+
+void WorkerSupervisor::seek(qint64 targetMs, quint64 generation) {
+    m_generation = generation;
+    QJsonObject p; p[QStringLiteral("target_ms")] = static_cast<qint64>(targetMs);
+    sendCommand(rcp::ipc::CommandType::Seek, p);
+}
+
+void WorkerSupervisor::setAudioTrack(int ffIndex, quint64 generation) {
+    m_generation = generation;
+    m_audioTrack = ffIndex;
+    QJsonObject p; p[QStringLiteral("audio_track")] = ffIndex;
+    sendCommand(rcp::ipc::CommandType::SetAudioTrack, p);
+}
+
+void WorkerSupervisor::setLanguage(const QString& lang, quint64 generation) {
+    m_generation = generation;
+    QJsonObject p; p[QStringLiteral("language")] = lang;
+    sendCommand(rcp::ipc::CommandType::SetLanguage, p);
+}
+
+void WorkerSupervisor::setProfile(const QString& profile, quint64 generation) {
+    m_generation = generation;
+    QJsonObject p; p[QStringLiteral("profile")] = profile;
+    sendCommand(rcp::ipc::CommandType::SetProfile, p);
 }
 
 void WorkerSupervisor::stop() {

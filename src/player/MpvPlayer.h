@@ -15,8 +15,18 @@
 
 #include <QString>
 #include <QSize>
+#include <QVector>
 #include <QObject>
 #include <functional>
+
+/// track-list 中的音轨信息（aid -> ffmpeg 流索引映射用）。
+struct MpvAudioTrack {
+    int id = 0;             // mpv aid
+    int ffIndex = -1;       // demuxer-id（FFmpeg 流索引）
+    QString lang;
+    QString title;
+    bool selected = false;
+};
 
 class MpvPlayer : public QObject {
     Q_OBJECT
@@ -70,10 +80,9 @@ public:
 
     // ---- 音轨 ----
     void setAudioTrack(int aid);       // mpv 音频轨 id（aid 属性）
-
-    // ---- 字幕叠加（mpv osd-overlay, ASS 事件）----
-    void showSubtitleOverlay(const QString& assEvents);  // assEvents: mpv ass-events 格式文本
-    void clearSubtitleOverlay();
+    QVector<MpvAudioTrack> audioTracks() const;   // track-list 中的音频轨
+    int audioTrackFfIndex(int aid) const;         // aid -> ffmpeg 流索引（-1 = 未知/默认）
+    int selectedAudioAid() const;                 // 当前选中音轨 aid（-1 = 无）
 
     // ---- 查询 ----
     double duration() const { return m_duration; }
@@ -88,6 +97,7 @@ signals:
     void mediaEnded();
     void mediaError(const QString& message);   // 打开/读取失败（含挂载盘离线）
     void playbackError(const QString& message);
+    void seeked(double seconds);               // 用户/程序发起 seek（目标绝对秒）
     void eventAvailable();            // mpv 唤醒：主线程应调用 processEvents()
 
 public slots:

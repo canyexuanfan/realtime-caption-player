@@ -8,8 +8,7 @@
 #include "MpvRenderWidget.h"
 #include "MpvTrace.h"
 #include "UiKit.h"
-#include "WorkerSupervisor.h"
-#include "captions/CaptionController.h"
+#include "CaptionCoordinator.h"
 #include "captions/SrtExporter.h"
 #include "captions/CaptionTypes.h"
 
@@ -157,8 +156,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         m_player->initialize();
     }
 
-    m_captionCtl = new rcp::captions::CaptionController(this);
-    m_worker = new rcp::player::WorkerSupervisor(this);
+    m_coordinator = new rcp::player::CaptionCoordinator(this);
     rcpMark("ctor:player-initialized");
 
     rcpMark("ctor:applyTheme-begin");
@@ -177,52 +175,54 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     connect(m_player, &MpvPlayer::pauseStateChanged, this, [this](bool paused) {
         m_playBtn->setIcon(icon(paused ? QStringLiteral("play") : QStringLiteral("pause"),
                                 QColor("#ffffff"), 22));
+        m_coordinator->setPaused(paused);   // B3：暂停同步给 worker（解码调度休眠）
+    });
+    connect(m_player, &MpvPlayer::seeked, this, [this](double sec) {
+        // B3：seek → 协调器换代，旧代字幕事件两端丢弃，worker 重锚解码。
+        m_coordinator->seekedToMs(static_cast<long long>(sec * 1000.0));
     });
 
-    connect(m_worker, &rcp::player::WorkerSupervisor::sessionStarted,
-            m_captionCtl, &rcp::captions::CaptionController::reset);
-    connect(m_worker, &rcp::player::WorkerSupervisor::sessionStarted, this, [this] {
-        setAsrStatus(tr("识别中"), kWarning.name());
-        m_finalCount = 0;
-        m_finals.clear();
-        m_partialText.clear();
-        m_overlayFinalText.clear();
-        m_lastFinalEndMs = 0;
-        m_statLines->setText(tr("字幕行数：0"));
-    });
-    connect(m_worker, &rcp::player::WorkerSupervisor::captionSegment,
-            this, [this](const rcp::CaptionSegment& seg, bool isPartial) {
-                if (isPartial) {
-                    m_captionCtl->onPartial(seg, seg.generation);
-                    m_partialText = seg.text;
-                    appendTranscriptPartial(seg.text);
-                    m_waveform->pulse(1.0);
-                    updateOverlay();   // partial 也要实时上叠加层（原缺失，仅 final 刷新）
-                } else {
-                    m_captionCtl->onFinal(seg, seg.generation);
-                    m_finals.append(seg);
-                    m_partialText.clear();
-                    m_overlayFinalText = seg.text;   // 定稿常驻，直到下一句替换
-                    if (seg.endMs > m_lastFinalEndMs) m_lastFinalEndMs = seg.endMs;
-                    appendTranscriptFinal(seg.startMs, seg.text);
-                    updateOverlay();
+    // ---- 字幕唯一入口：CaptionCoordinator（B3 / ADR-0007 单一时间线）----
+    connect(m_coordinator, &rcp::player::CaptionCoordinator::displayChanged,
+            this, &MainWindow::onCaptionDisplay);
+    connect(m_coordinator, &rcp::player::CaptionCoordinator::transcriptPartial,
+            this, [this](const QString& text) {
+                appendTranscriptPartial(text);
+                m_waveform->pulse(1.0);
+            });
+    connect(m_coordinator, &rcp::player::CaptionCoordinator::transcriptFinal,
+            this, [this](long long startMs, const QString& text) {
+                appendTranscriptFinal(startMs, text);
+            });
+    connect(m_coordinator, &rcp::player::CaptionCoordinator::statsChanged,
+            this, &MainWindow::onCaptionStats);
+    connect(m_coordinator, &rcp::player::CaptionCoordinator::stateChanged, this,
+            [this](rcp::player::CaptionCoordinator::State st, const QString& msg) {
+                switch (st) {
+                case rcp::player::CaptionCoordinator::State::Starting:
+                    setAsrStatus(tr("识别中"), kWarning.name());
+                    break;
+                case rcp::player::CaptionCoordinator::State::Running:
+                    setAsrStatus(tr("运行中"), kSuccess.name());
+                    break;
+                case rcp::player::CaptionCoordinator::State::Seeking:
+                    setAsrStatus(tr("定位中"), kWarning.name());
+                    break;
+                case rcp::player::CaptionCoordinator::State::Suspended:
+                    setAsrStatus(tr("已暂停识别"), QColor("#69717d").name());
+                    break;
+                case rcp::player::CaptionCoordinator::State::Error:
+                    rcpTrace(QStringLiteral("workerError: %1").arg(msg));
+                    setAsrStatus(tr("字幕错误"), kDanger.name());
+                    break;
+                case rcp::player::CaptionCoordinator::State::Disabled:
+                    break;
                 }
             });
-    connect(m_worker, &rcp::player::WorkerSupervisor::ready, this,
-            [this] { setAsrStatus(tr("运行中"), kSuccess.name()); });
-    connect(m_worker, &rcp::player::WorkerSupervisor::workerError, this,
-            [this](const QString& msg) {
-                rcpTrace(QStringLiteral("workerError: %1").arg(msg));
-                setAsrStatus(tr("字幕错误"), kDanger.name());
-            });
-    connect(m_worker, &rcp::player::WorkerSupervisor::workerFinished, this, [this] {
-        setAsrStatus(tr("识别进程退出"), QColor("#69717d").name());
-    });
     connect(m_player, &MpvPlayer::positionChanged, this, [this](double s) {
-        if (qEnvironmentVariableIsEmpty("RCP_NO_OVERLAY"))   // 诊断开关：跳过字幕对齐/叠加
-            m_captionCtl->setPlayheadMs(static_cast<long long>(s * 1000.0) + m_delayMs);
+        if (!qEnvironmentVariableIsEmpty("RCP_NO_OVERLAY")) return;   // 诊断开关
+        m_coordinator->setPlayheadMs(static_cast<long long>(s * 1000.0));
         if (!m_videoRectValid) repositionOverlays();   // video-params 就绪后补一次画面锚定
-        updateOverlay();   // 播放头推进时刷新定稿选择（与语音同步显示）
     });
 
     setAcceptDrops(true);
@@ -418,12 +418,12 @@ void MainWindow::demoTick() {
     for (int i = 0; i < 7; ++i)
         if (rel >= segs[i].start && rel <= segs[i].end) { idx = i; break; }
     if (idx < 0) idx = qBound(0, rel * 7 / 60, 6);
-    m_partialText = QString::fromUtf8(segs[idx].partial);
-    m_overlayFinalText = QString::fromUtf8(segs[idx].final);
+    const QString demoPartial = QString::fromUtf8(segs[idx].partial);
+    const QString demoFinal = QString::fromUtf8(segs[idx].final);
     if (!qEnvironmentVariableIsEmpty("RCP_NO_OVERLAY")) return;
-    m_partialLabel->setText(m_partialText);
+    m_partialLabel->setText(demoPartial);
     m_partialLabel->setVisible(true);
-    m_finalLabel->setText(m_overlayFinalText);
+    m_finalLabel->setText(demoFinal);
     if (m_video) m_video->update();
     // 转写面板当前句高亮（参考 .transcript-item.active 紫底）+ 滚动跟随
     if (idx != m_demoSegIdx) {
@@ -1167,6 +1167,7 @@ QWidget* MainWindow::paneSubtitle() {
     auto apply = [this, val](double d) {
         m_delayMs = qBound(-5000LL, m_delayMs + qRound64(d * 1000), 5000LL);
         val->setText(tr("%1 秒").arg(m_delayMs / 1000.0, 0, 'f', 1));
+        if (m_coordinator) m_coordinator->setDelayMs(m_delayMs);
     };
     connect(minus, &QPushButton::clicked, this, [apply] { apply(-0.1); });
     connect(plus, &QPushButton::clicked, this, [apply] { apply(0.1); });
@@ -1175,6 +1176,7 @@ QWidget* MainWindow::paneSubtitle() {
     connect(reset, &QPushButton::clicked, this, [this, val] {
         m_delayMs = 0;
         val->setText(tr("0.0 秒"));
+        if (m_coordinator) m_coordinator->setDelayMs(0);
     });
     connect(loadSub, &QPushButton::clicked, this, [this] {
         const QString p = QFileDialog::getOpenFileName(this, tr("加载字幕"), QString(),
@@ -1732,8 +1734,6 @@ void MainWindow::openFile(const QString& path) {
         m_mediaList->clear();
         m_historyList->clear();
         m_demoDurations.clear();
-        m_partialText.clear();
-        m_overlayFinalText.clear();
     }
     rcpTrace(QStringLiteral("openFile -> %1").arg(path));
     m_currentPath = path;   // 先于 loadFile：durationChanged 可能先到
@@ -1760,7 +1760,8 @@ void MainWindow::openFile(const QString& path) {
     }
 }
 
-// 启动字幕 worker（诊断开关 RCP_NO_CAPTION=1 可跳过）。
+// 启动字幕识别（诊断开关 RCP_NO_CAPTION=1 可跳过）。字幕会话由 CaptionCoordinator
+// 统一管理（B3）：本函数只负责解析 worker/模型路径。
 void MainWindow::startCaptioningFor(const QString& path) {
     if (!qEnvironmentVariableIsEmpty("RCP_NO_CAPTION")) return;
     const QString appDir = QCoreApplication::applicationDirPath();
@@ -1770,7 +1771,7 @@ void MainWindow::startCaptioningFor(const QString& path) {
     if (!QFileInfo::exists(modelsRoot))
         modelsRoot = appDir + QStringLiteral("/.tools/models");
 
-    if (m_worker->isRunning()) m_worker->shutdown();
+    m_coordinator->setWorkerExecutable(workerExe, modelsRoot);
     m_transcript->clear();
     m_lastPartialLabel = nullptr;
     m_finalCount = 0;
@@ -1780,7 +1781,7 @@ void MainWindow::startCaptioningFor(const QString& path) {
         setAsrStatus(tr("缺少 caption_worker"), QStringLiteral("#ff6b79"));
         return;
     }
-    m_worker->start(workerExe, QFileInfo(path).absoluteFilePath(), modelsRoot);
+    m_coordinator->openMedia(QFileInfo(path).absoluteFilePath());
 }
 
 void MainWindow::onOpen() {
@@ -1807,7 +1808,9 @@ void MainWindow::onPlayPause() { m_player->togglePause(); }
 
 void MainWindow::onPrevNext(int delta) {
     if (m_mediaPaths.isEmpty()) return;
-    const int row = qBound(0, m_mediaList->currentRow() + delta, m_mediaPaths.size() - 1);
+    const int row = m_mediaList->currentRow() + delta;
+    // 修复（审查 §2.3）：越界即停止（原先 qBound 夹回当前行，最后一集无限重播）。
+    if (row < 0 || row >= m_mediaPaths.size()) return;
     m_mediaList->setCurrentRow(row);
     openFile(m_mediaPaths.at(row));
 }
@@ -1815,6 +1818,7 @@ void MainWindow::onPrevNext(int delta) {
 void MainWindow::onSpeed(double v) {
     if (m_demoMode) return;   // 示例态固定 1.50x（ctor 的速度恢复 singleShot 不得覆盖）
     m_player->setSpeed(v);
+    m_coordinator->setSpeed(v);   // B3：倍速同步给 worker（放大解码提前量窗口）
     m_btnSpeed->setText(QString::number(v, 'f', 2) + QStringLiteral("x ⌄"));
     m_settings.setValue(QStringLiteral("playback/speed"), v);
 }
@@ -1861,14 +1865,13 @@ void MainWindow::onPositionChanged(double seconds) {
     if (m_seeking) return;
     if (m_duration > 0.0) m_seek->setValue(static_cast<int>(seconds));
     m_timeCur->setText(formatTime(seconds));
-    updateOverlay();
     const long long head = static_cast<long long>(seconds * 1000.0);
-    if (m_lastFinalEndMs > 0) {
-        const double lead = qMax<long long>(0, m_lastFinalEndMs - head) / 1000.0;
+    if (m_coveredUntilMs > 0) {
+        const double lead = qMax<long long>(0, m_coveredUntilMs - head) / 1000.0;
         m_statLatency->setText(tr("实时延迟：%1s").arg(lead, 0, 'f', 1));
         m_asrLatency->setText(tr("%1s").arg(lead, 0, 'f', 1));
     }
-    m_asrRecognized->setText(formatTime(m_lastFinalEndMs / 1000.0));
+    m_asrRecognized->setText(formatTime(m_coveredUntilMs / 1000.0));
     static qint64 lastSave = 0;
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
     if (now - lastSave > 4000 && m_duration > 0) {
@@ -1908,22 +1911,29 @@ void MainWindow::onMediaLoaded() {
 
 void MainWindow::onMediaEnded() {
     m_playBtn->setIcon(icon(QStringLiteral("play"), QColor("#ffffff"), 22));
-    m_worker->stop();
+    m_coordinator->stop();
     // 播完清除记忆位置：否则下次打开自动 seek 到片尾 → 立即 EOF → 黑屏死循环。
     m_settings.remove(QStringLiteral("position/") + m_titleFile->text());
     if (m_settings.value(QStringLiteral("playback/folderContinue"), true).toBool()
         && m_mediaPaths.size() > 1) {
+        // 修复（审查 §2.3）：连播分支先完成自动导出再跳下一集；
+        // 末项不再循环重播（onPrevNext 的 qBound 已改为列表尾后停止）。
+        exportFinalsSrt();
         onPrevNext(1);
         return;
     }
-    if (m_settings.value(QStringLiteral("caption/autoExport"), false).toBool() && !m_finals.isEmpty()) {
-        const QString path = m_mediaPaths.value(qMax(0, m_mediaList->currentRow()));
-        if (!path.isEmpty()) {
-            QList<rcp::CaptionSegment> list;
-            for (const auto& s : m_finals) list.append(s);
-            rcp::captions::SrtExporter::writeSrt(path + QStringLiteral(".srt"), list);
-        }
-    }
+    if (m_settings.value(QStringLiteral("caption/autoExport"), false).toBool())
+        exportFinalsSrt();
+}
+
+// 自动导出：把当前媒体的 final 时间线写到 <媒体>.srt（修复连播分支永不导出）。
+void MainWindow::exportFinalsSrt() {
+    if (!m_coordinator || m_coordinator->finals().isEmpty()) return;
+    const QString path = m_mediaPaths.value(qMax(0, m_mediaList->currentRow()));
+    if (path.isEmpty()) return;
+    QList<rcp::CaptionSegment> list;
+    for (const auto& s : m_coordinator->finals()) list.append(s);
+    rcp::captions::SrtExporter::writeSrt(path + QStringLiteral(".srt"), list);
 }
 
 // ================= 字幕开关/导出 =================
@@ -1932,7 +1942,7 @@ void MainWindow::onExportSrt() {
                                                       tr("SubRip (*.srt)"));
     if (path.isEmpty()) return;
     QList<rcp::CaptionSegment> list;
-    for (const auto& s : m_captionCtl->finals()) list.append(s);
+    for (const auto& s : m_coordinator->finals()) list.append(s);
     const auto res = rcp::captions::SrtExporter::writeSrt(path, list);
     if (res.isError()) appendTranscriptFinal(-1, tr("[导出失败] %1").arg(path));
     else appendTranscriptFinal(-1, tr("[已导出] %1").arg(path));
@@ -1940,12 +1950,7 @@ void MainWindow::onExportSrt() {
 
 void MainWindow::onToggleCaption() {
     m_captionOn = m_btnCaption->isChecked();
-    if (!m_captionOn) {
-        m_partialLabel->clear();
-        m_finalLabel->clear();
-    } else {
-        updateOverlay();
-    }
+    m_coordinator->setEnabled(m_captionOn);   // 只控显示层（B3：识别不中断）
 }
 
 void MainWindow::onToggleSettings() {
@@ -1956,12 +1961,14 @@ void MainWindow::onToggleFullscreen() { isFullScreen() ? showNormal() : showFull
 
 // ================= 字幕叠加/样式 =================
 void MainWindow::updateOverlay() {
-    if (!m_captionOn) return;
+    if (m_coordinator) m_coordinator->refresh();   // 显示选择在协调器内，重发 displayChanged
+}
+
+// 协调器 displayChanged：唯一字幕显示落点（B3 / ADR-0007）。
+// 参考稿视觉：叠加层 partial 一行、final 单行（超宽取尾加省略号）。
+void MainWindow::onCaptionDisplay(const QString& partialText, const QString& finalText) {
     if (!qEnvironmentVariableIsEmpty("RCP_NO_OVERLAY")) return;   // 诊断开关
     const bool showPartial = m_settings.value(QStringLiteral("caption/showPartial"), true).toBool();
-    // 参考稿视觉：叠加层只保留"当前句尾"——partial 一行、final 至多两行。
-    // worker 的 partial 覆盖整段未完句（授课式语音一段可达数百字），直接
-    // 显示会换行成文字墙。按像素宽度取尾部，截断处加省略号。
     auto tailToFit = [](const QString& t, const QFont& f, qreal maxW, int maxLines) {
         if (t.isEmpty()) return t;
         const QFontMetrics fm(f);
@@ -1976,28 +1983,21 @@ void MainWindow::updateOverlay() {
     const QString prevFinal = m_finalLabel->text();
     const qreal pw = qMax<qreal>(320.0, m_partialLabel->width() - 8.0);
     const qreal fw = qMax<qreal>(320.0, m_finalLabel->width() - 8.0);
-    m_partialLabel->setText(showPartial ? tailToFit(m_partialText, m_partialLabel->font(), pw, 1) : QString());
-    m_partialLabel->setVisible(showPartial && !m_partialText.isEmpty());
-    // 定稿显示策略（双兜底）：
-    // 1) worker 离线提取音频通常跑赢播放头——只显示播放头已到达的句子
-    //    （startMs <= head+0.5s 的最后一条），字幕与语音同步；
-    // 2) worker 落后/seek/恢复会话时可能没有任何已到达句——退回常驻显示
-    //    最后到达的一句，不空窗（用户报"直接看不到字幕"的根因即定稿空窗）。
-    // 两种情况都不要求 head <= 句尾：句子显示到下一句开始（参考稿行为）。
-    const double s = m_player->timePosition() + m_delayMs / 1000.0;
-    const long long head = static_cast<long long>(s * 1000.0) + 500;
-    QString activeFinal;
-    for (const auto& seg : m_finals) {
-        if (seg.startMs <= head) activeFinal = seg.text;
-    }
-    if (activeFinal.isEmpty()) activeFinal = m_overlayFinalText;
+    m_partialLabel->setText(showPartial ? tailToFit(partialText, m_partialLabel->font(), pw, 1) : QString());
+    m_partialLabel->setVisible(showPartial && !partialText.isEmpty());
     // 参考稿 final 恒为单行短句：超宽取尾加省略号（2 行会顶压 partial 行）。
-    const QString shownFinal = tailToFit(activeFinal, m_finalLabel->font(), fw, 1);
+    const QString shownFinal = tailToFit(finalText, m_finalLabel->font(), fw, 1);
     if (m_finalLabel->text() != shownFinal) m_finalLabel->setText(shownFinal);
     // 叠加文字变化时强制视频区整体重组：QOpenGLWidget 的子控件脏区合成
     // 在仅子控件重绘时可能残留下帧旧文字（重影），整块 update 一并消除。
     if (m_video && (m_partialLabel->text() != prevPartial || m_finalLabel->text() != prevFinal))
         m_video->update();
+}
+
+void MainWindow::onCaptionStats(int finalCount, long long coveredUntilMs) {
+    m_finalCount = finalCount;
+    m_coveredUntilMs = coveredUntilMs;
+    m_statLines->setText(tr("字幕行数：%1").arg(finalCount));
 }
 
 void MainWindow::applyCaptionStyle() {
@@ -2106,7 +2106,11 @@ void MainWindow::dropEvent(QDropEvent* event) {
     openFile(files.first());
 }
 
-void MainWindow::closeEvent(QCloseEvent*) {}
+void MainWindow::closeEvent(QCloseEvent* event) {
+    // B3：优雅关闭——停止识别会话并终止 worker 进程（B4 加 Job Object 兜底）。
+    if (m_coordinator) m_coordinator->shutdown();
+    event->accept();
+}
 
 QString MainWindow::formatTime(double seconds) const {
     if (seconds < 0) seconds = 0;

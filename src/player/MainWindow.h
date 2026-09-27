@@ -29,8 +29,7 @@ class QStackedWidget;
 class QTimer;
 class QDragLeaveEvent;
 namespace rcpui { class Switch; class CaptionLabel; class Waveform; }
-namespace rcp::player { class WorkerSupervisor; }
-namespace rcp::captions { class CaptionController; }
+namespace rcp::player { class CaptionCoordinator; }
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -76,6 +75,8 @@ private slots:
     void onAbLoop();
     void onCycleSub();
     void onTranscriptSearch(const QString& text);
+    void onCaptionDisplay(const QString& partialText, const QString& finalText);
+    void onCaptionStats(int finalCount, long long coveredUntilMs);
 
 private:
     void applyTheme();
@@ -108,6 +109,7 @@ private:
     void loadHistory();
     void saveHistory(const QString& path);
     void updateOverlay();
+    void exportFinalsSrt();   // 自动导出当前 final 时间线到 <媒体>.srt（连播也执行）
     void applyCaptionStyle();
     void fillDemoData();
     void demoTick();
@@ -119,15 +121,11 @@ private:
     MpvPlayer* m_player = nullptr;
     MpvRenderWidget* m_video = nullptr;
     QWidget* m_videoHost = nullptr;   // 视频容器（离屏快照模式下为黑色占位）
-    rcp::captions::CaptionController* m_captionCtl = nullptr;
-    rcp::player::WorkerSupervisor* m_worker = nullptr;
+    rcp::player::CaptionCoordinator* m_coordinator = nullptr;  // 字幕唯一入口（B3/ADR-0007）
     QSettings m_settings;
     QStringList m_mediaPaths;
-    QVector<rcp::CaptionSegment> m_finals;   // 本窗口维护的 final 时间线
-    QString m_partialText;
-    QString m_overlayFinalText;   // 叠加层当前定稿句：常驻直到下一句替换
     long long m_delayMs = 0;               // 字幕同步延迟
-    long long m_lastFinalEndMs = 0;
+    long long m_coveredUntilMs = 0;        // worker 已识别覆盖到的时间（延迟统计用）
     bool m_captionOn = true;
 
     // ---- 标题栏 ----

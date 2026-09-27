@@ -19,12 +19,22 @@ class WorkerSupervisor : public QObject {
 public:
     explicit WorkerSupervisor(QObject* parent = nullptr);
 
-    // 启动后台 caption-worker 并对 mediaPath 全速识别。
+    // 启动后台 caption-worker 并对 mediaPath 识别（generation 由协调器下发）。
     // workerExe : caption_worker.exe 绝对路径
     // modelsRoot: 模型根目录（其下应有 zipformer-ctc / silero / sensevoice）
-    // audioTrack: mpv 音轨索引（-1 = 默认首条）
+    // audioTrack: ffmpeg 音频流索引（-1 = 默认首条）
+    // generation: 会话代（协调器为权威；事件与命令均携带）
     bool start(const QString& workerExe, const QString& mediaPath,
-               const QString& modelsRoot, int audioTrack = -1);
+               const QString& modelsRoot, int audioTrack, quint64 generation);
+
+    // B3 实时控制（worker 端 CaptionPipeline 消费）。
+    void setPlayheadMs(qint64 ms);
+    void setPaused(bool paused);
+    void setSpeed(double speed);
+    void seek(qint64 targetMs, quint64 generation);
+    void setAudioTrack(int ffIndex, quint64 generation);
+    void setLanguage(const QString& lang, quint64 generation);
+    void setProfile(const QString& profile, quint64 generation);
 
     void stop();       // 停止当前识别（保留进程）
     void shutdown();   // 终止 worker 进程

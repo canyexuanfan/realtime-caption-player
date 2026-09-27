@@ -156,6 +156,61 @@ void MpvPlayer::seek(double seconds, bool relative) {
         nullptr
     };
     mpv_command(m_handle, args);
+    // 相对 seek 换算为绝对目标（协调器按绝对媒体时间换代）。
+    const double target = relative ? m_timePos + seconds : seconds;
+    emit seeked(target);
+}
+
+// ---- 音轨查询（track-list，B3：aid -> ffmpeg 流索引映射）----
+static int mpvNodeI64(const mpv_node& n, int def) {
+    return n.format == MPV_FORMAT_INT64 ? static_cast<int>(n.u.int64) : def;
+}
+static QString mpvNodeStr(const mpv_node& n) {
+    return (n.format == MPV_FORMAT_STRING && n.u.string) ? QString::fromUtf8(n.u.string) : QString();
+}
+static const mpv_node* mpvNodeGet(const mpv_node& list, const char* key) {
+    if (list.format != MPV_FORMAT_NODE_MAP) return nullptr;
+    for (int i = 0; i < list.u.list->num; ++i)
+        if (std::strcmp(list.u.list->keys[i], key) == 0) return &list.u.list->values[i];
+    return nullptr;
+}
+
+QVector<MpvAudioTrack> MpvPlayer::audioTracks() const {
+    QVector<MpvAudioTrack> out;
+    if (!m_handle) return out;
+    mpv_node node;
+    if (mpv_get_property(m_handle, "track-list", MPV_FORMAT_NODE, &node) < 0) return out;
+    if (node.format == MPV_FORMAT_NODE_ARRAY) {
+        for (int i = 0; i < node.u.list->num; ++i) {
+            const mpv_node& e = node.u.list->values[i];
+            const mpv_node* type = mpvNodeGet(e, "type");
+            if (!type || type->format != MPV_FORMAT_STRING ||
+                std::strcmp(type->u.string, "audio") != 0) continue;
+            MpvAudioTrack t;
+            if (const mpv_node* v = mpvNodeGet(e, "id")) t.id = mpvNodeI64(*v, 0);
+            if (const mpv_node* v = mpvNodeGet(e, "demuxer-id")) t.ffIndex = mpvNodeI64(*v, -1);
+            if (const mpv_node* v = mpvNodeGet(e, "lang")) t.lang = mpvNodeStr(*v);
+            if (const mpv_node* v = mpvNodeGet(e, "title")) t.title = mpvNodeStr(*v);
+            if (const mpv_node* v = mpvNodeGet(e, "selected")) t.selected = mpvNodeI64(*v, 0) != 0;
+            out.append(t);
+        }
+    }
+    mpv_free_node_contents(&node);
+    return out;
+}
+
+int MpvPlayer::audioTrackFfIndex(int aid) const {
+    const auto tracks = audioTracks();
+    for (const auto& t : tracks)
+        if (t.id == aid) return t.ffIndex >= 0 ? t.ffIndex : t.id - 1;
+    return -1;  // 无媒体/未知 aid：worker 默认选首条音轨
+}
+
+int MpvPlayer::selectedAudioAid() const {
+    const auto tracks = audioTracks();
+    for (const auto& t : tracks)
+        if (t.selected) return t.id;
+    return -1;
 }
 
 bool MpvPlayer::loadSubtitle(const QString& path) {
@@ -195,26 +250,6 @@ void MpvPlayer::setAudioTrack(int aid) {
     if (!m_handle) return;
     int64_t id = aid;
     mpv_set_property(m_handle, "aid", MPV_FORMAT_INT64, &id);
-}
-
-void MpvPlayer::showSubtitleOverlay(const QString& assEvents) {
-    if (!m_handle) return;
-    // mpv osd-overlay 语法：osd-overlay <id:int> <format> <data>。
-    // 同一 id 重复下发即原位更新；没有 add/remove 子命令。
-    const QByteArray data = assEvents.toUtf8();
-    const char* args[] = {
-        "osd-overlay", "1", "ass-events", data.constData(), nullptr
-    };
-    mpv_command(m_handle, args);
-}
-
-void MpvPlayer::clearSubtitleOverlay() {
-    if (!m_handle) return;
-    // format "none" 表示移除该 id 的叠加层。
-    const char* args[] = {
-        "osd-overlay", "1", "none", "", nullptr
-    };
-    mpv_command(m_handle, args);
 }
 
 void MpvPlayer::wakeupCallback(void* ctx) {
