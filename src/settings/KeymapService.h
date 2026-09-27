@@ -20,6 +20,8 @@ public:
     Result<void> loadFromObject(const QJsonObject& root);
     /// Start from the built-in default bindings.
     void loadDefaults();
+    /// Bind (or rebind) an action; an empty key removes the binding.
+    void setBinding(const QString& action, const QString& key);
 
     bool hasAction(const QString& action) const;
     /// Raw key string for an action (e.g. "Ctrl+Shift+C"), empty if unbound.

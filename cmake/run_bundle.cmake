@@ -7,3 +7,17 @@ get_filename_component(RCP_SOURCE_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 set(RCP_DEPS_ROOT "${RCP_SOURCE_ROOT}/.tools")
 include("${CMAKE_CURRENT_LIST_DIR}/RcpBundle.cmake")
 rcp_copy_native_runtime(DEST "${RCP_SOURCE_ROOT}/out/bundle/runtime")
+
+# D1：Qt SQL 运行时（Qt6Sql.dll + sqldrivers/qsqlite.dll，Qt 会在 exe 旁
+# 的 sqldrivers/ 子目录查找驱动插件）。
+set(_QT_BIN "${RCP_SOURCE_ROOT}/.qt6/6.8.1/msvc2022_64")
+foreach(_dll Qt6Sql)
+  if(EXISTS "${_QT_BIN}/bin/${_dll}.dll")
+    file(COPY "${_QT_BIN}/bin/${_dll}.dll" DESTINATION "${RCP_SOURCE_ROOT}/out/bundle/runtime")
+  endif()
+endforeach()
+if(EXISTS "${_QT_BIN}/plugins/sqldrivers/qsqlite.dll")
+  file(MAKE_DIRECTORY "${RCP_SOURCE_ROOT}/out/bundle/runtime/sqldrivers")
+  file(COPY "${_QT_BIN}/plugins/sqldrivers/qsqlite.dll"
+       DESTINATION "${RCP_SOURCE_ROOT}/out/bundle/runtime/sqldrivers")
+endif()

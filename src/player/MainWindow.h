@@ -14,6 +14,7 @@
 #include <QVector>
 
 #include "captions/CaptionTypes.h"
+#include "settings/KeymapService.h"
 
 class MpvPlayer;
 class MpvRenderWidget;
@@ -79,6 +80,9 @@ private slots:
     void showFullscreenControls();
 
 private:
+    void applyShortcuts();
+    struct HotkeyDef { QString id; QString defaultKey; QString desc; };
+    static QVector<HotkeyDef> hotkeyDefs();
     void applyTheme();
     void buildTitleBar(QWidget* parent);
     QWidget* buildLeftRail(QWidget* parent);
@@ -123,6 +127,8 @@ private:
     QWidget* m_videoHost = nullptr;   // 视频容器（离屏快照模式下为黑色占位）
     rcp::player::CaptionCoordinator* m_coordinator = nullptr;  // 字幕唯一入口（B3/ADR-0007）
     QSettings m_settings;
+    rcp::settings::KeymapService m_keymap;   // D2/C5：键映射（默认+用户覆写+冲突检测）
+    QVector<QShortcut*> m_shortcuts;
     QStringList m_mediaPaths;
     long long m_delayMs = 0;               // 字幕同步延迟
     long long m_coveredUntilMs = 0;        // worker 已识别覆盖到的时间（延迟统计用）

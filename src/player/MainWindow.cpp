@@ -44,6 +44,7 @@
 #include <memory>
 #include <QMenu>
 #include <QShortcut>
+#include <QKeySequenceEdit>
 #include <qt_windows.h>
 #include <QSlider>
 #include <QStackedWidget>
@@ -312,23 +313,13 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setMinimumSize(1024, 660);
 
     // 快捷键
-    auto sc = [this](const char* key, auto slot) {
-        auto* s = new QShortcut(QKeySequence(QLatin1String(key)), this);
-        connect(s, &QShortcut::activated, this, slot);
-    };
-    sc("Space", &MainWindow::onPlayPause);
-    sc("Left",  [this] { m_player->seek(qBound(0.0, m_player->timePosition() - 5.0, m_duration), false); });
-    sc("Right", [this] { m_player->seek(qBound(0.0, m_player->timePosition() + 5.0, m_duration), false); });
-    sc("Up",    [this] { m_volume->setValue(qMin(100, m_volume->value() + 5)); });
-    sc("Down",  [this] { m_volume->setValue(qMax(0, m_volume->value() - 5)); });
-    sc("F", &MainWindow::onToggleFullscreen);
-    sc("S", &MainWindow::onToggleSettings);
-    sc("R", &MainWindow::onToggleCaption);
-    sc("Ctrl+O", &MainWindow::onOpen);
-    sc("Esc", [this] { if (isFullScreen()) onToggleFullscreen(); });   // C3：Esc 退出全屏
-    // C3：逐帧步进（暂停态下按帧前进/后退）。
-    sc(",", [this] { if (m_player->handle()) { const char* a[] = {"frame-back-step", nullptr}; mpv_command(m_player->handle(), a); } });
-    sc(".", [this] { if (m_player->handle()) { const char* a[] = {"frame-step", nullptr}; mpv_command(m_player->handle(), a); } });
+    // D2/C5：快捷键统一走键映射（默认表 + QSettings 覆写 + 冲突检测 + 可编辑）。
+    for (const auto& def : hotkeyDefs()) {
+        m_keymap.setBinding(def.id, def.defaultKey);   // 默认表唯一来源 = hotkeyDefs
+        const QString v = m_settings.value(QStringLiteral("keymap/") + def.id).toString();
+        if (!v.isEmpty()) m_keymap.setBinding(def.id, v);
+    }
+    applyShortcuts();
 
     m_volume->setValue(m_settings.value(QStringLiteral("playback/volume"), 100).toInt());
     const double sp = m_settings.value(QStringLiteral("playback/speed"), 1.0).toDouble();
@@ -505,6 +496,57 @@ void MainWindow::demoTick() {
         }
         if (QListWidgetItem* cur = m_transcript->item(idx))
             m_transcript->scrollToItem(cur, QAbstractItemView::PositionAtCenter);
+    }
+}
+
+// ---- D2/C5：动作表与快捷键构建 ----
+QVector<MainWindow::HotkeyDef> MainWindow::hotkeyDefs() {
+    return {
+        {QStringLiteral("playback.play_pause"), QStringLiteral("Space"),   tr("播放 / 暂停")},
+        {QStringLiteral("playback.seek_back"),  QStringLiteral("Left"),    tr("后退 5 秒")},
+        {QStringLiteral("playback.seek_fwd"),   QStringLiteral("Right"),   tr("前进 5 秒")},
+        {QStringLiteral("volume.up"),           QStringLiteral("Up"),      tr("音量增大")},
+        {QStringLiteral("volume.down"),         QStringLiteral("Down"),    tr("音量减小")},
+        {QStringLiteral("fullscreen.toggle"),   QStringLiteral("F"),       tr("全屏")},
+        {QStringLiteral("settings.toggle"),     QStringLiteral("S"),       tr("打开设置")},
+        {QStringLiteral("caption.toggle"),      QStringLiteral("R"),       tr("开关实时字幕")},
+        {QStringLiteral("file.open"),           QStringLiteral("Ctrl+O"),  tr("打开文件")},
+        {QStringLiteral("fullscreen.exit"),     QStringLiteral("Esc"),     tr("退出全屏")},
+        {QStringLiteral("frame.back"),          QStringLiteral(","),       tr("逐帧后退")},
+        {QStringLiteral("frame.forward"),       QStringLiteral("."),       tr("逐帧前进")},
+    };
+}
+
+void MainWindow::applyShortcuts() {
+    for (auto* sc : m_shortcuts) sc->deleteLater();
+    m_shortcuts.clear();
+
+    auto invoke = [this](const QString& id) {
+        if (id == QLatin1String("playback.play_pause")) onPlayPause();
+        else if (id == QLatin1String("playback.seek_back"))
+            m_player->seek(qBound(0.0, m_player->timePosition() - 5.0, m_duration), false);
+        else if (id == QLatin1String("playback.seek_fwd"))
+            m_player->seek(qBound(0.0, m_player->timePosition() + 5.0, m_duration), false);
+        else if (id == QLatin1String("volume.up")) m_volume->setValue(qMin(100, m_volume->value() + 5));
+        else if (id == QLatin1String("volume.down")) m_volume->setValue(qMax(0, m_volume->value() - 5));
+        else if (id == QLatin1String("fullscreen.toggle")) onToggleFullscreen();
+        else if (id == QLatin1String("fullscreen.exit")) { if (isFullScreen()) onToggleFullscreen(); }
+        else if (id == QLatin1String("settings.toggle")) onToggleSettings();
+        else if (id == QLatin1String("caption.toggle")) onToggleCaption();
+        else if (id == QLatin1String("file.open")) onOpen();
+        else if (id == QLatin1String("frame.back")) {
+            if (m_player->handle()) { const char* a[] = {"frame-back-step", nullptr}; mpv_command(m_player->handle(), a); }
+        } else if (id == QLatin1String("frame.forward")) {
+            if (m_player->handle()) { const char* a[] = {"frame-step", nullptr}; mpv_command(m_player->handle(), a); }
+        }
+    };
+
+    for (const auto& def : hotkeyDefs()) {
+        const QKeySequence seq = m_keymap.sequenceForAction(def.id);
+        if (seq.isEmpty()) continue;
+        auto* sc = new QShortcut(seq, this);
+        connect(sc, &QShortcut::activated, this, [invoke, id = def.id] { invoke(id); });
+        m_shortcuts.append(sc);
     }
 }
 
@@ -1695,26 +1737,30 @@ QWidget* MainWindow::paneShortcuts() {
     auto* title = new QLabel(tr("快捷键"), w);
     title->setProperty("class", "paneTitle");
     v->addWidget(title);
-    const QList<QPair<QString, QString>> rows = {
-        {tr("播放 / 暂停"), QStringLiteral("Space")},
-        {tr("前进 5 秒"), QStringLiteral("→")},
-        {tr("后退 5 秒"), QStringLiteral("←")},
-        {tr("切换实时字幕"), QStringLiteral("R")},
-        {tr("打开设置"), QStringLiteral("S")},
-        {tr("全屏"), QStringLiteral("F")},
-        {tr("打开文件"), QStringLiteral("Ctrl+O")}};
-    for (const auto& [act, key] : rows) {
+    // C5：快捷键编辑器（QKeySequenceEdit + QSettings 覆写 + 冲突提示）。
+    for (const auto& def : hotkeyDefs()) {
         auto* r = new QWidget(w);
         auto* h = new QHBoxLayout(r);
         h->setContentsMargins(0, 0, 0, 0);
-        auto* a = new QLabel(act, r);
+        auto* a = new QLabel(def.desc, r);
         a->setProperty("class", "rowLabel");
-        auto* k = new QLabel(key, r);
-        k->setStyleSheet(QStringLiteral(
-            "background:#20252d;border:1px solid rgba(255,255,255,0.16);border-radius:4px;color:#e6e8ee;font-size:10px;padding:2px 8px;"));
+        auto* ed = new QKeySequenceEdit(m_keymap.sequenceForAction(def.id), r);
+        ed->setStyleSheet(QStringLiteral(
+            "QKeySequenceEdit{background:#20252d;border:1px solid rgba(255,255,255,0.16);"
+            "border-radius:4px;color:#e6e8ee;font-size:10px;min-height:24px;}"
+            "QKeySequenceEdit:focus-visible{border-color:#7868ff;}"));
+        connect(ed, &QKeySequenceEdit::editingFinished, this, [this, ed, id = def.id] {
+            const QString text = ed->keySequence().toString();
+            m_settings.setValue(QStringLiteral("keymap/") + id, text);
+            m_keymap.setBinding(id, text);
+            const QStringList conflicts = m_keymap.conflictBindings();
+            if (!conflicts.isEmpty())
+                appendTranscriptFinal(-1, tr("[快捷键冲突] %1").arg(conflicts.join(QStringLiteral(", "))));
+            applyShortcuts();
+        });
         h->addWidget(a);
         h->addStretch();
-        h->addWidget(k);
+        h->addWidget(ed);
         v->addWidget(r);
     }
     v->addStretch();

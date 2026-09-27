@@ -66,6 +66,11 @@ void KeymapService::loadDefaults() {
     bindings_.insert(QStringLiteral("window.fullscreen"), QStringLiteral("F11"));
 }
 
+void KeymapService::setBinding(const QString& action, const QString& key) {
+    if (key.isEmpty()) bindings_.remove(action);
+    else bindings_.insert(action, key);
+}
+
 bool KeymapService::hasAction(const QString& action) const {
     return bindings_.contains(action);
 }
