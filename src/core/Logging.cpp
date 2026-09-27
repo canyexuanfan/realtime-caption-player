@@ -1,6 +1,7 @@
 #include "core/Logging.h"
 
 #include <cstdio>
+#include <QRegularExpression>
 #include <QFile>
 #include <QTextStream>
 #include <QDateTime>
@@ -73,20 +74,34 @@ void Logger::rotateIfNeeded() {
     bytesWritten_ = 0;
 }
 
+QString redactForLog(const QString& message) {
+    // 盘符路径（X:/.. 与 X:\..）与 UNC/网络路径统一替换为 <path>；
+    // 其余消息保持原样。字幕正文不由 Logger 处理（调用方不传即不入日志）。
+    // 正则说明：匹配到空白、引号、回车换行为止的完整路径片段。
+    static const QRegularExpression drivePath(
+        QStringLiteral("[A-Za-z]:[/\\\\][^\\s\"']+"));
+    static const QRegularExpression uncPath(
+        QStringLiteral("(?:\\\\\\\\|//)[^\\s\"']+"));
+    QString out = message;
+    out.replace(drivePath, QStringLiteral("<path>"));
+    out.replace(uncPath, QStringLiteral("<path>"));
+    return out;
+}
+
 void Logger::log(Level l, const QString& category, const QString& message) {
     if (l < level_) return;
     const QString line = QStringLiteral("%1 [%2] [%3] %4")
         .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss.zzz")))
         .arg(levelName(l))
         .arg(category)
-        .arg(message);
+        .arg(redactForLog(message));
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (file_) {
             QTextStream ts(file_);
             ts << line << Qt::endl;
-            bytesWritten_ += line.size() + 1;
+            bytesWritten_ += line.toUtf8().size() + 1;   // D4：按字节而非 UTF-16 字符数
             rotateIfNeeded();
         }
     }

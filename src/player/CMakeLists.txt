@@ -29,6 +29,7 @@ target_link_libraries(rcp_player PUBLIC
     Qt6::Svg
     Qt6::Network
     opengl32
+    dbghelp
 )
 
 # UI 资源（参考稿复刻）：品牌 logo + sprite 图标 SVG 集（见下方 AUTORCC + rcp.qrc）。

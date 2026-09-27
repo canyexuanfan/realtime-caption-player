@@ -1,16 +1,51 @@
 // src/player/main.cpp
 // 播放器应用入口（P2 基础窗口）。后续里程碑接入字幕 worker 与叠加层。
 #include <QApplication>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QLocalServer>
+#include <QLocalSocket>
 #include <QStandardPaths>
 #include <QSurfaceFormat>
 #include <QSvgRenderer>
 #include <QTimer>
+#include <qt_windows.h>
+#include <dbghelp.h>
 #include "MainWindow.h"
 #include "MpvTrace.h"
 
+// D4 崩溃转储：未处理异常/访问违规时写 minidump 到应用数据目录，供事后定位。
+static LONG WINAPI crashDumpFilter(EXCEPTION_POINTERS* info) {
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    QDir().mkpath(dir);
+    const QString path = dir + QStringLiteral("/crash-%1.dmp")
+                             .arg(QDateTime::currentMSecsSinceEpoch());
+    HANDLE file = CreateFileW(reinterpret_cast<const wchar_t*>(path.utf16()),
+                              GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                              FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file != INVALID_HANDLE_VALUE) {
+        MINIDUMP_EXCEPTION_INFORMATION dumpInfo{GetCurrentThreadId(), info, FALSE};
+        MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), file,
+                          MiniDumpNormal, info ? &dumpInfo : nullptr, nullptr, nullptr);
+        CloseHandle(file);
+    }
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+// D4 单实例：第二个实例通过命名管道通知首实例"唤起窗口"后退出。
+static bool tryConnectExistingInstance() {
+    QLocalSocket sock;
+    sock.connectToServer(QStringLiteral("rcp-player-singleton"));
+    if (!sock.waitForConnected(300)) return false;
+    sock.write("raise\n");
+    sock.flush();
+    sock.waitForBytesWritten(300);
+    return true;
+}
+
 int main(int argc, char* argv[]) {
+    SetUnhandledExceptionFilter(crashDumpFilter);
     // libmpv 的 GL 渲染器依赖兼容 profile 的旧式 GL；Qt6 默认在支持的
     // 驱动上申请 Core profile（实测 4.6 Core → mpv 建纹理 INVALID_ENUM，
     // VO 等不到首帧导致播放停滞）。必须在 QApplication 创建前设置默认格式。
@@ -22,6 +57,15 @@ int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("RealtimeCaptionPlayer"));
     QApplication::setOrganizationName(QStringLiteral("RealtimeCaption"));
+
+    // D4 单实例：已运行则唤起后退出。
+    if (tryConnectExistingInstance()) {
+        qInfo("another instance is running; raise requested");
+        return 0;
+    }
+    QLocalServer::removeServer(QStringLiteral("rcp-player-singleton"));
+    QLocalServer* singleton = new QLocalServer(&app);
+    singleton->listen(QStringLiteral("rcp-player-singleton"));
 
     // 资源自检（图标/logo 空白排查）：启动时记录 :/ 资源可达性到诊断文件。
     {
@@ -70,6 +114,18 @@ int main(int argc, char* argv[]) {
             QApplication::quit();
         });
     }
+    // D4：首实例收到"raise"请求时唤起窗口。
+    QObject::connect(singleton, &QLocalServer::newConnection, &window, [singleton, &window] {
+        while (QLocalSocket* c = singleton->nextPendingConnection()) {
+            c->readAll();
+            c->disconnectFromServer();
+            c->deleteLater();
+        }
+        window.showNormal();
+        window.raise();
+        window.activateWindow();
+    });
+
     window.show();
     rcpMark("main:shown");
     // 快照/示例模式：统一 1280x800 逻辑尺寸（与 Edge 无头渲染同宽，像素比对用），

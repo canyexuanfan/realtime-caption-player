@@ -50,6 +50,10 @@ private:
     bool qtHandlerInstalled_ = false;
 };
 
+/// 隐私脱敏（D4，审查 §2.3/§3）：盘符路径/UNC 路径 → "<path>"，
+/// 日志与诊断 trace 默认不再携带完整本机路径。字幕正文由调用方保证不入日志。
+QString redactForLog(const QString& message);
+
 /// Convenience free functions.
 void initLogging(const QString& logDir, bool console = true);
 void setLogLevel(Level l);
