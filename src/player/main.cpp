@@ -13,7 +13,7 @@
 #include <qt_windows.h>
 #include <dbghelp.h>
 #include "MainWindow.h"
-#include "MpvTrace.h"
+#include "core/MpvTrace.h"
 
 // D4 崩溃转储：未处理异常/访问违规时写 minidump 到应用数据目录，供事后定位。
 static LONG WINAPI crashDumpFilter(EXCEPTION_POINTERS* info) {

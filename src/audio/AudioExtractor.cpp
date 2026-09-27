@@ -37,6 +37,7 @@ void AudioExtractor::close() {
     m_acc.clear();
     m_totalOut = 0;
     m_chosen = -1;
+    m_eof = false;
 }
 
 bool AudioExtractor::open(const QString& path, int audioStreamIndex) {
@@ -109,12 +110,14 @@ bool AudioExtractor::seekToSec(double sec) {
     m_acc.clear();
     m_totalOut = 0;
     m_anchorSec = -1.0;  // 负值 = 未锚定，extract 收到首个有效 PTS 时重锚
+    m_eof = false;
     return true;
 }
 
 long long AudioExtractor::extract(double chunkSec, const ChunkCallback& cb,
                                   const rcp::CancellationToken& tok) {
     if (!d_ || !d_->fmt || !d_->ctx) return 0;
+    if (m_eof) return 0;   // EOF 后不再产出（B2 修复，见头文件注释）
     // 参数防御：chunkSec*rate<=0 会导致分块死循环（审查 §1.1-9）。
     if (chunkSec <= 0.0) chunkSec = 0.1;
     const int chunkSamples = static_cast<int>(chunkSec * d_->outRate);
@@ -157,6 +160,7 @@ long long AudioExtractor::extract(double chunkSec, const ChunkCallback& cb,
 
     while (av_read_frame(d_->fmt, pkt) >= 0) {
         if (tok.isCanceled()) { av_packet_unref(pkt); break; }
+        m_eof = false;
         if (pkt->stream_index != d_->chosen) { av_packet_unref(pkt); continue; }
         if (avcodec_send_packet(d_->ctx, pkt) < 0) { av_packet_unref(pkt); continue; }
         bool canceled = false;
@@ -167,11 +171,14 @@ long long AudioExtractor::extract(double chunkSec, const ChunkCallback& cb,
         if (canceled) break;
     }
     if (!tok.isCanceled()) {
-        // flush
-        avcodec_send_packet(d_->ctx, nullptr);
-        while (avcodec_receive_frame(d_->ctx, frame) >= 0) {
-            if (!processFrame(frame)) break;
+        if (!m_eof) {
+            // flush
+            avcodec_send_packet(d_->ctx, nullptr);
+            while (avcodec_receive_frame(d_->ctx, frame) >= 0) {
+                if (!processFrame(frame)) break;
+            }
         }
+        m_eof = true;   // 本轮读到 EOF：置位后 extract 快速返回 0
     }
     av_packet_free(&pkt);
     av_frame_free(&frame);

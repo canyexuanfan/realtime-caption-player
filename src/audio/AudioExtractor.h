@@ -41,6 +41,9 @@ public:
     long long extract(double chunkSec, const ChunkCallback& cb,
                       const rcp::CancellationToken& tok = {});
 
+    // 是否已读到媒体末尾（EOF 后 extract 返回 0，直到 seek/重开重置）。
+    bool atEof() const { return m_eof; }
+
     // seek 到指定秒（avformat seek + 解码器 flush + 输出锚重置）。
     // 之后 extract 从新位置继续，块时间戳以新 PTS 锚定。
     bool seekToSec(double sec);
@@ -54,6 +57,8 @@ private:
     std::vector<float> m_acc;
     long long m_totalOut = 0;
     double   m_anchorSec = 0.0;   // 当前输出流起点对应的媒体绝对秒（首帧 PTS 锚）
+    bool     m_eof = false;       // 已读到媒体末尾（B2 修复：EOF 后 extract 不再产出，
+                                  // 防止 flush 段把最后残块反复喂给下游导致状态堆积）
 };
 
 } // namespace rcp::audio

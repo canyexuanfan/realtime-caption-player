@@ -1,7 +1,7 @@
 // src/player/MpvRenderWidget.cpp
 #include "MpvRenderWidget.h"
 #include "MpvPlayer.h"
-#include "MpvTrace.h"
+#include "core/MpvTrace.h"
 
 #include <QOpenGLContext>
 #include <QOpenGLFunctions>

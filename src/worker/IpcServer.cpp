@@ -6,6 +6,7 @@
 
 #include <QCoreApplication>
 #include <QUuid>
+#include "core/MpvTrace.h"
 
 namespace rcp::worker {
 
@@ -114,6 +115,7 @@ void IpcServer::handleCommand(const rcp::ipc::Envelope& env) {
         m_heartbeat->start();
         break;
     case rcp::ipc::CommandType::OpenMedia: {
+        rcpTrace(QStringLiteral("[open] recv gen=%1").arg(env.generation));
         const QString path = p.value(QStringLiteral("path")).toString();
         if (path.isEmpty()) {
             sendAck(env, false, QStringLiteral("open_media: path is required"));
@@ -122,8 +124,11 @@ void IpcServer::handleCommand(const rcp::ipc::Envelope& env) {
         if (env.generation != 0) m_generation = env.generation;
         m_mediaPath = path;
         m_audioTrack = p.value(QStringLiteral("audio_track")).toInt(-1);
+        rcpTrace(QStringLiteral("[open] ack send"));
         sendAck(env, true, {});
-        m_pipeline->start(m_mediaPath, m_audioTrack, m_generation);
+        rcpTrace(QStringLiteral("[open] pipeline.start begin"));
+        const bool ok = m_pipeline->start(m_mediaPath, m_audioTrack, m_generation);
+        rcpTrace(QStringLiteral("[open] pipeline.start done ok=%1").arg(ok));
         break;
     }
     case rcp::ipc::CommandType::SetPlayhead:

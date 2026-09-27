@@ -3,7 +3,7 @@
 
 #include "ipc/JsonMessageCodec.h"
 #include "ipc/Protocol.h"
-#include "MpvTrace.h"
+#include "core/MpvTrace.h"
 
 #include <QCoreApplication>
 #include <QLocalSocket>
@@ -53,6 +53,8 @@ bool WorkerSupervisor::start(const QString& workerExe, const QString& mediaPath,
 
     m_proc = new QProcess(this);
     m_proc->setWorkingDirectory(QCoreApplication::applicationDirPath());
+    // 崩溃定位：worker stderr 直通父进程 stderr（诊断期，随 RCP_TRACE 场景取证）。
+    m_proc->setProcessChannelMode(QProcess::ForwardedErrorChannel);
     connect(m_proc, &QProcess::started, this, &WorkerSupervisor::onProcessStarted);
     connect(m_proc, &QProcess::errorOccurred, this, &WorkerSupervisor::onProcessError);
     connect(m_proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
@@ -330,9 +332,11 @@ void WorkerSupervisor::onProcessError(QProcess::ProcessError err) {
 
 void WorkerSupervisor::onProcessFinished(int exitCode, QProcess::ExitStatus status) {
     m_connected = false;
-    m_openSent = false;
+    // B4 修复：openSent 不得在 scheduleRestart 之前清除——否则意外退出后
+    // 自动重启的"有活动会话"检查永远失败（自动重启形同虚设）。
     emit workerFinished(exitCode, status);
     scheduleRestart();
+    m_openSent = false;
 }
 
 bool WorkerSupervisor::isRunning() const {

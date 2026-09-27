@@ -21,6 +21,8 @@
          Every dialog/control is defined here and verified via msilib so no control can
          have an empty required property. -->
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <!-- E(ICE20)：必需的错误对话框指定。 -->
+    <Property Id="ErrorDialog" Value="RcpErrorDlg" />
 
     <!-- 升级检测/目录记忆：安装时把最终目录写入注册表；重装时 AppSearch 读回。
          PREVINSTALLDIR 命中且以程序名子目录结尾（防陈旧脏路径）→ 预填旧目录；
@@ -38,6 +40,37 @@
     <UI>
       <Property Id="DefaultUIFont" Value="DlgFont" />
       <TextStyle Id="DlgFont" FaceName="Tahoma" Size="8" />
+        <!-- ErrorDialog 规范要求：指定对话框需存在且首控件为 ErrorText。 -->
+      <Dialog Id="RcpErrorDlg" Width="370" Height="100" Title="[ProductName] Setup" NoMinimize="yes">
+        <Control Id="ErrorText" Type="Text" X="20" Y="15" Width="330" Height="60">
+          <Text>[ErrorText]</Text>
+        </Control>
+        <Control Id="OK" Type="PushButton" X="150" Y="70" Width="70" Height="20">
+          <Text>OK</Text>
+          <Publish Event="EndDialog" Value="Return">1</Publish>
+        </Control>
+      </Dialog>
+
+      <!-- E(ICE20)：标准 FilesInUse 对话框（最小合规实现）。 -->
+      <Dialog Id="FilesInUse" Width="370" Height="150" Title="[ProductName] Files in Use" NoMinimize="yes">
+        <Control Id="Text" Type="Text" X="20" Y="15" Width="330" Height="50">
+          <Text>The following applications are using files that need to be updated. Close them and click Retry.</Text>
+        </Control>
+        <Control Id="FileInUseList" Type="ListBox" Property="FileInUseProcess"
+                 X="20" Y="70" Width="330" Height="40" />
+        <Control Id="Retry" Type="PushButton" X="60" Y="115" Width="70" Height="20" Default="yes">
+          <Text>Retry</Text>
+          <Publish Event="EndDialog" Value="Retry">1</Publish>
+        </Control>
+        <Control Id="Ignore" Type="PushButton" X="150" Y="115" Width="70" Height="20">
+          <Text>Ignore</Text>
+          <Publish Event="EndDialog" Value="Ignore">1</Publish>
+        </Control>
+        <Control Id="Exit" Type="PushButton" X="240" Y="115" Width="70" Height="20" Cancel="yes">
+          <Text>Exit</Text>
+          <Publish Event="EndDialog" Value="Exit">1</Publish>
+        </Control>
+      </Dialog>
 
       <Dialog Id="WelcomeDlg" Width="370" Height="270" Title="[ProductName] Setup">
         <Control Id="Title" Type="Text" X="15" Y="15" Width="340" Height="20" NoPrefix="yes">
@@ -252,6 +285,12 @@
         <Show Dialog="WelcomeDlg" After="CostFinalize">1</Show>
         <Show Dialog="ProgressDlg" Before="ExecuteAction" />
       </InstallUISequence>
+      <!-- E(ICE20)：管理安装(admin) UI 序列同样要有完整出口链。 -->
+      <AdminUISequence>
+        <Show Dialog="ExitDialog" OnExit="success" />
+        <Show Dialog="UserExit" OnExit="cancel" />
+        <Show Dialog="FatalError" OnExit="error" />
+      </AdminUISequence>
     </UI>
 
     <Feature Id="Complete" Title="RealtimeCaptionPlayer" Level="1">
@@ -259,6 +298,7 @@
       <ComponentRef Id="StartMenuShortcut" />
       <ComponentRef Id="DesktopShortcut" />
       <ComponentRef Id="InstallDirReg" />
+      <ComponentRef Id="FileAssociation" />
     </Feature>
 
     <Directory Id="TARGETDIR" Name="SourceDir">
@@ -292,7 +332,9 @@
                 Description="Local-first offline realtime captioning player"
                 Target="[INSTALLFOLDER]player_app.exe"
                 WorkingDirectory="INSTALLFOLDER" />
-      <RegistryValue Root="HKLM"
+      <!-- 与 StartMenuShortcut 一致：HKCU KeyPath（ICE57：避免组件内混用
+           per-user 目录与 per-machine 注册表数据）。 -->
+      <RegistryValue Root="HKCU"
                      Key="Software\Rcp\RealtimeCaptionPlayer" Name="desktop"
                      Type="integer" Value="1" KeyPath="yes" />
     </Component>
@@ -302,6 +344,31 @@
       <RegistryValue Root="HKLM"
                      Key="Software\Rcp\RealtimeCaptionPlayer" Name="InstallDir"
                      Value="[INSTALLFOLDER]" Type="string" KeyPath="yes" />
+    </Component>
+
+    <!-- E 文件关联（T0219-T0227 第一步）：注册 Rcp.VideoFiles ProgId 并把常见
+         视频扩展挂到"打开方式"列表（OpenWithProgids 不抢占默认，用户显式
+         "设为默认"在应用内后续实现）。卸载时随组件移除。 -->
+    <Component Id="FileAssociation" Guid="*" Directory="INSTALLFOLDER">
+      <RegistryValue Root="HKLM"
+                     Key="SOFTWARE\Classes\Rcp.VideoFiles"
+                     Value="RealtimeCaptionPlayer Video" Type="string" KeyPath="yes" />
+      <RegistryValue Root="HKLM"
+                     Key="SOFTWARE\Classes\Rcp.VideoFiles\shell\open\command"
+                     Value='"[INSTALLFOLDER]player_app.exe" "%1"' Type="string" />
+      <RegistryValue Root="HKLM"
+                     Key="SOFTWARE\Classes\Rcp.VideoFiles\DefaultIcon"
+                     Value="[INSTALLFOLDER]player_app.exe,0" Type="string" />
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\.mp4\OpenWithProgids"
+                     Name="Rcp.VideoFiles" Value="" Type="string" />
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\.mkv\OpenWithProgids"
+                     Name="Rcp.VideoFiles" Value="" Type="string" />
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\.avi\OpenWithProgids"
+                     Name="Rcp.VideoFiles" Value="" Type="string" />
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\.mov\OpenWithProgids"
+                     Name="Rcp.VideoFiles" Value="" Type="string" />
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\.webm\OpenWithProgids"
+                     Name="Rcp.VideoFiles" Value="" Type="string" />
     </Component>
 
   </Product>

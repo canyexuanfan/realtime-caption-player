@@ -31,5 +31,6 @@
     <file alias="migrations/001_initial.sql">../migrations/001_initial.sql</file>
     <file alias="migrations/002_add_display_name.sql">../migrations/002_add_display_name.sql</file>
     <file alias="migrations/003_add_last_path.sql">../migrations/003_add_last_path.sql</file>
+    <file alias="theme.qss">theme.qss</file>
   </qresource>
 </RCC>

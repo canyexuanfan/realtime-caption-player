@@ -1,1 +1,30 @@
 IDI_ICON1 ICON DISCARDABLE "app.ico"
+
+// E：版本资源（资源管理器文件属性可见；版本随 release notes 同步）。
+// 不含 VS_VERSION_INFO 宏依赖，使用字面量常量以避免 rc.exe 搜索系统头。
+1 VERSIONINFO
+ FILEVERSION 0,1,0,0
+ PRODUCTVERSION 0,1,0,0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "RealtimeCaption contributors"
+            VALUE "FileDescription", "Realtime Caption Player - local offline realtime captioning player"
+            VALUE "FileVersion", "0.1.0 (preview)"
+            VALUE "ProductName", "RealtimeCaptionPlayer"
+            VALUE "LegalCopyright", "(C) 2026 RealtimeCaptionPlayer contributors. GPL-3.0-or-later."
+            VALUE "OriginalFilename", "player_app.exe"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

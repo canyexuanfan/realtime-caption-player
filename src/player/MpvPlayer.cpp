@@ -3,7 +3,7 @@
 
 #include <QMetaObject>
 #include <QCoreApplication>
-#include "MpvTrace.h"
+#include "core/MpvTrace.h"
 
 namespace {
 constexpr int kPropTimePos = 1;

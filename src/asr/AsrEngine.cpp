@@ -5,6 +5,7 @@ extern "C" {
 #include <sherpa-onnx/c-api/c-api.h>
 }
 
+#include <QFile>
 #include <cstring>
 #include <cstdio>
 #include <vector>
@@ -86,24 +87,34 @@ bool AsrEngine::load(const QString& zfDir, const QString& vadDir,
     d_->zs = SherpaOnnxCreateOnlineStream(d_->zf);
 
     // ---------- 3) SenseVoice 离线识别器（精准终稿 + ITN）----------
-    SherpaOnnxOfflineRecognizerConfig sv_cfg;
-    memset(&sv_cfg, 0, sizeof(sv_cfg));
-    sv_cfg.feat_config.sample_rate = sr;
-    sv_cfg.feat_config.feature_dim = 80;
+    // Lite 包（E 阶段 Lite MSI）不含 sensevoice 模型目录：文件缺失时跳过创建，
+    // 终稿自动回退为分句结束时的 partial 快照（等价 Lite 档），不判失败。
     QByteArray svModel = (svDir + "/model.int8.onnx").toUtf8();
     QByteArray svTokens = (svDir + "/tokens.txt").toUtf8();
-    sv_cfg.model_config.tokens = svTokens.constData();
-    sv_cfg.model_config.sense_voice.model = svModel.constData();
-    sv_cfg.model_config.sense_voice.language = m_language.toUtf8().constData();
-    sv_cfg.model_config.sense_voice.use_itn = 1;
-    d_->sv = SherpaOnnxCreateOfflineRecognizer(&sv_cfg);
-    if (!d_->sv) { error_ = QStringLiteral("SenseVoice create failed"); return false; }
+    if (QFile::exists(QString::fromUtf8(svModel)) && QFile::exists(QString::fromUtf8(svTokens))) {
+        SherpaOnnxOfflineRecognizerConfig sv_cfg;
+        memset(&sv_cfg, 0, sizeof(sv_cfg));
+        sv_cfg.feat_config.sample_rate = sr;
+        sv_cfg.feat_config.feature_dim = 80;
+        sv_cfg.model_config.tokens = svTokens.constData();
+        sv_cfg.model_config.sense_voice.model = svModel.constData();
+        // language 必须存入局部 QByteArray：toUtf8() 临时对象在语句结束即析构，
+        // 直接 constData() 是悬空指针（sherpa 校验时读到垃圾串导致 create 崩溃，
+        // Lite/完整包 IPC 冒烟稳定复现——B5 引入）。
+        const QByteArray svLanguage = m_language.toUtf8();
+        sv_cfg.model_config.sense_voice.language =
+            svLanguage.isEmpty() ? "auto" : svLanguage.constData();
+        sv_cfg.model_config.sense_voice.use_itn = 1;
+        d_->sv = SherpaOnnxCreateOfflineRecognizer(&sv_cfg);
+        if (!d_->sv) { error_ = QStringLiteral("SenseVoice create failed"); return false; }
+    }
 
     return true;
 }
 
 void AsrEngine::feed(const float* samples, int count, long long startMs) {
-    if (!d_ || !d_->zf || !d_->vad || !d_->sv) return;
+    // sv 可为空（Lite 包无 SenseVoice，终稿走 partial 快照）。
+    if (!d_ || !d_->zf || !d_->vad) return;
     const int32_t sr = kSampleRate;
 
     // 媒体绝对位置推进：优先以喂入块的 PTS 起始为锚；与预期偏差 >20ms 视为
@@ -203,9 +214,10 @@ void AsrEngine::drainVad() {
         u.isPartial = false;
 
         if (m_profile == Profile::Lite) {
-            // Lite 档：跳过 SenseVoice，取分句结束时的 partial 快照作终稿。
+            // Lite 档（或 Lite 包无 SenseVoice）：取分句结束时的 partial 快照作终稿。
             u.text = m_currentPartialText;
-        } else {            const float* segSamples = allSamples_.data() + localStart;
+        } else if (d_->sv) {
+            const float* segSamples = allSamples_.data() + localStart;
             const SherpaOnnxOfflineStream* os = SherpaOnnxCreateOfflineStream(d_->sv);
             SherpaOnnxAcceptWaveformOffline(os, sr, segSamples, seg->n);
             SherpaOnnxDecodeOfflineStream(d_->sv, os);
@@ -213,6 +225,8 @@ void AsrEngine::drainVad() {
             u.text = (r && r->text) ? QString::fromUtf8(r->text) : QString();
             SherpaOnnxDestroyOfflineStream(os);
             if (r) SherpaOnnxDestroyOfflineRecognizerResult(r);
+        } else {
+            u.text = m_currentPartialText;   // 无 SenseVoice：回退 partial 快照
         }
         // seg->start 是自流开始的绝对采样索引；时间戳必须用绝对值，
         // 减 consumed_ 只用于取缓冲区内的样本指针。

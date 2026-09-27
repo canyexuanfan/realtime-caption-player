@@ -1,4 +1,4 @@
-// src/player/MpvTrace.h
+// src/core/MpvTrace.h
 // 诊断 trace（P7 诊断能力的一部分）：设置环境变量 RCP_TRACE=<文件路径> 时，
 // 将播放/渲染事件流写入该文件。
 // 实现为每次调用独立开关文件（诊断用途，性能不敏感）：杜绝静态 QFile 实例

@@ -2,6 +2,8 @@
 #include "CaptionPipeline.h"
 
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <cmath>
 
 namespace rcp::worker {
@@ -87,12 +89,25 @@ void CaptionPipeline::setProfile(const QString& profile, quint64 generation) {
     if (hasMedia_) start(mediaPath_, audioTrack_, generation);
 }
 
+namespace {
+// 崩溃取证：向 RCP_CRASH_DIR/worker-boot.log 追加一行（线程名+位置）。
+void crashLog(const char* where, long long v) {
+    if (const char* cd = std::getenv("RCP_CRASH_DIR")) {
+        FILE* lg = std::fopen((std::string(cd) + "/worker-boot.log").c_str(), "a");
+        if (lg) { std::fprintf(lg, "%s %lld\n", where, v); std::fclose(lg); }
+    }
+}
+inline bool everyNth(int counter, int n) { return counter % n == 0; }
+} // namespace
+
 void CaptionPipeline::decodeLoop() {
     const rcp::CancellationToken tok = cancel_.token();
     double decodedPosSec = -1.0;   // 已解码到的媒体位置（下一个块将从此产出）
     quint64 localGen = state_.snapshot().generation;
+    int hbCounter = 0;
 
     while (!tok.isCanceled()) {
+        if (everyNth(++hbCounter, 20)) crashLog("decode-alive", hbCounter);
         const auto st = state_.snapshot();
         if (st.generation != localGen) {
             // 换代（seek/换轨/重载）：当前窗口作废，从新播放头重锚。
@@ -158,8 +173,10 @@ void CaptionPipeline::asrLoop() {
     const rcp::CancellationToken tok = cancel_.token();
     quint64 asrGen = state_.snapshot().generation;
     int overloadStreak = 0;
+    int hbCounter = 0;
 
     while (!tok.isCanceled()) {
+        if (everyNth(++hbCounter, 20)) crashLog("asr-alive", hbCounter);
         auto chunk = pcm_.pop(tok);
         if (!chunk) break;                       // 关闭/取消
         const auto st = state_.snapshot();
@@ -174,7 +191,9 @@ void CaptionPipeline::asrLoop() {
         }
 
         const auto t0 = clock_t::now();
+        crashLog("asr-feed-begin", chunk->startMs);
         engine_.feed(chunk->data.data(), static_cast<int>(chunk->data.size()), chunk->startMs);
+        crashLog("asr-feed-done", chunk->startMs);
         // 终稿超时 tick：以媒体时间为准（2.5s 未落定则强制提交最优 partial）。
         const auto tick = assembler_.tick(chunk->startMs, kFinalTimeoutMs);
         if (tick.action == AssembleResult::Action::Committed) {
