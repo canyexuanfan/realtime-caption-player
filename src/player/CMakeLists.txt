@@ -40,9 +40,9 @@ file(GLOB RCP_UI_ICONS "${CMAKE_SOURCE_DIR}/resources/icons/*.svg")
 # 教训：qt_add_resources 挂静态库→初始化对象被链接器丢弃；且 FILES 不支持
 # alias（资源路径变 logo128.png，代码读 :/logo.png 必失败）。
 add_executable(player_app main.cpp
-    "${CMAKE_SOURCE_DIR}/resources/rcp.qrc"
     "${CMAKE_SOURCE_DIR}/resources/app.rc"   # exe 图标（霓虹语音 logo .ico）
 )
+# 注：rcp.qrc 已编入 rcp_core（迁移 SQL 供测试/worker 共享），此处不再重复注册。
 set_property(TARGET player_app PROPERTY AUTORCC ON)
 target_link_libraries(player_app PRIVATE
     rcp_player

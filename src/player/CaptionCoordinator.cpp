@@ -9,14 +9,15 @@ namespace rcp::player {
 CaptionCoordinator::CaptionCoordinator(QObject* parent) : QObject(parent) {
     m_supervisor = new WorkerSupervisor(this);
     connect(m_supervisor, &WorkerSupervisor::sessionStarted, this, [this](quint64) {
-        m_finals.clear();
+        // 时间线不清空：openMedia 已按新会话清理；数据库预载的缓存终稿与
+        // worker 重识别结果经 insertFinal 就近去重共存（D1 重看秒出）。
         m_partial = rcp::CaptionSegment{};
         m_havePartial = false;
         m_coveredUntilMs = 0;
         m_lastFinalText.clear();
         setState(State::Running);
         emit finalsChanged();
-        emit statsChanged(0, 0);
+        emit statsChanged(m_finals.size(), 0);
         recompute();
     });
     connect(m_supervisor, &WorkerSupervisor::captionSegment, this, &CaptionCoordinator::handleSegment);
@@ -140,6 +141,22 @@ void CaptionCoordinator::refresh() {
     recompute();
 }
 
+void CaptionCoordinator::adoptCachedFinals(const QVector<rcp::CaptionSegment>& segs) {
+    for (const auto& seg : segs) insertFinal(seg);
+}
+
+void CaptionCoordinator::insertFinal(const rcp::CaptionSegment& seg) {
+    // 有序插入 + 就近去重：缓存预载与重识别的同一句（起止差 ≤50ms）替换不叠加。
+    auto it = std::lower_bound(m_finals.begin(), m_finals.end(), seg.startMs,
+                               [](const rcp::CaptionSegment& s, long long v) { return s.startMs < v; });
+    auto near = [](const rcp::CaptionSegment& s, const rcp::CaptionSegment& t) {
+        return std::llabs(s.startMs - t.startMs) <= 50 && std::llabs(s.endMs - t.endMs) <= 50;
+    };
+    if (it != m_finals.begin() && near(*(it - 1), seg)) *(it - 1) = seg;
+    else if (it != m_finals.end() && near(*it, seg)) *it = seg;
+    else m_finals.insert(it, seg);
+}
+
 void CaptionCoordinator::handleSegment(const rcp::CaptionSegment& seg, bool isPartial) {
     if (seg.generation != 0 && seg.generation != m_generation) return; // 显示侧代隔离兜底
     if (isPartial) {
@@ -147,11 +164,7 @@ void CaptionCoordinator::handleSegment(const rcp::CaptionSegment& seg, bool isPa
         m_havePartial = true;
         emit transcriptPartial(seg.text);
     } else {
-        // 有序插入（startMs 升序），显示/导出用同一份时间线（ADR-0007）。
-        auto it = std::lower_bound(m_finals.begin(), m_finals.end(), seg.startMs,
-                                   [](const rcp::CaptionSegment& s, long long v) { return s.startMs < v; });
-        if (it != m_finals.end() && it->id == seg.id) *it = seg;   // 修订覆盖
-        else m_finals.insert(it, seg);
+        insertFinal(seg);
         if (seg.endMs > m_coveredUntilMs) m_coveredUntilMs = seg.endMs;
         if (!seg.text.isEmpty()) m_lastFinalText = seg.text;
         emit transcriptFinal(seg.startMs, seg.text);

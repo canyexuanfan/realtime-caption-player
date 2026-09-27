@@ -11,6 +11,12 @@
 #include "CaptionCoordinator.h"
 #include "captions/SrtExporter.h"
 #include "captions/CaptionTypes.h"
+#include "storage/Database.h"
+#include "storage/MigrationRunner.h"
+#include "storage/HistoryRepository.h"
+#include "storage/TranscriptRepository.h"
+#include "storage/MediaIdentity.h"
+#include <QtConcurrent/QtConcurrent>
 
 #include <QApplication>
 #include <QColor>
@@ -166,6 +172,18 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     }
 
     m_coordinator = new rcp::player::CaptionCoordinator(this);
+    // D1：本地 SQLite（WAL）+ schema 迁移。失败则降级为无持久化（不阻塞 UI）。
+    {
+        const QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        auto opened = rcp::storage::Database::open(dataDir + QStringLiteral("/rcp.db"));
+        if (opened.isError())
+            rcpTrace(QStringLiteral("db open failed: %1").arg(opened.error().technicalMessage));
+        else {
+            auto mig = rcp::storage::MigrationRunner::run(rcp::storage::Database::threadConnection());
+            if (mig.isError())
+                rcpTrace(QStringLiteral("db migrate failed: %1").arg(mig.error().technicalMessage));
+        }
+    }
     rcpMark("ctor:player-initialized");
 
     rcpMark("ctor:applyTheme-begin");
@@ -1850,25 +1868,62 @@ void MainWindow::onTranscriptSearch(const QString& text) {
 
 // ================= 历史/播放列表 =================
 void MainWindow::loadHistory() {
-    m_historyList->clear();
-    const QStringList hist = m_settings.value(QStringLiteral("history/paths")).toStringList();
-    for (const QString& p : hist) {
-        // 绝不同步 QFile::exists()：历史可能含网盘挂载路径（如 X:/），离线时阻塞 UI（启动卡死实测）。
-        auto* it = new QListWidgetItem(m_historyList);   // 文字留空：条目自带文字会被
-        it->setToolTip(p);                               // 默认委托画在透明行控件底下（重影）
-        it->setData(Qt::UserRole, p);
-    }
+    // D1：最近播放 200 条上限（原先 QSettings 30 条），后台线程查询。
+    QtConcurrent::run([this] {
+        auto rows = rcp::storage::HistoryRepository::recent(200);
+        QMetaObject::invokeMethod(this, [this, rows] {
+            if (rows.isError()) return;
+            m_historyList->clear();
+            for (const auto& e : rows.value()) {
+                const QString show = e.path.isEmpty() ? e.displayName : e.path;
+                if (show.isEmpty()) continue;
+                auto* it = new QListWidgetItem(m_historyList);   // 文字留空防重影
+                it->setToolTip(show);
+                it->setData(Qt::UserRole, show);
+            }
+        }, Qt::QueuedConnection);
+    });
 }
 
 void MainWindow::saveHistory(const QString& path) {
-    QStringList hist = m_settings.value(QStringLiteral("history/paths")).toStringList();
-    hist.removeAll(path);
-    hist.prepend(path);
-    while (hist.size() > 30) hist.removeLast();
-    m_settings.setValue(QStringLiteral("history/paths"), hist);
-    rcpMark("ctor:loadHistory-begin");
-    loadHistory();
-    rcpMark("ctor:loadHistory-done");
+    const QString abs = QFileInfo(path).absoluteFilePath();
+    QFileInfo info(abs);
+    const qint64 size = info.size();
+    const qint64 mtime = info.lastModified().toMSecsSinceEpoch();
+    const QString name = info.fileName();
+    // D1：文件指纹（64KB 头哈希，不含路径/mtime）在后台线程计算，绝不阻塞 UI。
+    QtConcurrent::run([this, abs, size, mtime, name] {
+        auto key = rcp::storage::MediaIdentityUtil::cacheKeyForPath(abs);
+        const QString k = key.isError() ? QStringLiteral("name:%1").arg(name) : key.value();
+        if (key.isError()) {
+            QMetaObject::invokeMethod(this, [this, k, name, abs] {
+                m_mediaKeyCache.insert(name, k);
+                if (abs == m_currentPath) m_currentKey = k;
+            }, Qt::QueuedConnection);
+            return;
+        }
+        rcp::storage::HistoryRepository::upsertPlayback(k, size, mtime, name, 0, 0, abs);
+        auto cached = rcp::storage::TranscriptRepository::loadLatestFinals(k);
+        QMetaObject::invokeMethod(this, [this, k, name, abs, cached] {
+            m_mediaKeyCache.insert(name, k);
+            if (abs != m_currentPath) return;   // 用户已切到别的媒体
+            m_currentKey = k;
+            // 字幕缓存预载（重看秒出）：worker 重识别结果会就近去重合并。
+            if (!cached.isError() && !cached.value().isEmpty())
+                m_coordinator->adoptCachedFinals(cached.value());
+            // 续播位置检索。
+            QtConcurrent::run([this, k] {
+                auto pos = rcp::storage::HistoryRepository::lastPositionMs(k);
+                QMetaObject::invokeMethod(this, [this, pos] {
+                    if (m_resumeApplied || pos.isError()) return;
+                    const qint64 saved = pos.value();
+                    m_resumeApplied = true;
+                    if (saved > 5000 && (m_duration <= 0.0 || saved < m_duration * 1000.0 - 2000))
+                        m_player->seek(saved / 1000.0, false);
+                }, Qt::QueuedConnection);
+            });
+        }, Qt::QueuedConnection);
+    });
 }
 
 void MainWindow::addMediaPaths(const QStringList& paths) {
@@ -1975,11 +2030,8 @@ void MainWindow::openFile(const QString& path) {
         // 画面内标题去扩展名（参考 .video-file-title stripExtension），标题栏保留原名
         m_videoFileTitle->setText(QFileInfo(path).completeBaseName());
         setWindowTitle(QStringLiteral("实时字幕播放器 — %1").arg(name));
-        if (m_settings.value(QStringLiteral("general/rememberPosition"), true).toBool()) {
-            const qint64 saved = m_settings.value(QStringLiteral("position/") + name, 0).toLongLong();
-            if (saved > 5000 && saved < m_duration * 1000.0 - 2000)   // 接近片尾不恢复（避免立即 EOF）
-                QTimer::singleShot(300, this, [this, saved] { m_player->seek(saved / 1000.0, false); });
-        }
+        // D1：续播位置改为缓存键检索（异步），见 saveHistory 的 key 解析回调；
+        // m_resumeApplied 防重复应用。
         if (m_settings.value(QStringLiteral("general/autoPlay"), true).toBool()) m_player->play();
         m_waveform->pulse(0.8);
         startCaptioningFor(path);
@@ -2109,8 +2161,14 @@ void MainWindow::onPositionChanged(double seconds) {
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
     if (now - lastSave > 4000 && m_duration > 0) {
         lastSave = now;
-        m_settings.setValue(QStringLiteral("position/") + m_titleFile->text(),
-                            static_cast<qint64>(seconds * 1000.0));
+        // D1：续播位置按缓存键入库（后台线程），同名不同目录不再互相覆盖。
+        if (!m_currentKey.isEmpty()) {
+            const QString key = m_currentKey;
+            const qint64 posMs = static_cast<qint64>(seconds * 1000.0);
+            QtConcurrent::run([key, posMs] {
+                rcp::storage::HistoryRepository::upsertPlayback(key, 0, 0, QString(), posMs, 0);
+            });
+        }
     }
 }
 
@@ -2154,6 +2212,16 @@ void MainWindow::onMediaEnded() {
     m_playBtn->setIcon(icon(QStringLiteral("play"), QColor("#ffffff"), 22));
     m_coordinator->stop();
     SetThreadExecutionState(ES_CONTINUOUS);   // C3：停止播放恢复休眠
+    // D1：终稿入字幕缓存（重看秒出）。
+    if (!m_currentKey.isEmpty() && m_coordinator && !m_coordinator->finals().isEmpty()) {
+        const QString key = m_currentKey;
+        const auto finals = m_coordinator->finals();
+        const int ff = m_player ? m_player->audioTrackFfIndex(m_player->selectedAudioAid()) : -1;
+        QtConcurrent::run([key, ff, finals] {
+            rcp::storage::TranscriptRepository::saveSession(key, ff,
+                QStringLiteral("auto"), QStringLiteral("balanced"), finals);
+        });
+    }
     // 播完清除记忆位置：否则下次打开自动 seek 到片尾 → 立即 EOF → 黑屏死循环。
     m_settings.remove(QStringLiteral("position/") + m_titleFile->text());
     if (m_settings.value(QStringLiteral("playback/folderContinue"), true).toBool()

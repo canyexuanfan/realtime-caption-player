@@ -21,7 +21,9 @@ Result<QString> MediaIdentityUtil::fingerprint(const QString& path, qint64 size,
     QCryptographicHash hash(QCryptographicHash::Sha256);
     hash.addData(reinterpret_cast<const char*>(head.constData()), head.size());
     hash.addData(QByteArray::number(size));
-    hash.addData(QByteArray::number(mtimeMs));
+    // D1 修复（审查 §3）：mtime 不再参与指纹——touch 只改时间戳不改内容，
+    // 缓存键不应漂移（mtimeMs 仅作展示/记录字段保留）。
+    Q_UNUSED(mtimeMs);
     return Result<QString>::ok(QString::fromLatin1(hash.result().toHex()));
 }
 

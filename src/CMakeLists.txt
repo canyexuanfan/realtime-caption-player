@@ -28,6 +28,14 @@ set(RCP_SETTINGS_SOURCES
 
 set(RCP_STORAGE_SOURCES
     storage/MediaIdentity.cpp
+    storage/Database.cpp
+    storage/MigrationRunner.cpp
+    storage/HistoryRepository.cpp
+    storage/TranscriptRepository.cpp
+    storage/Database.h
+    storage/MigrationRunner.h
+    storage/HistoryRepository.h
+    storage/TranscriptRepository.h
 )
 
 set(RCP_WORKER_SOURCES
@@ -54,6 +62,7 @@ add_library(rcp_core STATIC
     captions/CaptionTypes.h
     settings/Settings.h
     worker/BoundedQueue.h
+    ${CMAKE_SOURCE_DIR}/resources/rcp.qrc   # 迁移 SQL 等内嵌资源（全部消费方可用）
 )
 
 target_include_directories(rcp_core PUBLIC
@@ -63,6 +72,7 @@ target_include_directories(rcp_core PUBLIC
 target_link_libraries(rcp_core PUBLIC
     Qt6::Core
     Qt6::Gui
+    Qt6::Sql
 )
 
 # QtTest is only needed by the test target, not the library itself.

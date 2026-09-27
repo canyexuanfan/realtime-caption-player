@@ -1,5 +1,7 @@
 #include "settings/SettingsService.h"
 
+#include "settings/SettingsMigration.h"
+
 #include <QFile>
 #include <QSaveFile>
 #include <QJsonDocument>
@@ -31,7 +33,10 @@ Result<Settings> SettingsService::load(const QString& path) {
             QStringLiteral("SETTINGS-PARSE-FAILED"),
             QStringLiteral("设置文件格式损坏"), QStringLiteral("root not object")));
 
-    return parseSettings(doc.object());
+    // D3：旧版本设置对象先迁移到当前 schema 再解析（审查 §3：load 从不调用迁移）。
+    auto migrated = SettingsMigration::migrate(doc.object());
+    if (migrated.isError()) return Result<Settings>::fail(migrated.error());
+    return parseSettings(migrated.value());
 }
 
 Result<Settings> SettingsService::loadStrict(const QString& path) {

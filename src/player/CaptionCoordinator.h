@@ -46,6 +46,10 @@ public:
     void setEnabled(bool on);               // 字幕总开关：仅控显示层，不停止识别
     void refresh();                         // 样式/开关变化后强制重发 displayChanged
 
+    // D1 字幕缓存：把数据库预载的终稿并入时间线（与 worker 重识别结果就近去重，
+    // 同句替换不叠加——"重看秒出"）。
+    void adoptCachedFinals(const QVector<rcp::CaptionSegment>& segs);
+
     QVector<rcp::CaptionSegment> finals() const { return m_finals; }
     State state() const { return m_state; }
     QString lastError() const { return m_lastError; }
@@ -63,6 +67,7 @@ private:
     void bumpGeneration() { ++m_generation; }
     void setState(State s, const QString& msg = {});
     void recompute();
+    void insertFinal(const rcp::CaptionSegment& seg);
     void handleSegment(const rcp::CaptionSegment& seg, bool isPartial);
 
     WorkerSupervisor* m_supervisor = nullptr;

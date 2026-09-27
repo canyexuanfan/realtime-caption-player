@@ -208,4 +208,9 @@ private:
     int m_demoSegIdx = -1;           // 转写面板当前高亮段
     QTimer* m_demoTimer = nullptr;
     QHash<QString, qint64> m_demoDurations;
+
+    // ---- D1 持久化 ----
+    QHash<QString, QString> m_mediaKeyCache;  // 文件名 -> 缓存键（后台解析结果）
+    QString m_currentKey;                     // 当前媒体缓存键（空=未解析）
+    bool m_resumeApplied = false;             // 续播每次打开只应用一次
 };

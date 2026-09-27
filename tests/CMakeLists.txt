@@ -22,6 +22,7 @@ set(RCP_UNIT_TESTS
     test_media_identity
     test_srt_exporter
     test_default_settings
+    test_sql_persistence
 )
 
 foreach(t ${RCP_UNIT_TESTS})
