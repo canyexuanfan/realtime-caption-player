@@ -57,6 +57,29 @@
       "inherits": "windows-msvc-base",
       "displayName": "Windows MSVC CI",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "windows-ninja-base",
+      "hidden": true,
+      "description": "Ninja generator 基础预设（VS generator 在部分沙箱 project() 阶段崩溃时的替代；需先具备 MSVC 环境，推荐用 tools/build-release.sh 驱动）",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTS": "ON",
+        "BUILD_PLAYER": "ON",
+        "BUILD_WORKER": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "windows-ninja-release",
+      "inherits": "windows-ninja-base",
+      "displayName": "Windows Ninja Release（player+worker+tests）"
     }
   ],
   "buildPresets": [
@@ -83,6 +106,11 @@
       "configurePreset": "windows-msvc-ci",
       "configuration": "Release",
       "jobs": 0
+    },
+    {
+      "name": "windows-ninja-release",
+      "configurePreset": "windows-ninja-release",
+      "jobs": 0
     }
   ],
   "testPresets": [
@@ -97,6 +125,12 @@
       "name": "windows-msvc-release",
       "configurePreset": "windows-msvc-release",
       "configuration": "Release",
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error", "stopOnFailure": false }
+    },
+    {
+      "name": "windows-ninja-release",
+      "configurePreset": "windows-ninja-release",
       "output": { "outputOnFailure": true },
       "execution": { "noTestsAction": "error", "stopOnFailure": false }
     }

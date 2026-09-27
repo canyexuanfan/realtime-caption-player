@@ -24,5 +24,8 @@ set_target_properties(caption_worker PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
-# 沙箱链接限制：禁用 manifest 嵌入(/MANIFEST:NO)，避免 cvtres 在受限 TEMP 下失败。
-target_link_options(caption_worker PRIVATE "/MANIFEST:NO")
+# manifest 嵌入默认开启；沙箱受限 TEMP 下 cvtres 失败时加 -DRCP_SANDBOX_NO_MANIFEST=ON。
+option(RCP_SANDBOX_NO_MANIFEST "沙箱链接 workaround：禁用 manifest 嵌入" OFF)
+if(RCP_SANDBOX_NO_MANIFEST)
+    target_link_options(caption_worker PRIVATE "/MANIFEST:NO")
+endif()

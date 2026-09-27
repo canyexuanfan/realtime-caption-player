@@ -100,14 +100,19 @@ function(rcp_copy_native_runtime)
     _rcp_copy_dlls("${_d}" "${RCP_DEST}")
   endforeach()
 
-  # 2) ASR 模型目录(models/)
+  # 2) ASR 模型目录(models/) —— 白名单制：仅打包产品实际使用的模型，
+  #    防止 .tools/models 里已弃用模型(paraformer)与测试文件混进安装包。
   set(_models "${RCP_DEPS_ROOT}/models")
-  if(EXISTS "${_models}")
-    message(STATUS "RcpBundle: copy models from ${_models}")
-    _rcp_copy_tree("${_models}" "${RCP_DEST}/models")
-  else()
-    message(WARNING "RcpBundle: models dir not found at ${_models}")
-  endif()
+  set(RCP_MODEL_BUNDLES zipformer-ctc silero sensevoice
+      CACHE STRING "ASR 模型白名单（.tools/models 下的子目录名）")
+  foreach(_m ${RCP_MODEL_BUNDLES})
+    if(EXISTS "${_models}/${_m}")
+      message(STATUS "RcpBundle: copy model bundle ${_m}")
+      _rcp_copy_tree("${_models}/${_m}" "${RCP_DEST}/models/${_m}")
+    else()
+      message(WARNING "RcpBundle: model bundle not found: ${_models}/${_m}")
+    endif()
+  endforeach()
 
   message(STATUS "RcpBundle: self-contained runtime ready at ${RCP_DEST}")
 endfunction()
