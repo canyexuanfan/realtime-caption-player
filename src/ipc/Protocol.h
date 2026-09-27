@@ -11,6 +11,7 @@ constexpr quint8 kProtocolVersion = 1;
 
 /// Commands: main process -> worker
 enum class CommandType {
+    Unknown, ///< 未识别的命令名（解析回落值；禁止当 Hello 处理）
     Hello,
     LoadModelBundle,
     OpenMedia,
@@ -29,6 +30,8 @@ enum class CommandType {
 
 /// Events: worker -> main process
 enum class EventType {
+    Unknown, ///< 未识别的事件名（解析回落值；禁止当 Ready 处理）
+    Ack,     ///< 命令回执：payload {"for":<命令 id>,"command":<wire 名>,"ok":bool}
     Ready,
     ModelProgress,
     MediaOpened,

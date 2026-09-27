@@ -51,7 +51,8 @@ private:
     void sendCommand(rcp::ipc::CommandType t, const QJsonObject& payload);
     void readFrames();
     void handleEvent(const rcp::ipc::Envelope& env);
-    rcp::CaptionSegment buildSegment(const QJsonObject& p, bool isPartial);
+    bool isStaleEvent(const rcp::ipc::Envelope& env) const;
+    rcp::CaptionSegment buildSegment(const rcp::ipc::Envelope& env, bool isPartial);
 
     QProcess* m_proc = nullptr;
     QLocalSocket* m_sock = nullptr;

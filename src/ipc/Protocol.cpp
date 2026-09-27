@@ -27,7 +27,7 @@ CommandType commandTypeFromName(const QString& name) {
     };
     auto it = map.find(name);
     if (it != map.end()) return it.value();
-    return CommandType::Hello; // first enum value = invalid sentinel
+    return CommandType::Unknown; // 未识别命令必须显式报错，禁止回落为 Hello
 }
 
 QString eventTypeName(EventType e) {
@@ -37,6 +37,7 @@ QString eventTypeName(EventType e) {
 EventType eventTypeFromName(const QString& name) {
     static const QHash<QString, EventType> map = {
         {QStringLiteral("event.ready"),               EventType::Ready},
+        {QStringLiteral("event.ack"),                 EventType::Ack},
         {QStringLiteral("event.model_progress"),      EventType::ModelProgress},
         {QStringLiteral("event.media_opened"),        EventType::MediaOpened},
         {QStringLiteral("event.caption_partial"),     EventType::CaptionPartial},
@@ -50,11 +51,12 @@ EventType eventTypeFromName(const QString& name) {
     };
     auto it = map.find(name);
     if (it != map.end()) return it.value();
-    return EventType::Ready; // first enum value = invalid sentinel
+    return EventType::Unknown; // 未识别事件必须显式忽略/报错，禁止回落为 Ready
 }
 
 QString wireTypeForCommand(CommandType t) {
     switch (t) {
+    case CommandType::Unknown:          return QStringLiteral("command.unknown");
     case CommandType::Hello:            return QStringLiteral("command.hello");
     case CommandType::LoadModelBundle:  return QStringLiteral("command.load_model_bundle");
     case CommandType::OpenMedia:        return QStringLiteral("command.open_media");
@@ -75,6 +77,8 @@ QString wireTypeForCommand(CommandType t) {
 
 QString wireTypeForEvent(EventType e) {
     switch (e) {
+    case EventType::Unknown:           return QStringLiteral("event.unknown");
+    case EventType::Ack:               return QStringLiteral("event.ack");
     case EventType::Ready:             return QStringLiteral("event.ready");
     case EventType::ModelProgress:     return QStringLiteral("event.model_progress");
     case EventType::MediaOpened:       return QStringLiteral("event.media_opened");

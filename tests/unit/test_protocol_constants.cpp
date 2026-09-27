@@ -29,9 +29,16 @@ void TestProtocolConstants::eventWireNames() {
 void TestProtocolConstants::roundTripNames() {
     QCOMPARE(commandTypeFromName(wireTypeForCommand(CommandType::SetSpeed)), CommandType::SetSpeed);
     QCOMPARE(eventTypeFromName(wireTypeForEvent(EventType::Error)), EventType::Error);
-    // Unknown names resolve to the first enum value (invalid sentinel).
-    QCOMPARE(commandTypeFromName(QStringLiteral("command.unknown")), CommandType::Hello);
-    QCOMPARE(eventTypeFromName(QStringLiteral("")), EventType::Ready);
+    // Unknown names resolve to the explicit Unknown sentinel (B1: 禁止回落
+    // Hello/Ready——未知命令必须报错，未知事件必须忽略，见 ADR 审查阶段 B1)。
+    QCOMPARE(commandTypeFromName(QStringLiteral("command.does_not_exist")), CommandType::Unknown);
+    QCOMPARE(eventTypeFromName(QStringLiteral("event.does_not_exist")), EventType::Unknown);
+    QCOMPARE(eventTypeFromName(QStringLiteral("")), EventType::Unknown);
+    // Ack 事件与 Unknown 哨兵的 wire 名。
+    QCOMPARE(eventTypeFromName(QStringLiteral("event.ack")), EventType::Ack);
+    QCOMPARE(wireTypeForEvent(EventType::Ack), QStringLiteral("event.ack"));
+    QCOMPARE(wireTypeForCommand(CommandType::Unknown), QStringLiteral("command.unknown"));
+    QCOMPARE(wireTypeForEvent(EventType::Unknown), QStringLiteral("event.unknown"));
 }
 
 void TestProtocolConstants::envelopeValid() {

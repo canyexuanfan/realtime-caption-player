@@ -131,13 +131,23 @@ void WorkerSupervisor::handleEvent(const rcp::ipc::Envelope& env) {
     case rcp::ipc::EventType::MediaOpened:
         break;
     case rcp::ipc::EventType::CaptionPartial:
-        emit captionSegment(buildSegment(p, true), true);
+        if (isStaleEvent(env)) break;
+        emit captionSegment(buildSegment(env, true), true);
         break;
     case rcp::ipc::EventType::CaptionFinal:
-        emit captionSegment(buildSegment(p, false), false);
+        if (isStaleEvent(env)) break;
+        emit captionSegment(buildSegment(env, false), false);
         break;
     case rcp::ipc::EventType::Error:
         emit workerError(p.value(QStringLiteral("message")).toString());
+        break;
+    case rcp::ipc::EventType::Ack:
+        // 命令回执：失败回执升级为 workerError，成功回执仅忽略。
+        if (!p.value(QStringLiteral("ok")).toBool(true)) {
+            emit workerError(QStringLiteral("worker 命令回执失败：%1：%2")
+                                 .arg(p.value(QStringLiteral("command")).toString(),
+                                      p.value(QStringLiteral("message")).toString()));
+        }
         break;
     case rcp::ipc::EventType::Heartbeat:
     default:
@@ -145,14 +155,22 @@ void WorkerSupervisor::handleEvent(const rcp::ipc::Envelope& env) {
     }
 }
 
-rcp::CaptionSegment WorkerSupervisor::buildSegment(const QJsonObject& p, bool isPartial) {
+bool WorkerSupervisor::isStaleEvent(const rcp::ipc::Envelope& env) const {
+    // generation 以主进程为权威：事件代早于当前代 = 旧会话残留，直接丢弃，
+    // 防止 seek/换轨后旧媒体字幕混入新媒体（tech plan 7.4）。
+    return env.generation != 0 && env.generation < m_generation;
+}
+
+rcp::CaptionSegment WorkerSupervisor::buildSegment(const rcp::ipc::Envelope& env, bool isPartial) {
+    const QJsonObject& p = env.payload;
     rcp::CaptionSegment seg;
     seg.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     seg.text = p.value(QStringLiteral("text")).toString();
     seg.startMs = p.value(QStringLiteral("start_ms")).toInteger();
     seg.endMs = p.value(QStringLiteral("end_ms")).toInteger();
     seg.kind = isPartial ? rcp::CaptionKind::Partial : rcp::CaptionKind::Final;
-    seg.generation = m_generation;
+    // 事件自带 generation（worker 采用主进程下发的代），不再改写。
+    seg.generation = env.generation != 0 ? env.generation : m_generation;
     return seg;
 }
 
