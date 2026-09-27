@@ -176,6 +176,32 @@ static const mpv_node* mpvNodeGet(const mpv_node& list, const char* key) {
 }
 
 QVector<MpvAudioTrack> MpvPlayer::audioTracks() const {
+    return tracksOfType("audio");
+}
+
+QVector<MpvAudioTrack> MpvPlayer::subtitleTracks() const {
+    return tracksOfType("subtitle");
+}
+
+bool MpvPlayer::selectSubtitleTrack(int sid) {
+    if (!m_handle) return false;
+    if (sid < 0) {
+        const char* args[] = {"set", "sid", "no", nullptr};
+        mpv_command(m_handle, args);
+        return true;
+    }
+    int64_t id = sid;
+    return mpv_set_property(m_handle, "sid", MPV_FORMAT_INT64, &id) >= 0;
+}
+
+int MpvPlayer::selectedSubtitleSid() const {
+    if (!m_handle) return -1;
+    int64_t id = -1;
+    if (mpv_get_property(m_handle, "sid", MPV_FORMAT_INT64, &id) < 0) return -1;
+    return static_cast<int>(id);
+}
+
+QVector<MpvAudioTrack> MpvPlayer::tracksOfType(const char* type) const {
     QVector<MpvAudioTrack> out;
     if (!m_handle) return out;
     mpv_node node;
@@ -183,16 +209,16 @@ QVector<MpvAudioTrack> MpvPlayer::audioTracks() const {
     if (node.format == MPV_FORMAT_NODE_ARRAY) {
         for (int i = 0; i < node.u.list->num; ++i) {
             const mpv_node& e = node.u.list->values[i];
-            const mpv_node* type = mpvNodeGet(e, "type");
-            if (!type || type->format != MPV_FORMAT_STRING ||
-                std::strcmp(type->u.string, "audio") != 0) continue;
-            MpvAudioTrack t;
-            if (const mpv_node* v = mpvNodeGet(e, "id")) t.id = mpvNodeI64(*v, 0);
-            if (const mpv_node* v = mpvNodeGet(e, "demuxer-id")) t.ffIndex = mpvNodeI64(*v, -1);
-            if (const mpv_node* v = mpvNodeGet(e, "lang")) t.lang = mpvNodeStr(*v);
-            if (const mpv_node* v = mpvNodeGet(e, "title")) t.title = mpvNodeStr(*v);
-            if (const mpv_node* v = mpvNodeGet(e, "selected")) t.selected = mpvNodeI64(*v, 0) != 0;
-            out.append(t);
+            const mpv_node* t = mpvNodeGet(e, "type");
+            if (!t || t->format != MPV_FORMAT_STRING ||
+                std::strcmp(t->u.string, type) != 0) continue;
+            MpvAudioTrack info;
+            if (const mpv_node* v = mpvNodeGet(e, "id")) info.id = mpvNodeI64(*v, 0);
+            if (const mpv_node* v = mpvNodeGet(e, "demuxer-id")) info.ffIndex = mpvNodeI64(*v, -1);
+            if (const mpv_node* v = mpvNodeGet(e, "lang")) info.lang = mpvNodeStr(*v);
+            if (const mpv_node* v = mpvNodeGet(e, "title")) info.title = mpvNodeStr(*v);
+            if (const mpv_node* v = mpvNodeGet(e, "selected")) info.selected = mpvNodeI64(*v, 0) != 0;
+            out.append(info);
         }
     }
     mpv_free_node_contents(&node);

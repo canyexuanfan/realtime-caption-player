@@ -36,7 +36,9 @@
 #include <QScrollArea>
 #include <QSettings>
 #include <memory>
+#include <QMenu>
 #include <QShortcut>
+#include <qt_windows.h>
 #include <QSlider>
 #include <QStackedWidget>
 #include <QButtonGroup>
@@ -183,6 +185,18 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         m_playBtn->setIcon(icon(paused ? QStringLiteral("play") : QStringLiteral("pause"),
                                 QColor("#ffffff"), 22));
         m_coordinator->setPaused(paused);   // B3：暂停同步给 worker（解码调度休眠）
+        // C3：暂停恢复休眠、播放抑制休眠/息屏。
+        SetThreadExecutionState(paused ? ES_CONTINUOUS
+                                       : (ES_CONTINUOUS | ES_DISPLAY_REQUIRED));
+    });
+    connect(m_player, &MpvPlayer::mediaError, this, [this](const QString& msg) {
+        // 打开/读取失败（文件不存在、挂载盘离线等）：显式提示 + 错误引导层。
+        appendTranscriptFinal(-1, tr("[打开失败] %1").arg(msg));
+        setAsrStatus(tr("打开失败"), QStringLiteral("#ff6b79"));
+        if (m_dropHint) {
+            m_dropHint->setText(tr("无法打开媒体：%1\n拖放其他文件或按 Ctrl+O 重新打开").arg(msg));
+            m_dropHint->show();
+        }
     });
     connect(m_player, &MpvPlayer::seeked, this, [this](double sec) {
         // B3：seek → 协调器换代，旧代字幕事件两端丢弃，worker 重锚解码。
@@ -293,6 +307,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     sc("S", &MainWindow::onToggleSettings);
     sc("R", &MainWindow::onToggleCaption);
     sc("Ctrl+O", &MainWindow::onOpen);
+    sc("Esc", [this] { if (isFullScreen()) onToggleFullscreen(); });   // C3：Esc 退出全屏
+    // C3：逐帧步进（暂停态下按帧前进/后退）。
+    sc(",", [this] { if (m_player->handle()) { const char* a[] = {"frame-back-step", nullptr}; mpv_command(m_player->handle(), a); } });
+    sc(".", [this] { if (m_player->handle()) { const char* a[] = {"frame-step", nullptr}; mpv_command(m_player->handle(), a); } });
 
     m_volume->setValue(m_settings.value(QStringLiteral("playback/volume"), 100).toInt());
     const double sp = m_settings.value(QStringLiteral("playback/speed"), 1.0).toDouble();
@@ -329,6 +347,20 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
             m_dropHint->show();
         }
     }
+
+    // C3：全屏 2.5s 无鼠标活动自动隐藏控制界面。
+    m_fsHideTimer = new QTimer(this);
+    m_fsHideTimer->setSingleShot(true);
+    m_fsHideTimer->setInterval(2500);
+    connect(m_fsHideTimer, &QTimer::timeout, this, [this] {
+        if (!isFullScreen()) return;
+        if (m_leftRail) m_leftRail->setVisible(false);
+        if (m_deck) m_deck->setVisible(false);
+        if (m_settingsPanel) {
+            m_settingsVisibleBeforeFs = m_settingsPanel->isVisible();
+            m_settingsPanel->setVisible(false);
+        }
+    });
 }
 
 void MainWindow::resizeEvent(QResizeEvent* event) {
@@ -887,9 +919,22 @@ QWidget* MainWindow::buildControlDeck(QWidget* parent) {
         "QPushButton:hover{background:rgba(255,255,255,0.07);}"));
 
     m_btnSettings = cbtn(QStringLiteral("settings"), tr("设置（S）"));
-    auto* volIcon = new QLabel(deck);
-    volIcon->setStyleSheet(QStringLiteral("background:transparent;"));
-    volIcon->setPixmap(icon(QStringLiteral("volume"), QColor("#e6e8ee"), 18).pixmap(18, 18));
+    auto* volIcon = new QPushButton(deck);
+    volIcon->setCheckable(true);
+    volIcon->setFixedSize(24, 24);
+    volIcon->setCursor(Qt::PointingHandCursor);
+    volIcon->setFlat(true);
+    volIcon->setIcon(icon(QStringLiteral("volume"), QColor("#e6e8ee"), 18));
+    volIcon->setIconSize(QSize(18, 18));
+    volIcon->setAccessibleName(tr("静音"));
+    volIcon->setStyleSheet(QStringLiteral("QPushButton{background:transparent;border:none;}"
+                                          "QPushButton:hover{background:rgba(121,105,255,0.13);border-radius:6px;}"));
+    // C3：静音切换（音量图标变按钮）。
+    connect(volIcon, &QPushButton::toggled, this, [this, volIcon](bool muted) {
+        m_player->setMuted(muted);
+        volIcon->setIcon(icon(muted ? QStringLiteral("minus") : QStringLiteral("volume"),
+                              QColor(muted ? "#7868ff" : "#e6e8ee"), 18));
+    });
     m_volume = new QSlider(Qt::Horizontal, deck);
     m_volume->setRange(0, 100);
     m_volume->setValue(100);
@@ -946,7 +991,53 @@ QWidget* MainWindow::buildControlDeck(QWidget* parent) {
     connect(btnLib, &QPushButton::clicked, this, &MainWindow::onOpenFolder);
     connect(m_btnCam, &QPushButton::clicked, this, &MainWindow::onScreenshot);
     connect(m_btnAb, &QPushButton::clicked, this, &MainWindow::onAbLoop);
-    connect(m_btnTrack, &QPushButton::clicked, this, &MainWindow::onCycleSub);
+    connect(m_btnTrack, &QPushButton::clicked, this, [this] {
+        // C3：音轨/字幕轨动态菜单（track-list 实时构建，替代盲目 cycle sub）。
+        if (!m_player || !m_player->handle()) return;
+        QMenu menu(this);
+        menu.setStyleSheet(QStringLiteral(
+            "QMenu{background:#191e25;border:1px solid rgba(255,255,255,0.16);border-radius:8px;color:#d7dae0;font-size:12px;}"
+            "QMenu::item{padding:6px 22px;} QMenu::item:selected{background:rgba(121,105,255,0.25);}"
+            "QMenu::separator{height:1px;background:rgba(255,255,255,0.1);}"));
+        const auto audios = m_player->audioTracks();
+        if (!audios.isEmpty()) {
+            auto* am = menu.addMenu(tr("音轨"));
+            for (const auto& t : audios) {
+                QString label = tr("音轨 %1").arg(t.id);
+                if (!t.lang.isEmpty()) label += QStringLiteral(" [%1]").arg(t.lang);
+                if (!t.title.isEmpty()) label += QStringLiteral(" %1").arg(t.title);
+                auto* act = am->addAction(label);
+                act->setCheckable(true);
+                act->setChecked(t.selected);
+                connect(act, &QAction::triggered, this, [this, id = t.id] {
+                    m_player->setAudioTrack(id);
+                    m_coordinator->setAudioTrack(m_player->audioTrackFfIndex(id));
+                });
+            }
+        }
+        auto* sm = menu.addMenu(tr("字幕轨"));
+        auto* offAct = sm->addAction(tr("关闭字幕"));
+        offAct->setCheckable(true);
+        offAct->setChecked(m_player->selectedSubtitleSid() < 0);
+        connect(offAct, &QAction::triggered, this, [this] { m_player->selectSubtitleTrack(-1); });
+        for (const auto& t : m_player->subtitleTracks()) {
+            QString label = tr("字幕 %1").arg(t.id);
+            if (!t.lang.isEmpty()) label += QStringLiteral(" [%1]").arg(t.lang);
+            if (!t.title.isEmpty()) label += QStringLiteral(" %1").arg(t.title);
+            auto* act = sm->addAction(label);
+            act->setCheckable(true);
+            act->setChecked(t.selected);
+            connect(act, &QAction::triggered, this, [this, id = t.id] { m_player->selectSubtitleTrack(id); });
+        }
+        sm->addSeparator();
+        sm->addAction(tr("加载外挂字幕…"), this, [this] {
+            const QString p = QFileDialog::getOpenFileName(this, tr("加载字幕"), QString(),
+                tr("字幕文件 (*.srt *.ass *.ssa *.vtt *.sub);;所有文件 (*.*)"));
+            if (!p.isEmpty()) m_player->loadSubtitle(p);
+        });
+        if (menu.actions().isEmpty()) return;
+        menu.exec(m_btnTrack->mapToGlobal(QPoint(0, -menu.sizeHint().height() - 8)));
+    });
     connect(m_btnB10, &QPushButton::clicked, this, [this] { m_player->seek(qBound(0.0, m_player->timePosition() - 10.0, m_duration), false); });
     connect(m_btnF10, &QPushButton::clicked, this, [this] { m_player->seek(qBound(0.0, m_player->timePosition() + 10.0, m_duration), false); });
     connect(m_btnPrev, &QPushButton::clicked, this, [this] { onPrevNext(-1); });
@@ -983,9 +1074,26 @@ QWidget* MainWindow::buildControlDeck(QWidget* parent) {
             grid->addWidget(b, i / 4, i % 4);
         }
         pv->addLayout(grid);
+        // C3：0.1 步进微调（PRD 倍速 0.1 步进要求）。
+        auto* fine = new QWidget(pop);
+        auto* fh = new QHBoxLayout(fine);
+        fh->setContentsMargins(0, 0, 0, 0);
+        const QString fbQss = QStringLiteral(
+            "QPushButton{background:#20252d;border:1px solid rgba(255,255,255,0.105);border-radius:6px;color:#a7adb8;min-height:30px;}"
+            "QPushButton:hover{border-color:rgba(121,105,255,0.55);color:#f4f6fb;}");
+        auto* minus = new QPushButton(QStringLiteral("− 0.1x"), fine);
+        auto* plus = new QPushButton(QStringLiteral("+ 0.1x"), fine);
+        minus->setStyleSheet(fbQss);
+        plus->setStyleSheet(fbQss);
+        connect(minus, &QPushButton::clicked, pop, [this, pop] { onSpeed(qMax(0.1, m_player->speed() - 0.1)); pop->close(); });
+        connect(plus, &QPushButton::clicked, pop, [this, pop] { onSpeed(m_player->speed() + 0.1); pop->close(); });
+        fh->addWidget(minus);
+        fh->addWidget(plus);
+        pv->addWidget(fine);
         pop->move(m_btnSpeed->mapToGlobal(QPoint(0, -150)));
         pop->show();
     });
+    m_deck = deck;   // C3：全屏自动隐藏需要容器指针
     return deck;
 }
 
@@ -1150,6 +1258,47 @@ QWidget* MainWindow::panePlayback() {
         }
     });
     v->addWidget(settingRow(tr("保留音调"), pitch, w));
+
+    // C3 画面调节：mpv 属性直控（亮度/对比度/饱和度/旋转/宽高比）。
+    v->addWidget(sectionTitle(tr("画面调节"), w));
+    auto mpvSlider = [this, w](const QString& label, const char* prop) -> QWidget* {
+        auto* s = new QSlider(Qt::Horizontal, w);
+        s->setRange(-100, 100);
+        s->setValue(0);
+        s->setAccessibleName(label);
+        connect(s, &QSlider::valueChanged, this, [this, prop](int v) {
+            if (m_player && m_player->handle()) {
+                double d = v;
+                mpv_set_property(m_player->handle(), prop, MPV_FORMAT_DOUBLE, &d);
+            }
+        });
+        return settingRow(label, s, w);
+    };
+    v->addWidget(mpvSlider(tr("亮度"), "brightness"));
+    v->addWidget(mpvSlider(tr("对比度"), "contrast"));
+    v->addWidget(mpvSlider(tr("饱和度"), "saturation"));
+    auto* rot = new QComboBox(w);
+    rot->setProperty("class", "fieldSelect");
+    rot->setFixedWidth(135);
+    rot->addItems({tr("0°"), tr("90°"), tr("180°"), tr("270°")});
+    connect(rot, &QComboBox::currentIndexChanged, this, [this](int i) {
+        if (m_player && m_player->handle()) {
+            int64_t d = i * 90;
+            mpv_set_property(m_player->handle(), "video-rotate", MPV_FORMAT_INT64, &d);
+        }
+    });
+    v->addWidget(settingRow(tr("旋转"), rot, w));
+    auto* ar = new QComboBox(w);
+    ar->setProperty("class", "fieldSelect");
+    ar->setFixedWidth(135);
+    ar->addItems({tr("自动"), QStringLiteral("16:9"), QStringLiteral("4:3"), QStringLiteral("2.35:1")});
+    connect(ar, &QComboBox::currentIndexChanged, this, [this, ar](int i) {
+        if (m_player && m_player->handle()) {
+            const QString v = (i == 0) ? QStringLiteral("no") : ar->itemText(i);
+            mpv_set_property_string(m_player->handle(), "video-aspect-override", v.toUtf8().constData());
+        }
+    });
+    v->addWidget(settingRow(tr("宽高比"), ar, w));
     auto* folderCont = new Switch(w);
     folderCont->setChecked(m_settings.value(QStringLiteral("playback/folderContinue"), true).toBool());
     connect(folderCont, &Switch::toggled, this, [this](bool on) {
@@ -1914,10 +2063,16 @@ void MainWindow::onVolumeChanged(int value) {
 }
 
 void MainWindow::onScreenshot() {
-    if (m_player->handle()) {
-        const char* args[] = {"screenshot", nullptr};
-        mpv_command(m_player->handle(), args);
-    }
+    // C3：带实时字幕截图——Qt overlay 不会进入 mpv 原生截图，
+    // 改为对视频区整体 grab（含 CaptionLabel/波形等子控件合成）。
+    QWidget* area = m_videoHost ? m_videoHost : (m_video ? static_cast<QWidget*>(m_video) : nullptr);
+    if (!area) return;
+    const QPixmap shot = area->grab();
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+    const QString path = QDir(dir).filePath(QStringLiteral("RCP-%1.png")
+                                                .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"))));
+    if (shot.save(path)) appendTranscriptFinal(-1, tr("[截图] %1").arg(path));
+    else appendTranscriptFinal(-1, tr("[截图失败] %1").arg(path));
 }
 
 void MainWindow::onAbLoop() {
@@ -1936,13 +2091,6 @@ void MainWindow::onAbLoop() {
         m_btnAb->setText(QStringLiteral("AB"));
     }
     m_abClicks = (m_abClicks + 1) % 3;
-}
-
-void MainWindow::onCycleSub() {
-    if (m_player->handle()) {
-        const char* args[] = {"cycle", "sub", nullptr};
-        mpv_command(m_player->handle(), args);
-    }
 }
 
 // ================= 进度/时长 =================
@@ -1997,11 +2145,15 @@ void MainWindow::onMediaLoaded() {
         int flag = m_settings.value(QStringLiteral("playback/pitchCorrection"), true).toBool() ? 1 : 0;
         mpv_set_property(m_player->handle(), "audio-pitch-correction", MPV_FORMAT_FLAG, &flag);
     }
+    // C3：播放中抑制系统休眠/息屏；成功打开后清除错误引导层。
+    SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED);
+    if (m_dropHint) m_dropHint->hide();
 }
 
 void MainWindow::onMediaEnded() {
     m_playBtn->setIcon(icon(QStringLiteral("play"), QColor("#ffffff"), 22));
     m_coordinator->stop();
+    SetThreadExecutionState(ES_CONTINUOUS);   // C3：停止播放恢复休眠
     // 播完清除记忆位置：否则下次打开自动 seek 到片尾 → 立即 EOF → 黑屏死循环。
     m_settings.remove(QStringLiteral("position/") + m_titleFile->text());
     if (m_settings.value(QStringLiteral("playback/folderContinue"), true).toBool()
@@ -2065,7 +2217,24 @@ void MainWindow::onToggleSettings() {
     m_settingsPanel->setVisible(!m_settingsPanel->isVisible());
 }
 
-void MainWindow::onToggleFullscreen() { isFullScreen() ? showNormal() : showFullScreen(); }
+void MainWindow::onToggleFullscreen() {
+    if (isFullScreen()) {
+        showNormal();
+        showFullscreenControls();   // 恢复非全屏 UI
+    } else {
+        showFullScreen();
+        showFullscreenControls();
+        if (m_fsHideTimer) m_fsHideTimer->start();
+    }
+}
+
+// C3 全屏自动隐藏：2.5s 无鼠标活动隐藏左栏/控制条/设置面板。
+void MainWindow::showFullscreenControls() {
+    if (m_fsHideTimer && isFullScreen()) m_fsHideTimer->start();
+    if (m_leftRail) m_leftRail->setVisible(true);
+    if (m_deck) m_deck->setVisible(true);
+    if (m_settingsPanel) m_settingsPanel->setVisible(m_settingsVisibleBeforeFs);
+}
 
 // ================= 字幕叠加/样式 =================
 void MainWindow::updateOverlay() {
@@ -2185,6 +2354,12 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
         }
     } else if (obj == m_videoHost && event->type() == QEvent::Resize) {
         repositionOverlays();
+    } else if (obj == m_videoHost && event->type() == QEvent::MouseButtonDblClick) {
+        auto* me = static_cast<QMouseEvent*>(event);
+        if (me->button() == Qt::LeftButton) onToggleFullscreen();   // C3：双击切换全屏
+    } else if (obj == m_videoHost && event->type() == QEvent::MouseMove) {
+        // C3：全屏鼠标活动 → 显示控制条并重置自动隐藏计时。
+        if (isFullScreen()) showFullscreenControls();
     } else if (obj == m_videoHost && event->type() == QEvent::Enter) {
         if (!m_currentPath.isEmpty() && m_privacyBadge) m_privacyBadge->show();   // 悬停显示（参考稿 hover 态）
     } else if (obj == m_videoHost && event->type() == QEvent::Leave) {
@@ -2217,6 +2392,7 @@ void MainWindow::dropEvent(QDropEvent* event) {
 void MainWindow::closeEvent(QCloseEvent* event) {
     // B3：优雅关闭——停止识别会话并终止 worker 进程（B4 加 Job Object 兜底）。
     if (m_coordinator) m_coordinator->shutdown();
+    SetThreadExecutionState(ES_CONTINUOUS);   // C3：恢复休眠策略
     event->accept();
 }
 

@@ -73,10 +73,10 @@ private slots:
     void onPlaylistActivated(QListWidgetItem* item);
     void onScreenshot();
     void onAbLoop();
-    void onCycleSub();
     void onTranscriptSearch(const QString& text);
     void onCaptionDisplay(const QString& partialText, const QString& finalText);
     void onCaptionStats(int finalCount, long long coveredUntilMs);
+    void showFullscreenControls();
 
 private:
     void applyTheme();
@@ -192,6 +192,11 @@ private:
     double m_duration = 0.0;
     bool m_seeking = false;
     QPoint m_windowDrag;
+
+    // ---- C3 全屏自动隐藏 ----
+    QWidget* m_deck = nullptr;             // 控制条容器（全屏隐藏用）
+    QTimer* m_fsHideTimer = nullptr;       // 全屏 2.5s 无活动隐藏
+    bool m_settingsVisibleBeforeFs = false;
 
     // ---- 参考稿复刻：断点响应 + 示例数据模式 ----
     QWidget* m_leftRail = nullptr;

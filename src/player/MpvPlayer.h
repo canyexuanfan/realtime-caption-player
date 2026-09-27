@@ -81,8 +81,11 @@ public:
     // ---- 音轨 ----
     void setAudioTrack(int aid);       // mpv 音频轨 id（aid 属性）
     QVector<MpvAudioTrack> audioTracks() const;   // track-list 中的音频轨
+    QVector<MpvAudioTrack> subtitleTracks() const;// track-list 中的字幕轨
     int audioTrackFfIndex(int aid) const;         // aid -> ffmpeg 流索引（-1 = 未知/默认）
     int selectedAudioAid() const;                 // 当前选中音轨 aid（-1 = 无）
+    bool selectSubtitleTrack(int sid);            // 选择字幕轨（sid 属性；-1 = 关闭）
+    int selectedSubtitleSid() const;              // 当前字幕轨 sid（-1 = 关闭）
 
     // ---- 查询 ----
     double duration() const { return m_duration; }
@@ -105,6 +108,7 @@ public slots:
     void processEvents();
 
 private:
+    QVector<MpvAudioTrack> tracksOfType(const char* type) const;
     static void wakeupCallback(void* ctx);
     void handleEvent(mpv_event* event);
     void applyInitialProperties();
