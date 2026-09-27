@@ -42,7 +42,7 @@ MVP 按"把产品开发成型"的用户指令压缩推进，P8 对应能力落�
 
 ## E2E（真机，Windows 11 x64 + Intel Iris Xe + 2560x1440 显示器）
 
-1. **安装**：`msiexec /i ... INSTALLFOLDER=F:\rcp-app-test /qn`（UAC 提权）→ **exit 0**，
+1. **安装**：`msiexec /i ... INSTALLFOLDER=<安装目录> /qn`（UAC 提权）→ **exit 0**，
    文件/模型/Qt 运行时齐全。
 2. **一键运行**：安装目录 `player_app.exe e2e-test.mp4` →
    player_app + caption_worker 均从安装目录自动启动（模型目录解析修复生效）；
@@ -179,7 +179,7 @@ manifest 同步（MSI cf781e8e…、player_app 425f015e…）。提交 faadb35 �
 updateOverlay（原缺失，叠加层 partial 仅 final 时刷新）；updateOverlay 尾部
 截断（partial 1 行 / final ≤2 行，超长取尾加省略号——对齐参考稿短句视觉）；
 文字变化时 m_video->update() 整块重组消除 QOpenGLWidget 子控件脏区残影。
-用用户实际课件（G 盘 40:44 提干网课）真机快照验证：单行灰字 partial、
+用用户实际课件（40:44 网课）真机快照验证：单行灰字 partial、
 转写面板 final+partial 分行、播放≈实时。ctest 21/21。MSI 重打
 （36d94b86…），manifest 同步。提交 041d1b2。
 

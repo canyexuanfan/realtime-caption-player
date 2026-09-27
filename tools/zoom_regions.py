@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 # tools/zoom_regions.py — 高放大核对指定区域
+# 用法: python tools/zoom_regions.py [ref.png ours.png]
+#       缺省读 out/ui-snap/{ref_scaled,ours_scaled}.png（仓库相对路径，禁止硬编码本机绝对路径）
 import sys
+from pathlib import Path
 from PIL import Image
 
-REF = r"F:\workbuddy\视频播放器\out\ui-snap\ref_scaled.png"
-OURS = r"F:\workbuddy\视频播放器\out\ui-snap\ours_scaled.png"
+SNAP = Path(__file__).resolve().parents[1] / "out" / "ui-snap"
+REF = sys.argv[1] if len(sys.argv) > 1 else str(SNAP / "ref_scaled.png")
+OURS = sys.argv[2] if len(sys.argv) > 2 else str(SNAP / "ours_scaled.png")
 ref = Image.open(REF).convert("RGB")
 ours = Image.open(OURS).convert("RGB")
 
@@ -17,7 +21,7 @@ def side(ref_box, ours_box, name, zoom=2):
     sep = 12*zoom
     canvas = Image.new("RGB", (rc.width + oc.width + sep, max(rc.height, oc.height)), (40,40,48))
     canvas.paste(rc, (0,0)); canvas.paste(oc, (rc.width+sep,0))
-    out = rf"F:\workbuddy\视频播放器\out\ui-snap\zoom_{name}.png"
+    out = str(SNAP / f"zoom_{name}.png")
     canvas.save(out); print(out, canvas.size)
 
 # 标题栏右侧按钮（ref/ours 同 x 范围 820-1280）

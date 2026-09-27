@@ -46,18 +46,18 @@
 [22:01:36.509] mpv[v] Running hook: ytdl_hook/on_load
 [22:01:36.509] mpv[v] Running hook: ytdl_hook/on_load
 [22:01:36.509] mpv[v] playlist hook
-[22:01:36.509] mpv[v] Opening F:\workbuddy\rcp-e2e\e2e-test.mp4
-[22:01:36.509] mpv[v] Opening F:\workbuddy\rcp-e2e\e2e-test.mp4
-[22:01:36.509] mpv[v] Opening F:\workbuddy\rcp-e2e\e2e-test.mp4
-[22:01:36.509] mpv[v] Opening F:\workbuddy\rcp-e2e\e2e-test.mp4
+[22:01:36.509] mpv[v] Opening <e2e-dir>\e2e-test.mp4
+[22:01:36.509] mpv[v] Opening <e2e-dir>\e2e-test.mp4
+[22:01:36.509] mpv[v] Opening <e2e-dir>\e2e-test.mp4
+[22:01:36.509] mpv[v] Opening <e2e-dir>\e2e-test.mp4
 [22:01:36.509] mpv[v] Trying demuxers for level=normal.
 [22:01:36.509] mpv[v] Found 'mov,mp4,m4a,3gp,3g2,mj2' at score=100 size=2048.
 [22:01:36.509] mpv[v] stream level seek from 131072 to 17941112
 [22:01:36.509] mpv[v] Could not set AVOption http_persistent='0'
 [22:01:36.509] mpv[v] Could not set AVOption http_multiple='1'
 [22:01:36.509] mpv[v] Detected file format: mov,mp4,m4a,3gp,3g2,mj2 (libavformat)
-[22:01:36.509] mpv[v] Opening done: F:\workbuddy\rcp-e2e\e2e-test.mp4
-[22:01:36.509] mpv[v] Loading external files in F:\workbuddy\rcp-e2e\
+[22:01:36.509] mpv[v] Opening done: <e2e-dir>\e2e-test.mp4
+[22:01:36.509] mpv[v] Loading external files in <e2e-dir>\
 [22:01:36.509] mpv[v] Running hook: auto_profiles/on_preloaded
 [22:01:36.509] mpv[v] Failed sending hook command auto_profiles/on_preloaded. Removing hook.
 [22:01:36.509] mpv[v] Running hook: ytdl_hook/on_preloaded
