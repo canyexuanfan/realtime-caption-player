@@ -1265,6 +1265,12 @@ QWidget* MainWindow::paneRealtime() {
         return c;
     };
     auto* engineSel = mkSel({tr("本地（SenseVoice）"), tr("本地（Paraformer）"), tr("云端高精度")});
+    // B5 诚实接线：worker 实际为本地 Zipformer2-CTC 流式 + SenseVoice 终稿双引擎，
+    // Paraformer 引擎已移除（ADR-0004/审查）、云端未实现 → 禁用对应选项。
+    for (int di : {1, 2}) {
+        auto* model = qobject_cast<QStandardItemModel*>(engineSel->model());
+        if (model && model->item(di)) model->item(di)->setEnabled(false);
+    }
     connect(engineSel, &QComboBox::currentIndexChanged, this, [this](int i) {
         m_settings.setValue(QStringLiteral("caption/engine"), i);
     });
@@ -1275,16 +1281,27 @@ QWidget* MainWindow::paneRealtime() {
     langSel->setCurrentIndex(m_settings.value(QStringLiteral("caption/lang"), 0).toInt());
     connect(langSel, &QComboBox::currentIndexChanged, this, [this](int i) {
         m_settings.setValue(QStringLiteral("caption/lang"), i);
+        // B5：语言同步 worker（SenseVoice 语言参数；流式 partial 恒为中文模型）。
+        static const QStringList kLangs = {QStringLiteral("auto"), QStringLiteral("en"),
+                                           QStringLiteral("ja"), QStringLiteral("ko")};
+        if (m_coordinator) m_coordinator->setLanguage(kLangs.value(i, QStringLiteral("auto")));
     });
     v->addWidget(settingRow(tr("语言"), langSel, w));
-    // 参考：Lite（低配置）/ Balanced（推荐，默认选中）
+    // 参考：Lite（低配置）/ Balanced（推荐，默认选中）——真实档位（B5）。
     auto* modelSel = mkSel({tr("Lite（低配置）"), tr("Balanced（推荐）")});
     modelSel->setCurrentIndex(m_settings.value(QStringLiteral("caption/model"), 1).toInt());
     connect(modelSel, &QComboBox::currentIndexChanged, this, [this](int i) {
         m_settings.setValue(QStringLiteral("caption/model"), i);
+        if (m_coordinator) m_coordinator->setProfile(i == 0 ? QStringLiteral("lite")
+                                                            : QStringLiteral("balanced"));
     });
     v->addWidget(settingRow(tr("模型大小"), modelSel, w));
     auto* devSel = mkSel({tr("自动（CPU / GPU）"), tr("CPU"), tr("GPU")});
+    {
+        // B5 诚实接线：当前仅 CPU 推理，GPU 选项禁用（避免无实现选项）。
+        auto* model = qobject_cast<QStandardItemModel*>(devSel->model());
+        if (model && model->item(2)) model->item(2)->setEnabled(false);
+    }
     devSel->setCurrentIndex(m_settings.value(QStringLiteral("caption/device"), 0).toInt());
     connect(devSel, &QComboBox::currentIndexChanged, this, [this](int i) {
         m_settings.setValue(QStringLiteral("caption/device"), i);
@@ -1781,6 +1798,13 @@ void MainWindow::startCaptioningFor(const QString& path) {
         setAsrStatus(tr("缺少 caption_worker"), QStringLiteral("#ff6b79"));
         return;
     }
+    // B5：应用已保存的语言/档位（引擎重建前生效）。
+    static const QStringList kLangs = {QStringLiteral("auto"), QStringLiteral("en"),
+                                       QStringLiteral("ja"), QStringLiteral("ko")};
+    m_coordinator->setLanguage(kLangs.value(m_settings.value(QStringLiteral("caption/lang"), 0).toInt(),
+                                            QStringLiteral("auto")));
+    m_coordinator->setProfile(m_settings.value(QStringLiteral("caption/model"), 1).toInt() == 0
+                                  ? QStringLiteral("lite") : QStringLiteral("balanced"));
     m_coordinator->openMedia(QFileInfo(path).absoluteFilePath());
 }
 

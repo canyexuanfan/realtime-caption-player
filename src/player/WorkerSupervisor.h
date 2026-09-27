@@ -8,6 +8,7 @@
 #include <QObject>
 #include <QProcess>
 #include <QLocalSocket>
+#include <QElapsedTimer>
 #include "ipc/FrameCodec.h"
 #include "ipc/Protocol.h"
 #include "captions/CaptionTypes.h"
@@ -18,6 +19,7 @@ class WorkerSupervisor : public QObject {
     Q_OBJECT
 public:
     explicit WorkerSupervisor(QObject* parent = nullptr);
+    ~WorkerSupervisor() override;
 
     // 启动后台 caption-worker 并对 mediaPath 识别（generation 由协调器下发）。
     // workerExe : caption_worker.exe 绝对路径
@@ -47,6 +49,7 @@ signals:
     void captioningStopped();
     void workerError(const QString& message);
     void workerFinished(int exitCode, QProcess::ExitStatus status);
+    void overloadDetected(double rtf);                             // worker 过载（B5 自动降级）
 
 private slots:
     void onProcessStarted();
@@ -63,6 +66,10 @@ private:
     void handleEvent(const rcp::ipc::Envelope& env);
     bool isStaleEvent(const rcp::ipc::Envelope& env) const;
     rcp::CaptionSegment buildSegment(const rcp::ipc::Envelope& env, bool isPartial);
+    void armWatchdog();
+    void scheduleRestart();
+    void killProcess();
+    void assignJobObject();
 
     QProcess* m_proc = nullptr;
     QLocalSocket* m_sock = nullptr;
@@ -76,6 +83,15 @@ private:
     bool m_connected = false;
     int m_connectTries = 0;
     QString m_lastSocketError;
+
+    // ---- B4 生命周期 ----
+    QTimer* m_watchdog = nullptr;      // 1s 心跳失联检查
+    QElapsedTimer m_alive;             // 启动时刻基准
+    qint64 m_lastHeartbeatMs = 0;      // 最近一次 Ready/Heartbeat 时刻
+    int m_restartAttempts = 0;         // 已自动重启次数（上限 3，指数退避）
+    bool m_intentionalStop = false;    // 主动 shutdown 不触发自动重启
+    void* m_jobHandle = nullptr;       // Windows Job Object（父进程崩溃连带杀 worker）
+    QString m_workerExe;
 };
 
 } // namespace rcp::player

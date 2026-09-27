@@ -79,6 +79,7 @@ private:
     QString m_modelsRoot;
     bool m_enabled = true;
     int m_audioTrackFfIndex = -1; // 选定音轨的 ffmpeg 流索引（-1 = 首条）
+    bool m_autoDowngraded = false;// 过载自动降级每会话只做一次（B5）
     QString m_lastFinalText;      // 空窗兜底：最后到达的一句
 };
 

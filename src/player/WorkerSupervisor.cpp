@@ -3,15 +3,35 @@
 
 #include "ipc/JsonMessageCodec.h"
 #include "ipc/Protocol.h"
+#include "MpvTrace.h"
 
 #include <QCoreApplication>
 #include <QLocalSocket>
 #include <QUuid>
 #include <QTimer>
+#include <qt_windows.h>
 
 namespace rcp::player {
 
-WorkerSupervisor::WorkerSupervisor(QObject* parent) : QObject(parent) {}
+WorkerSupervisor::WorkerSupervisor(QObject* parent) : QObject(parent) {
+    // B4 心跳看门狗：Ready/Heartbeat 每次刷新 m_lastHeartbeatMs；
+    // 心跳 2s × 3 次未到（+0.5s 余量）判定失联 → 杀进程自动重启（≤3 次退避）。
+    m_watchdog = new QTimer(this);
+    m_watchdog->setInterval(1000);
+    connect(m_watchdog, &QTimer::timeout, this, [this] {
+        if (!m_connected || !m_openSent || m_intentionalStop) return;
+        if (m_lastHeartbeatMs == 0) return;
+        if (m_alive.elapsed() - m_lastHeartbeatMs > 6500) {
+            rcpTrace(QStringLiteral("worker heartbeat lost (>6.5s), restarting"));
+            killProcess();   // 触发 onProcessFinished → scheduleRestart
+        }
+    });
+    m_watchdog->start();
+}
+
+WorkerSupervisor::~WorkerSupervisor() {
+    if (m_jobHandle) CloseHandle(static_cast<HANDLE>(m_jobHandle));
+}
 
 bool WorkerSupervisor::start(const QString& workerExe, const QString& mediaPath,
                              const QString& modelsRoot, int audioTrack, quint64 generation) {
@@ -27,6 +47,9 @@ bool WorkerSupervisor::start(const QString& workerExe, const QString& mediaPath,
     m_connectTries = 0;
     m_lastSocketError.clear();
     m_serverName = QStringLiteral("rcp-caption-") + QUuid::createUuid().toString(QUuid::WithoutBraces);
+    m_workerExe = workerExe;
+    m_alive.restart();
+    m_lastHeartbeatMs = 0;
 
     m_proc = new QProcess(this);
     m_proc->setWorkingDirectory(QCoreApplication::applicationDirPath());
@@ -44,7 +67,27 @@ bool WorkerSupervisor::start(const QString& workerExe, const QString& mediaPath,
         emit workerError(QStringLiteral("worker 进程启动失败"));
         return false;
     }
+    assignJobObject();
     return true;
+}
+
+// Job Object（B4）：把 worker 绑进 kill-on-close 的作业对象——
+// 主进程崩溃/被任务管理器强杀时 worker 不再残留占着模型文件。
+void WorkerSupervisor::assignJobObject() {
+    if (!m_proc) return;
+    if (!m_jobHandle) {
+        HANDLE job = CreateJobObjectW(nullptr, nullptr);
+        if (!job) return;
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION info{};
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &info, sizeof(info))) {
+            CloseHandle(job);
+            return;
+        }
+        m_jobHandle = job;
+    }
+    AssignProcessToJobObject(static_cast<HANDLE>(m_jobHandle),
+                             OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE, m_proc->processId()));
 }
 
 void WorkerSupervisor::onProcessStarted() {
@@ -120,6 +163,7 @@ void WorkerSupervisor::handleEvent(const rcp::ipc::Envelope& env) {
     const rcp::ipc::EventType et = rcp::ipc::eventTypeFromName(env.type);
     switch (et) {
     case rcp::ipc::EventType::Ready:
+        m_lastHeartbeatMs = m_alive.elapsed();
         emit ready();
         if (!m_openSent) {
             m_openSent = true;
@@ -130,6 +174,9 @@ void WorkerSupervisor::handleEvent(const rcp::ipc::Envelope& env) {
         }
         break;
     case rcp::ipc::EventType::MediaOpened:
+        break;
+    case rcp::ipc::EventType::Overload:
+        emit overloadDetected(p.value(QStringLiteral("rtf")).toDouble(0.0));
         break;
     case rcp::ipc::EventType::CaptionPartial:
         if (isStaleEvent(env)) break;
@@ -151,8 +198,37 @@ void WorkerSupervisor::handleEvent(const rcp::ipc::Envelope& env) {
         }
         break;
     case rcp::ipc::EventType::Heartbeat:
+        m_lastHeartbeatMs = m_alive.elapsed();   // B4：失联判定基准
+        break;
     default:
         break;
+    }
+}
+
+// B4：worker 意外退出/心跳失联后自动重启（≤3 次，1s/2s/4s 指数退避）。
+// 主动 shutdown（m_intentionalStop）不触发。
+void WorkerSupervisor::scheduleRestart() {
+    if (m_intentionalStop) return;
+    if (!m_openSent || m_mediaPath.isEmpty()) return;   // 无活动会话
+    if (++m_restartAttempts > 3) {
+        emit workerError(QStringLiteral("worker 自动重启失败（已达 3 次上限）"));
+        return;
+    }
+    const int backoffMs = 1000 << (m_restartAttempts - 1);
+    rcpTrace(QStringLiteral("worker restart #%1 in %2ms").arg(m_restartAttempts).arg(backoffMs));
+    const QString exe = m_workerExe, media = m_mediaPath, models = m_modelsRoot;
+    const int track = m_audioTrack;
+    const quint64 gen = m_generation;
+    QTimer::singleShot(backoffMs, this, [this, exe, media, models, track, gen] {
+        if (m_intentionalStop) return;
+        start(exe, media, models, track, gen);
+    });
+}
+
+void WorkerSupervisor::killProcess() {
+    if (m_proc && m_proc->state() == QProcess::Running) {
+        m_proc->kill();
+        m_proc->waitForFinished(3000);
     }
 }
 
@@ -234,15 +310,16 @@ void WorkerSupervisor::stop() {
 }
 
 void WorkerSupervisor::shutdown() {
+    m_intentionalStop = true;   // 主动关闭：不触发自动重启
     sendCommand(rcp::ipc::CommandType::Shutdown, QJsonObject{});
+    killProcess();
     if (m_proc) {
-        m_proc->terminate();
-        if (!m_proc->waitForFinished(2000)) m_proc->kill();
         m_proc->deleteLater();
         m_proc = nullptr;
     }
     if (m_sock) { m_sock->deleteLater(); m_sock = nullptr; }
     m_connected = false;
+    m_openSent = false;
 }
 
 void WorkerSupervisor::onProcessError(QProcess::ProcessError err) {
@@ -253,7 +330,9 @@ void WorkerSupervisor::onProcessError(QProcess::ProcessError err) {
 
 void WorkerSupervisor::onProcessFinished(int exitCode, QProcess::ExitStatus status) {
     m_connected = false;
+    m_openSent = false;
     emit workerFinished(exitCode, status);
+    scheduleRestart();
 }
 
 bool WorkerSupervisor::isRunning() const {

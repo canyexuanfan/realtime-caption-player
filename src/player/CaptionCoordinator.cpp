@@ -34,6 +34,13 @@ CaptionCoordinator::CaptionCoordinator(QObject* parent) : QObject(parent) {
         m_havePartial = false;
         recompute();
     });
+    // B5 过载自动降级：RTF 持续超阈值 → 本会话内一次性降为 Lite（跳过终稿精修）。
+    connect(m_supervisor, &WorkerSupervisor::overloadDetected, this, [this](double rtf) {
+        if (m_autoDowngraded) return;
+        m_autoDowngraded = true;
+        setProfile(QStringLiteral("lite"));
+        emit transcriptFinal(-1, QStringLiteral("[过载] 实时率 %1，已自动切换到 Lite 档位").arg(rtf, 0, 'f', 2));
+    });
 }
 
 CaptionCoordinator::~CaptionCoordinator() = default;
@@ -57,6 +64,7 @@ void CaptionCoordinator::openMedia(const QString& path) {
     m_havePartial = false;
     m_coveredUntilMs = 0;
     m_lastFinalText.clear();
+    m_autoDowngraded = false;
     emit finalsChanged();
     emit statsChanged(0, 0);
     setState(State::Starting);
