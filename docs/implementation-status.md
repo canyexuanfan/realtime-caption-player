@@ -3,13 +3,21 @@
 > 本文件是项目实时状态的主索引。任何 Agent 打开仓库首先读它。
 > 规则：状态只能为 `TODO / IN_PROGRESS / BLOCKED / DONE / WAIVED`。禁止伪造完成。
 
-## 当前快照（2026-09-27 · 阶段 A 重新基线）
+## 当前快照（2026-09-27 · 审查阶段 A→E 执行完毕）
 
-- **Current phase:** 阶段 A 止血与重新基线（依据外部审查 `docs/review/2026-09-25-全面代码审查与后续规划.md`；路线 A→B→C→D→E 见根目录 `todolist.md`）
-- **⚠️ 声明撤回（2026-09-27）：** 下文与历史章节中出现的「T0001–T0272 完成 / MVP v0.1.0 RELEASE READY / COMPLETE」**不实，予以撤回**。真实状态：`03_Detailed_Development_TODO.md` 291 项无一通过验收勾选；当前为「能打开视频播放并叠加显示实时生成字幕」的演示级预览——字幕不随 seek/倍速/暂停/切轨同步（worker 全速预识别模型），持久化、CI、文件关联、日志脱敏等未实现（缺口清单见审查 §0–§3）。
-- **真实已验证能力（有证据，2026-09-27 复验）：** `tools/build-release.sh`（windows-ninja-release preset）全新 configure + 全目标构建 rc=0（manifest 默认嵌入，`RCP_SANDBOX_NO_MANIFEST` 门控沙箱 workaround）；ctest **21/21 PASS**；`cmake -P cmake/run_bundle.cmake` 模型白名单打包（zipformer-ctc/silero/sensevoice）实证；Zipformer2-CTC 流式 + SenseVoice+VAD 探针链路 rc=0（BLOCKER-1/2 修复记录仍有效）。
+- **Current phase:** 审查阶段 A→E 全部可执行工作完成（依据 `docs/review/2026-09-25-全面代码审查与后续规划.md`；逐阶段明细见根目录 `todolist.md`）
+- **⚠️ 声明撤回（2026-09-27）：** 下文与历史章节中出现的「T0001–T0272 完成 / MVP v0.1.0 RELEASE READY / COMPLETE」**不实，予以撤回**。03 TODO 的 291 项无一按其原始验收标准勾选；真实完成边界以本快照与 todolist 为准。
+- **2026-09-27 阶段 A→E 完成摘要（全部有实测证据）：**
+  - **A 重新基线**：撤回虚假声明、公开仓库路径脱敏（check-status.ps1 持续审计）、构建固化（windows-ninja-release 预设 + build-release.sh + manifest 门控 + 模型白名单）、重复文档清理。
+  - **B 字幕管线重做**：B1 协议加固（Unknown/Ack/FrameDecoder/generation）；B2 worker 实时管线（播放头 30–120s 窗口解码调度、有界队列、partial 200ms 限频、PTS 锚定、seek/换轨/倍速/暂停实时生效——此前为全速预识别模型）；B3 CaptionCoordinator 唯一时间线 + 状态机 + mpv osd-overlay 死代码删除（ADR-0007）；B4 心跳看门狗/重启退避/Job Object；B5 Lite/Balanced/语言/过载降级。验收：30 分钟媒体 seek E2E PASS（`docs/evidence/B2-seek-e2e/`）。
+  - **C 前端纠偏**：demo 门控+空状态、假开关全接线、连播双 bug 修复、:focus-visible/hover/无障碍、动态音轨字幕轨菜单、逐帧/画面调节/静音/带字幕截图/休眠抑制/全屏自动隐藏/错误引导、快捷键可编辑（KeymapService）。
+  - **D 基础设施**：SQLite 持久化（WAL/迁移/历史+续播+字幕缓存仓库，test_sql_persistence 往返 PASS）、设置迁移接线、日志脱敏+单实例+崩溃转储、GitHub Actions + check-status.ps1。
+  - **E 集成发布**：双 MSI（完整 511MB / Lite 343MB，Lite 缺 SenseVoice 自动回退 partial 快照终稿）、版本资源、文件关联注册、ICE 校验恢复（实抓修复 ICE80/ICE57）。
+  - **B2 管线 IPC 崩溃根因修复**（E 验证期发现）：EOF 残块重复产出 / sensevoice language 悬空指针 / B4 重启 openSent 时序——双包真实媒体全程 workerError=0。
+- **真实已验证能力（有证据，2026-09-27 复验）：** 全量构建 rc=0；ctest **20/20 PASS**；seek E2E PASS；双 MSI OLE 头 + 文件关联字节级验证；check-status PASS。
+- **待真机回填（沙箱无显示器/GPU/语料）：** 渲染出图、真实语音 ASR 准确率、播放中 seek 的 3s 字幕窗口体验；代码签名/VM smoke/升级卸载矩阵（无证书/无 VM）；C2 完整组件化拆分为后续债务。
 - **Current branch:** `main`（PUBLIC：github.com/canyexuanfan/realtime-caption-player）
-- **Last update:** 2026-09-27（阶段 A：归档审查 / 状态重基线 / 公开仓库路径脱敏 / 构建固化 / 清理重复文档）
+- **Last update:** 2026-09-27（阶段 A→E 全线收口）
 
 > **历史章节说明**：下方各「本会话补充」为历史记录，保留作证据链；其「完成 / RELEASE READY」等表述一律以本快照撤回声明为准。2026-09-25 filter-repo 之前的提交哈希均已失效，仅作历史标记。涉及真实媒体的信息已脱敏为「用户本机课程视频（文件名略）」。
 
