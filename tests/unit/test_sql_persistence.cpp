@@ -36,7 +36,7 @@ void TestSqlPersistence::migrationHistoryTranscriptRoundTrip() {
     // 历史：插入 → 查询续播 → 更新（mtime 变化不产生重复行）→ recent。
     auto up1 = rcp::storage::HistoryRepository::upsertPlayback(
         QStringLiteral("key1"), 123, 456, QStringLiteral("a.mp4"), 1000, 60000,
-        QStringLiteral("F:/x/a.mp4"));
+        QStringLiteral("samples/a.mp4"));
     QVERIFY2(!up1.isError(), qPrintable(up1.isError() ? up1.error().technicalMessage + " | " + up1.error().userMessage : QStringLiteral("ok")));
     auto pos = rcp::storage::HistoryRepository::lastPositionMs(QStringLiteral("key1"));
     QVERIFY(!pos.isError());
@@ -49,7 +49,7 @@ void TestSqlPersistence::migrationHistoryTranscriptRoundTrip() {
     QVERIFY(!recent.isError());
     QCOMPARE(recent.value().size(), 1);
     QCOMPARE(recent.value().first().displayName, QStringLiteral("a.mp4"));
-    QCOMPARE(recent.value().first().path, QStringLiteral("F:/x/a.mp4"));
+    QCOMPARE(recent.value().first().path, QStringLiteral("samples/a.mp4"));
     auto pos2 = rcp::storage::HistoryRepository::lastPositionMs(QStringLiteral("key1"));
     QCOMPARE(pos2.value(), 2000LL);
 

@@ -1,0 +1,22 @@
+# D5: CI — windows-latest 上 configure（VS 预设）+ 构建 + ctest。
+# 沙箱（本机）用 windows-ninja-release 预设；CI 用标准 MSVC generator。
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (MSVC Release)
+        run: cmake --preset windows-msvc-ci
+
+      - name: Build
+        run: cmake --build out/build/windows-msvc-ci --config Release
+
+      - name: Test
+        run: ctest --test-dir out/build/windows-msvc-ci -C Release --output-on-failure

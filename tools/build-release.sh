@@ -70,6 +70,11 @@ if [ -d "$QT_BIN" ]; then
   find out/build/windows-ninja-release -name "test_*.exe" | while read -r t; do
     d=$(dirname "$t")
     cp -f "$QT_BIN"/Qt6*.dll "$d/"
+    # SQLite 驱动插件（test_sql_persistence 需要 sqldrivers/qsqlite.dll）
+    if [ -d "$QT_BIN/../plugins/sqldrivers" ]; then
+      mkdir -p "$d/sqldrivers"
+      cp -f "$QT_BIN/../plugins/sqldrivers/"qsqlite.dll "$d/sqldrivers/" 2>/dev/null || true
+    fi
   done
   echo "Qt DLL 已部署到测试目录"
 fi
