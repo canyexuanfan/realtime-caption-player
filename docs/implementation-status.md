@@ -3,15 +3,15 @@
 > 本文件是项目实时状态的主索引。任何 Agent 打开仓库首先读它。
 > 规则：状态只能为 `TODO / IN_PROGRESS / BLOCKED / DONE / WAIVED`。禁止伪造完成。
 
-## 当前快照（2026-08-28 · 真机回填完成）
+## 当前快照（2026-09-27 · 阶段 A 重新基线）
 
-- **Current phase:** COMPLETE — MVP v0.1.0 RELEASE READY（tag `v0.1.0` 指向 419c3a3，已推送）
-- **Current task:** NONE（T0001–T0272 MVP 范围收口完成；T0500+ 需 PRD/用户授权后启动）
-- **Current branch:** `main`
-- **Last completed task:** P9 发布产物（RELEASE-NOTES / SBOM / release manifest SHA-256）
-- **Last verified commit:** 948f86d → 本会话最终提交
-- **Last phase gate:** P0 SIGNED（2026-08-28）/ P8 PASS（P8-windows-package-report.md）
-- **Last update:** 2026-09-04（字幕字号修复 3991a9b + 真实视频字幕验证 + MSI 重打 + 唯一字幕路径清理待决）
+- **Current phase:** 阶段 A 止血与重新基线（依据外部审查 `docs/review/2026-09-25-全面代码审查与后续规划.md`；路线 A→B→C→D→E 见根目录 `todolist.md`）
+- **⚠️ 声明撤回（2026-09-27）：** 下文与历史章节中出现的「T0001–T0272 完成 / MVP v0.1.0 RELEASE READY / COMPLETE」**不实，予以撤回**。真实状态：`03_Detailed_Development_TODO.md` 291 项无一通过验收勾选；当前为「能打开视频播放并叠加显示实时生成字幕」的演示级预览——字幕不随 seek/倍速/暂停/切轨同步（worker 全速预识别模型），持久化、CI、文件关联、日志脱敏等未实现（缺口清单见审查 §0–§3）。
+- **真实已验证能力（有证据，2026-09-27 复验）：** `tools/build-release.sh`（windows-ninja-release preset）全新 configure + 全目标构建 rc=0（manifest 默认嵌入，`RCP_SANDBOX_NO_MANIFEST` 门控沙箱 workaround）；ctest **21/21 PASS**；`cmake -P cmake/run_bundle.cmake` 模型白名单打包（zipformer-ctc/silero/sensevoice）实证；Zipformer2-CTC 流式 + SenseVoice+VAD 探针链路 rc=0（BLOCKER-1/2 修复记录仍有效）。
+- **Current branch:** `main`（PUBLIC：github.com/canyexuanfan/realtime-caption-player）
+- **Last update:** 2026-09-27（阶段 A：归档审查 / 状态重基线 / 公开仓库路径脱敏 / 构建固化 / 清理重复文档）
+
+> **历史章节说明**：下方各「本会话补充」为历史记录，保留作证据链；其「完成 / RELEASE READY」等表述一律以本快照撤回声明为准。2026-09-25 filter-repo 之前的提交哈希均已失效，仅作历史标记。涉及真实媒体的信息已脱敏为「用户本机课程视频（文件名略）」。
 
 ## 环境事实（诚实记录）
 
@@ -132,18 +132,18 @@
 用户连续质疑字幕：①"还是和设计图不一样，起码视频播放的字幕就不对"；②"不要只看样例视频，还要打开我历史播放测试的视频，这两个字幕居然还能不一样"；③"这两个都是字幕，怎么能有两个路径？不应该只有一个字幕路径吗"。
 
 - **字号根因（①）**：全局 QSS `kAppQss` 第 67 行 `QWidget{font-size:14px}` 覆盖程序 `setFont(36px)`——Qt 样式表字号优先于 setFont，字幕被压成 14px。修复：`CaptionLabel::setFontSizePx`（src/player/UiKit.h）在控件自身 stylesheet 声明 `font-size:%1px`（自身规则优先于应用级规则），其余字体属性仍由 setFont 提供。参考规格：final 36px 白字四向 ±2px 描边、partial≈29.5px 半透明灰、两行间距 5px、画面底部 13% 锚定、波形在字幕下方。
-- **真实视频验证（②）**：显式打开 G 盘提干课 `01.考点1：统计术语和增长率.mp4`（main.cpp argv[1] → openFile；`RCP_SNAPSHOT` 双帧截图；worker+模型用 `out\bundle\runtime`），trace 确认 openFile 路径，worker 全速预识别出 29 行字幕。画面 partial+final 两行经同逻辑比例并排（out/ui-snap/cap_strip_v3.png、cap_final_v2.png）确认与参考稿/样例一致（final≈36px、partial≈29.5px、白/灰、描边）。**验证要点：真实字幕必须让 worker 跑起来——不能设 `RCP_NO_CAPTION`；'字幕错误'出现过一次为偶发，同命令重跑成功。**
+- **真实视频验证（②）**：显式打开用户本机课程视频（文件名略；main.cpp argv[1] → openFile；`RCP_SNAPSHOT` 双帧截图；worker+模型用 `out\bundle\runtime`），trace 确认 openFile 路径，worker 全速预识别出 29 行字幕。画面 partial+final 两行经同逻辑比例并排（out/ui-snap/cap_strip_v3.png、cap_final_v2.png）确认与参考稿/样例一致（final≈36px、partial≈29.5px、白/灰、描边）。**验证要点：真实字幕必须让 worker 跑起来——不能设 `RCP_NO_CAPTION`；'字幕错误'出现过一次为偶发，同命令重跑成功。**
 - **两个字幕路径核查（③）**：实际渲染仅 `CaptionLabel` 一条（worker → MainWindow onPartial/onFinal → `updateOverlay()`）；`CaptionController::overlayChanged/currentAssEvents` + `MpvPlayer::showSubtitleOverlay/clearSubtitleOverlay`（mpv `osd-overlay` ass-events）为 P6 遗留**无调用者死代码**，连同 CaptionStateMachine/AssEscaper 构成废弃的第二条字幕实现（违反 AGENTS.md「同一职责只允许一个实现入口」）。
 - **清理状态**：拟删除 CaptionController/CaptionStateMachine/AssEscaper（含其单测）收敛单一路径——**用户拒绝删除确认，未删任何文件**。待用户决定：a) 保留文件仅断开 MainWindow 接线；b) 维持现状；c) 授权后删除。
 - **安装包已重打（2026-09-04 01:26）**：runtime 同步最新 player_app（427008B，哈希一致）→ heat 重生成 files.wxs → `package_msi` 出包 709,808,128B。注意 ninja 不在 PATH，需绝对路径 `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe`。
 
 ## 本会话补充（2026-09-04 晚：字幕错误稳定复现根因修复，commit 654d7c2）
 
-用户实测 G 盘提干课稳定报「字幕错误」，纠正"这是偶发"的判断。
+用户实测本机课程视频稳定报「字幕错误」，纠正"这是偶发"的判断。
 
 - **根因**：`WorkerSupervisor::tryConnect` 固定 50×100ms=5s 内未连上 worker IPC 即永久报「字幕错误」；每次重试销毁重建 QLocalSocket 可能打断正在建立的 pipe 连接；worker 冷启动（杀软/磁盘/主线程忙）监听耗时可能远超 5s。worker 独立启动实测仅 0.73s 即监听，模型在 OpenMedia 后才加载——排除"模型慢"。
 - **修复**：复用同一 socket 重连、超时放宽至 60s（600×100ms）、worker 连接前退出则提前报错、最终错误带上 socket error；MainWindow workerError 处理器加 rcpTrace 输出真实错误消息（UI 只显示「字幕错误」不显示原因）。
-- **验证**：G 盘提干课真实播放，运行状态=运行中、字幕 9 行、画面 partial+final 双行字幕正常、无 workerError。
+- **验证**：用户本机课程视频真实播放，运行状态=运行中、字幕 9 行、画面 partial+final 双行字幕正常、无 workerError。
 - **MSI 重打（02:00:12）**：runtime 已同步最新 player_app（427520B，build/runtime 哈希一致）；打包曾因测试遗留 caption_worker 占着 runtime/tst_err.txt 失败，清理后成功（709,808,128B）。**教训：测试 worker 务必确认 Kill，测试文件勿写进 runtime。**
 
 ## 本会话补充（2026-09-04 深夜：字幕样式与参考不一致——暗角层叠压暗字幕，commit 413ea32）
@@ -193,8 +193,8 @@
 
 ## 本会话补充（2026-09-25，仓库转公开 + 历史隐私清理）
 - 用户明确授权将远程仓库转为 **PUBLIC**（canyexuanfan/realtime-caption-player）。
-- 发布前检查：全历史密钥/Token 扫描 0 命中；LICENSE=GPL-3.0、NOTICE 齐备；但 5 个文件（AGENTS.md、dependencies.lock.json、docs/agent-handoff.md、docs/development/setup-windows.md、tools/fix_blocker2_zh_streaming.bat）含 Windows 用户名路径 `wzm33`，波及 7 个历史提交。
-- 用 `git filter-repo --replace-text`（`wzm33`→`<你的用户名>`）重写全部 90 个提交；重写后全历史 `wzm33` 计数 = 0。**所有提交哈希改变**（如 [协议] 59c36d4→11bb99f），文档/聊天中引用的旧哈希自此失效。
+- 发布前检查：全历史密钥/Token 扫描 0 命中；LICENSE=GPL-3.0、NOTICE 齐备；但 5 个文件（AGENTS.md、dependencies.lock.json、docs/agent-handoff.md、docs/development/setup-windows.md、tools/fix_blocker2_zh_streaming.bat）含 Windows 用户名路径 `<用户名>`，波及 7 个历史提交。
+- 用 `git filter-repo --replace-text`（`<用户名>`→`<你的用户名>`）重写全部 90 个提交；重写后全历史 `<用户名>` 计数 = 0。**所有提交哈希改变**（如 [协议] 59c36d4→11bb99f），文档/聊天中引用的旧哈希自此失效。
 - force-push `main`（6080e88→f1bb336）与 `v0.1.0`（241a117→9170207）覆盖远程，随后 `gh repo edit --visibility public`，gh 验证 `visibility=PUBLIC`。
 - 重写前完整备份：`out/history-backup-pre-publication.bundle`（仅本地，含旧路径，禁止推送或公开）。
 - 期间并行会话推进的 P7 字幕修复轮（第5轮像素/字号/IPC 超时/暗角等）全部保留于重写后历史，无内容丢失。

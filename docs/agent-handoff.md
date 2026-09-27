@@ -1,206 +1,95 @@
 # Agent Handoff
 
-- **Last updated:** 2026-09-04 深夜（字幕样式与参考不一致修复 413ea32；此前 654d7c2 字幕错误、3991a9b 字幕字号）
+- **Last updated:** 2026-09-27（阶段 A 止血与重新基线，依据 `docs/review/2026-09-25-全面代码审查与后续规划.md`）
 - **Branch:** `main`
-- **HEAD:** 413ea32（字幕被暗角压暗修复）；链 0ab66c9→c2c56eb→3991a9b→57fa54d→654d7c2→d818c59
-- **远程：** origin/main 已同步（github.com/canyexuanfan/realtime-caption-player，私有）
+- **HEAD:** 以 `git log` 实时为准（2026-09-25 filter-repo 转公开后全部旧提交哈希失效；历史文档中的哈希仅作历史标记）
+- **远程：** origin = github.com/canyexuanfan/realtime-caption-player，**PUBLIC**（2026-09-25 经用户授权转公开）。
+  任何提交严禁引入 Windows 用户名、本机绝对路径、真实媒体文件名与密钥/Token；公开内容按 08 指南最小披露。
 
 ## Current Phase
 
-**MVP v0.1.0 RELEASE READY**。本会话在 Release 基础上完成第 5 轮像素复刻、字幕字号修复、字幕错误根因修复、字幕样式（暗角层叠）修复。
+**阶段 A 止血与重新基线（进行中）**。⚠️ 此前「MVP v0.1.0 RELEASE READY」声明已于 2026-09-27 **撤回**：
+当前真实状态是「能打开视频播放并叠加显示实时生成字幕」的演示级预览——worker 全速预识别模型，
+seek/倍速/暂停/切轨不通知 worker；持久化、CI、文件关联、日志脱敏未实现。缺口清单见审查文档 §0–§3。
 
-## Last Completed Task（本会话主线）
+## Last Completed Task（阶段 A，2026-09-27）
 
-0. **第 5 轮像素复刻（0ab66c9）**：修复 4 项差异（标题去扩展名/选项卡图标/字幕轨按钮归位/AB 字号）清零。
-1. **重打安装包（c2c56eb）**：runtime 同步最新并重打 MSI。
-2. **字幕字号修复（3991a9b）**：全局 QSS 覆盖 setFont 根因，CaptionLabel 自身 stylesheet 声明字号。
-3. **字幕错误修复（654d7c2）**：worker IPC 连接 5s 超时窗口过脆+重建 socket，复用 socket+60s 窗口。真实 G 盘视频验证运行中/9 行字幕。
-4. **字幕样式修复（413ea32）**：vignette 后创建叠在字幕上压暗（255→207），lower() 后 final 恢复纯白 (255,255,255)、partial rgba(225,228,234,.67) 精确匹配参考。
+- **A0** 归档外部审查（`docs/review/`，含项目侧实码复核勘误附录）+ 建立 `todolist.md` +
+  `docs/adr/ADR-0007-字幕渲染单一路径.md` + 03 TODO 基线注记。
+- **A1** 状态文档重基线（本文件 + `docs/implementation-status.md`：撤回 RELEASE READY、远程改 PUBLIC、
+  HEAD 说明、真实媒体信息脱敏）。
+- **A2** 公开仓库路径脱敏：tools 像素比对脚本参数化（`Path(__file__)` 相对）、`cmake/run_bundle.cmake`
+  仓库相对化、evidence/phase-gates/questions 路径与课程名脱敏、AGENTS.md 内部路径泛化、
+  删一次性工具 `tools/fix_blocker2_zh_streaming.bat`。
+- **A3** 构建固化：CMakePresets 增 `windows-ninja-release`、新增 `tools/build-release.sh`、
+  `/MANIFEST:NO` 改 `RCP_SANDBOX_NO_MANIFEST` 门控（正式构建默认嵌入 manifest）、
+  RcpBundle 模型白名单（zipformer-ctc/silero/sensevoice）。
+  **验证：全新 configure + 全目标构建 rc=0；ctest 21/21 PASS；白名单打包实证。**
+- **A4** 清理：删根目录重复文档（01_PRD/02_Technical/PRD.md/docs/development-todo.md）、README.txt、
+  SHA256SUMS.txt、未引用的 EnsureAppSubfolder.*；RELEASE-NOTES 标注预览版并修正 osd-overlay 失实描述；
+  README/NOTICE 的 Paraformer 陈旧描述更正为 Zipformer2-CTC。
+
+（逐项勾选以根目录 `todolist.md` 为准）
 
 ## Current Task
 
-**NONE（等待用户）**：唯一字幕路径清理待用户拍板（死代码 CaptionController/CaptionStateMachine/AssEscaper：a 断开接线 b 维持现状 c 授权删除，用户此前拒绝 Remove-Item）。
+见根目录 `todolist.md`「当前执行状态」。
 
 ## Next Exact Action
 
-- 等用户确认唯一字幕路径清理方式；确认后执行并回填。
-- 若用户重测仍报字幕错误：抓 `RCP_TRACE` 里 `workerError:` 具体消息（已加 trace），按 6 类错误定位。
-
-## 本会话新增坑位（详见 questions/）
-
-- sherpa-onnx VAD：`Detected()`≠"有已完成分句"，排空队列必须用 `Empty()`；
-  `Front()` 队列空时返回 NULL。
-- 时间戳用 `seg->start`（绝对采样索引）；`seg->start - consumed_` 只是缓冲区局部索引。
-- libmpv：`MPV_FORMAT_FLAG` 必须传 `int*`（0/1）；osd-overlay 无 add/remove 子命令，
-  移除用 format=none。
-- 本环境 shell PATH export 不生效：ninja/cl/cmake/ctest 全部用绝对路径调用
-  （cmake/ninja 在 `C:/Users/<你的用户名>/.workbuddy/binaries/python/envs/default/Scripts/`）。
-- PowerShell 5.1 无 BOM UTF-8 中文脚本乱码：脚本需加 BOM。
-- 全量构建需同一条命令内联 INCLUDE/LIB/MSYS_NO_PATHCONV（详见下文命令块）。
-- cmake 重新配置 spikes2 必须带
-  `-DCMAKE_MAKE_PROGRAM="C:/Users/<你的用户名>/.workbuddy/binaries/python/envs/default/Scripts/ninja.exe"`。
+阶段 A 收口（A5 Git 存档 + push）后，进入**阶段 B1 协议加固**（审查 §5）：
+worker 端改用 `src/ipc/FrameDecoder` 安全分帧、协议增加 Unknown 类型与必填字段校验、
+事件保留原始 generation 并两端丢弃旧代。动手前先读 `todolist.md` 与审查文档阶段 B 章节。
 
 ## Important Decisions
 
-- UI 视觉与布局以 `05_Single_HTML_Frontend_Reference.html` 为唯一参考稿复刻（QSS 令牌对应 :root 变量）。
-- 诊断 trace `RCP_TRACE=<file>`（src/player/MpvTrace.h）保留为 P7 诊断能力的一部分。
-- 已知非致命问题：Intel Iris Xe 上 mpv 首帧建纹理 INVALID_ENUM 一次（不阻塞播放）；
-  `/MANIFEST:NO` 为沙箱链接 workaround，正式发布建议恢复嵌入。
+- **ADR-0007（2026-09-27）**：唯一字幕渲染路径 = Qt CaptionLabel；mpv osd-overlay 路径
+  （CaptionController overlay 输出 / MpvPlayer::showSubtitleOverlay / CaptionStateMachine / AssEscaper）
+  为死代码——授权前不接线、不维护、不得新增调用者；物理删除需用户明确授权（2026-09-04 用户曾拒绝）。
+- UI 视觉与布局以 `05_Single_HTML_Frontend_Reference.html` 为唯一参考稿复刻。
+- 诊断 trace `RCP_TRACE=<file>`（src/player/MpvTrace.h）保留为诊断能力。
+- 已知非致命问题：Intel Iris Xe 上 mpv 首帧建纹理 INVALID_ENUM 一次（不阻塞播放）。
 - 文件关联（T0219–T0227）与设置页（T0202+）未实装，UI 中不放假入口。
+- `/MANIFEST:NO` 已改 `RCP_SANDBOX_NO_MANIFEST` 门控：正式构建默认嵌入 manifest；
+  仅当沙箱受限 TEMP 报 CVT1108/LNK1123 时加 `-DRCP_SANDBOX_NO_MANIFEST=ON`。
 
-## MVP Build & Package（2026-08-28，已验证）
+## Build & Test（已固化，统一走脚本）
 
 ```bash
-# 1) 编译（内联 MSVC 环境，绝对路径调用）
-export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
-export VS="C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207"
-export SDK="C:/Program Files (x86)/Windows Kits/10"
-export INCLUDE="$VS/include;$SDK/Include/10.0.26100.0/ucrt;$SDK/Include/10.0.26100.0/um;$SDK/Include/10.0.26100.0/shared"
-export LIB="$VS/lib/x64;$SDK/Lib/10.0.26100.0/ucrt/x64;$SDK/Lib/10.0.26100.0/um/x64"
-"C:/Users/<你的用户名>/.workbuddy/binaries/python/envs/default/Scripts/ninja.exe" -C out/build/spikes2 player_app caption_worker
-cp out/build/spikes2/bin/*.exe out/bundle/runtime/
+# 一键 Release（git-bash；自动定位 VS/SDK/ninja，可用 RCP_VS_ROOT/RCP_SDK_ROOT/RCP_NINJA/RCP_CMAKE 覆盖）
+bash tools/build-release.sh                                 # configure(preset windows-ninja-release) + 全目标构建 + 部署 Qt DLL
+bash tools/build-release.sh -DRCP_SANDBOX_NO_MANIFEST=ON    # 沙箱 cvtres workaround（勿用于正式发布）
 
-# 2) MSI
-"C:/Users/<你的用户名>/.workbuddy/binaries/python/envs/default/Scripts/ninja.exe" -C out/build/spikes2 package_msi
+# 测试（Qt DLL 已被脚本自动拷到测试 exe 旁，无需设 PATH）
+"C:/Users/<你的用户名>/.workbuddy/binaries/python/envs/default/Scripts/ctest.exe" --preset windows-ninja-release
 
-# 3) 安装/卸载（UAC 提权）
-# msiexec /i out/package/RealtimeCaptionPlayer-0.1.0.msi INSTALLFOLDER=F:\rcp-app-test /qn
-# msiexec /x out/package/RealtimeCaptionPlayer-0.1.0.msi /qn
+# 自包含运行时（模型白名单）+ MSI
+cmake -P cmake/run_bundle.cmake                             # → out/bundle/runtime（zipformer-ctc/silero/sensevoice）
+ninja -C out/build/windows-ninja-release package_msi        # → out/package/RealtimeCaptionPlayer-0.1.0.msi
 ```
 
-## Commands To Resume
+脚本要点（踩坑固化）：不把 MSVC/SDK 塞进 PATH（MSYS 与 Windows 版 cmake 对 PATH 风格要求相反），
+显式传 cl/rc/mt 绝对路径给 CMake；mt.exe 由 **Windows SDK** 提供（MSVC bin 目录没有）；
+中文仓库路径下 MSYS→Windows 的 PATH 转换会乱码，Qt DLL 必须拷到测试 exe 旁（脚本已自动做）。
 
-- 构建/打包见上节；测试：在 `out/build/spikes2` 下运行
-  `"C:/Users/<你的用户名>/.workbuddy/binaries/python/envs/default/Scripts/ctest.exe"`（tests 目录需 Qt6 DLL，构建后已拷入）。
-- E2E 语料：`out/e2e-verify/`（TTS 生成脚本 gen_tts.ps1、e2e-test.mp4、语料文本）。
+## 真实视频字幕验证方法
 
-## 追加（2026-08-28 晚）：MSI 交互式「修改文件夹」2812 修复
+`out\bundle\runtime\player_app.exe "<视频路径>"` + `RCP_SNAPSHOT=<png>` 双帧截图后退出；
+**不得设 `RCP_NO_CAPTION`**（会跳过 worker）。运行/错误细节先看 `RCP_TRACE` 日志。
 
-- 根因与修复：见 `questions/Wix安装器错误排查指南.md`（三次错误事件名试错记录 +
-  官方 BrowseDlg.wxs 对照正解）。product.wxs 已改用
-  `DirectoryListUp`/`DirectoryListNew`/`Subscribe IgnoreChange`/`SetTargetPath`/`Reset`。
-- 交互验证：非提权向导 a11y 驱动，Browse→Up 导航成功无 2812（旧包同操作必现）。
-- MSI 已重打，manifest 哈希已更新（tag v0.1.0 指向修复前状态，修复为 tag 后提交）。
-- 待用户重装复验完整链（Up/NewFolder/选目录/OK/安装）。
+## 公开仓库提交前自查
 
-## 前端像素级复现（进行中，2026-08-30）
+```bash
+git grep -nE "F:[/\\\\]|考点1|提干" -- . | grep -v "docs/review/"   # 应无输出（占位符 <你的用户名> 除外）
+```
 
-用户要求：以 05_Single_HTML_Frontend_Reference.html 源码为规格像素级复现前端，
-示例数据也同源。已建 Edge 同宽比对回路（--headless --screenshot vs
-RCP_DEMO_ONLY=1 + RCP_SNAPSHOT + RCP_SNAP_T1/T2，统一 1280x800 逻辑尺寸，
-注意用户屏幕 150% 缩放 → 快照物理像素 1.5x）。
+## 本会话新增坑位（详见 questions/）
 
-本轮已落地（未提交部分见 git status）：
-- 示例数据模式：fillDemoData/demoTick（demoPlaylist 5 项/historyPlaylist 3 项/
-  transcriptSegments 7 段/state 24:18、49:12、1.50x、音量 72、字幕行数 128、
-  延迟 1.2s），activeSegmentForTime 同源算法；开真实媒体整体退出示例态
-- 历史记录 tab 无反应根修：checkable 按钮无互斥组 → QButtonGroup exclusive
-- 字幕按视频画面矩形锚定（video-params contain-fit，repositionOverlays）
-- @media(max-width:1320px) 断点：左栏 218/设置 322/标题钮只留图标
-- CaptionLabel 对齐参考 CSS（字体族/字距/四向描边+模糊阴影缓存）
-- mpv sub-auto=no+sid=no 根除同目录 srt 双层字幕；手动加载 sub-add select
-
-### 下一轮清单（按此继续）
-1. 播放列表行绘制重叠：rowName setFixedWidth(132) 后仍溢出（怀疑 QLabel
-   stylesheet 字体与 fm12 不一致/行容器宽于 sizeHint 触发横向滚动条），需
-   row 级布局重做：play 18 + name elided(stretch) + dur 右对齐，行宽锁 218。
-2. 设置面板"实时字幕"页补参考稿缺失行：字幕字体 select(思源黑体)、字号
-   slider、字幕颜色 白/黄 segmented、描边/阴影 select、字幕位置 select、
-   预览结果颜色 chip、导出设置(自动导出 switch/导出格式 SRT/保存目录)。
-3. 字幕定位 trace 验证（reposition trace 行已加：RCP_TRACE 看 content/box 矩形）。
-4. Waveform 对照（36 根 2px 渐变条 #a79cff→#6555ef 动画）。
-5. demo 海报：参考稿 stage 有 cover 图片（航拍中国剧照），demo 态放等价渐变。
-6. a11y 实测历史 tab 点击 + 全量 ctest + MSI 重打。
-
-### 已完成（2026-08-30 第二轮）
-- 播放列表行重影根除：demo 项把名字写进 QListWidgetItem 本身，默认委托把
-  条目文字画在透明行控件底下（全名+省略名叠加+横向滚动条）；条目文字留空、
-  只设 UserRole 后干净。rowName 定宽 110 裁剪 + 时长完整右对齐（49:12）。
-- 设置面板实时字幕页对齐参考稿：识别引擎/语言/模型大小/计算设备选项串逐字
-  同源；新增 显示设置（字幕字体/字幕颜色白黄segmented/描边阴影/预览结果颜色
-  chip）与 导出设置（自动导出/导出格式/保存目录），全部接入真实 settings 并
-  由 applyCaptionStyle 生效（黄=#ffe66d；思源黑体=Source Han Sans SC 族）。
-- 字号步长 ±1（参考 22..54）。
-
-### 仍余
-- 字幕定位 reposition trace 复验（行已加）；Waveform 细节对照；demo 海报图；
-  a11y 实测历史 tab 点击；MSI 重打。
-
-### 已完成（2026-08-30 第三轮）
-- 字幕画面锚定 trace 实证：host=740x644, video=1280x720 → content=(0,114
-  740x416), 字幕盒 (52,295 636x180)（content.y+87%-180）。mediaLoaded 时
-  video-params 常未就绪 → positionChanged 里 m_videoRectValid 未就绪即重试。
-- MSI 重打 06307143…（含目录记忆/示例数据/设置页对齐），manifest 同步。
-
-### 仍余
-- Waveform 细节对照（36 根 2px 渐变动画——现有实现结构已同，仅微调观感）；
-  demo 海报图（参考稿为外部剧照资产，暂用黑底，可用渐变替代）；历史 tab 点击
-  a11y 实测（QButtonGroup 修复后逻辑确定，未做真机点击验证）。
-- a11y 实测历史 tab 点击通过（标题联动+真实历史列表切换）；Waveform 对照通过
-  （36 根/2px/间距2/渐变/动画同源）；无媒体底色改参考 .video-surface #10151d。
-- 第三处同类重影根除：loadHistory 也把文件名写进 QListWidgetItem 本身（用户
-  截图历史行重影），已改为条目文字留空+UserRole（与 demo 行同款修复）。
-- final 字幕改单行省略（参考稿 final 恒单行；2 行会顶压 partial 行），
-  a11y 实测 live 播放中 partial/final 均单行省略。
-- Waveform 峰值 14→11、衰减 0.92→0.85：说话时常满格导致的"连成实块"消除。
-
-### 已完成（2026-08-30 第四轮：同尺寸并排比对逐项消差）
-比对方法：Edge 无头 1280x800 渲染参考 HTML vs RCP_DEMO_ONLY 快照 scale=1280:800
-后 vstack 拼图，逐区找差异。本轮修复：
-- 播放列表选中紫色渐变胶囊（参考 .playlist-item.active 135deg #5147aa→#6254cb）：
-  行控件动态上色（current||selected），QSS 里原有规则被子行控件遮挡从未生效；
-  fillDemoData 补 setCurrentRow(0)（参考 state.activeIndex=0）
-- 转写面板当前句高亮 + 居中滚动跟随（参考 .transcript-item.active），demo 按
-  activeSegmentForTime 段序刷新样式（真实媒体暂无逐句 UI 高亮，仅叠加层对齐）
-- 对照确认已同源：倍速弹窗按钮组、音量条、时间码、字幕统计、标题栏、设置面板
-- 剩余已知差异（低优先）：demo 海报（参考用外部剧照，我们黑底+渐晕）；波形
-  连续动画的相位感；参考底部 showcase 特性卡区（属于产品宣传页非应用窗口，
-  不在复现范围）
-
-### 已完成（2026-09-03 第五轮：4 项差异清零）
-- 视频区标题去扩展名（标题栏保留原名，画面内 `completeBaseName()`）；左轨 tab 补
-  list/history 15px 图标（激活态 `#7868ff` + toggled 同步）；控制条字幕轨按钮归位
-  （先回 HTML 1050-1062 行核对，参考右组确有 `#trackButton` subtitle 图标 → 从左组
-  移到右组音量与设置之间）；AB 字号 12px/700。全部经并排比对 + PIL 采样验证通过。
-- 排查经验入 `questions/前端像素复刻排查指南.md`（含"控件有无必须回 HTML 源码核对，
-  勿信 OCR"关键纠偏）。
-- 5 轮像素复刻后唯一保留偏差：设计图视频区「实时字幕设置小窗口」已并入设置页。
-
-### 安装包重打（2026-09-03）
-- 用户指出 runtime 未更新：`out/bundle/runtime/player_app.exe` 是 8/30 旧版。已将
-  `out/build/ui/bin/player_app.exe`（427008B，含本轮 4 项修复）同步进 runtime（哈希一致），
-  并 `ninja -C out/build/ui package_msi` 重打 `out/package/RealtimeCaptionPlayer-0.1.0.msi`
-  （≈709,808,128B，OLE 头 D0CF11E0 通过）。msiexec /a 解包核验包内 player_app.exe=427008B。
-  runtime demo 冒烟退出 0、快照正常。`out/` 已 gitignore。
-- 运行方式：开发机直接跑 `out\bundle\runtime\player_app.exe`（零安装，DLL/模型同目录）；
-  分发给他人装 `out\package\RealtimeCaptionPlayer-0.1.0.msi`。
-
-### 字幕字号修复 + 真实视频字幕验证（2026-09-04，commit 3991a9b）
-- **用户质疑**："还是和设计图不一样，起码视频播放的字幕就不对"；"不要只看样例视频，还要
-  打开我历史播放测试的视频，这两个字幕居然还能不一样"；"这两个都是字幕，怎么能有两个路径？
-  不应该只有一个字幕路径吗"。
-- **字号根因**：kAppQss 第 67 行 `QWidget{font-size:14px}` 覆盖程序 setFont(36px)
-  （样式表字号优先于 setFont），字幕被压成 14px。修复：`CaptionLabel::setFontSizePx`
-  （src/player/UiKit.h）在控件自身 stylesheet 声明 `font-size:%1px`（自身规则优先于
-  应用级规则）。参考 final 36px / partial≈29.5px，已通过并排比对 + PIL 采样确认
-  demo 与真实一致（cap_strip_v3 / cap_final_v2 图见 out/ui-snap/）。
-- **真实视频验证方法（关键）**：main.cpp 支持 argv[1] 打开媒体（1.5s 后 openFile，
-  `setStartupMedia` 让恢复会话让位）；`RCP_SNAPSHOT=<png>` 在 T1/T2 两帧 grab 后 quit。
-  用 `out\bundle\runtime\player_app.exe "<G盘视频>"`（worker+模型同目录）+ RCP_SNAPSHOT
-  即可对真实媒体出字幕并截图。注意：**真实字幕验证不能设 RCP_NO_CAPTION**（会跳过 worker）。
-- **已验证**：显式打开 G 盘 `01.考点1：统计术语和增长率.mp4`（trace 确认 openFile 路径），
-  worker 全速预识别出 29 行字幕，画面 partial（灰半透明）+final（白粗四向描边）两行正常，
-  与参考稿/样例一致；波形在字幕下方。**上次运行报『字幕错误』为偶发**（同命令重跑成功，
-  无残留 worker 进程）。
-- **『两个字幕两个路径』结论**：实际渲染仅 CaptionLabel 一条（worker → MainWindow
-  onPartial/onFinal → updateOverlay → CaptionLabel）；`CaptionController::overlayChanged/
-  currentAssEvents` + `MpvPlayer::showSubtitleOverlay/clearSubtitleOverlay`（mpv osd-overlay
-  ass-events）为 P6 遗留**无调用者死代码**，连同 CaptionStateMachine/AssEscaper 构成
-  废弃的第二条字幕实现。
-- **清理被用户拒绝**：拟删除 CaptionController/CaptionStateMachine/AssEscaper（含其单测）
-  以收敛单一路径，用户拒绝确认删除 → **未删除任何文件**。等用户决定：a) 保留但断开
-  MainWindow 里 m_captionCtl 接线（编辑不动文件）；b) 维持现状；c) 之后按用户授权再删。
-- **安装包已重打**（2026-09-04 01:26）：runtime 同步最新 player_app（427008B，哈希一致），
-  heat 从 runtime 重新生成 files.wxs 后 package_msi 出包 709,808,128B。ninja 不在 PATH，
-  需用绝对路径
-  `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe`。
+- MSYS bash 的 PATH 只认 POSIX 风格条目（`/c/...`），Windows 版 cmake 只认 Windows 风格——
+  两者不可共用 PATH，编译器/工具链一律显式绝对路径传参（已固化进 build-release.sh）。
+- bash → python -c 传参会把 `\\` 折叠成 `\`，Python 字符串里 `\r` `\w` 等会被当转义；
+  跨层传反斜杠用 `chr(92)` 构造，或写字幕脚本文件执行。
+- sherpa-onnx VAD：`Detected()`≠"有已完成分句"，排空队列必须用 `Empty()`；`Front()` 队列空时返回 NULL。
+- 时间戳用 `seg->start`（绝对采样索引）；`seg->start - consumed_` 只是缓冲区局部索引。
+- libmpv：`MPV_FORMAT_FLAG` 必须传 `int*`（0/1）；osd-overlay 无 add/remove 子命令，移除用 format=none。
+- PowerShell 5.1 无 BOM UTF-8 中文脚本乱码：脚本需加 BOM；PowerShell 内联 stdout 本会话不显示，写文件后 Read。
