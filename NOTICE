@@ -15,9 +15,9 @@ Third-party components (planned / to be verified):
 - Qt 6 (Widgets, GUI/OpenGL, Network, SQL, Test)        — LGPL-3.0 / GPL-3.0  (dynamic linking; relinking notice retained)
 - mpv / libmpv                                          — GPL-2.0-or-later (player built as GPL-3.0-or-later aggregate)
 - FFmpeg (libavformat/libavcodec/libavutil/libswresample) — LGPL-2.1-or-later / GPL-2.0 (configure-flag dependent; recorded in build-metadata)
-- sherpa-onnx (VAD, Online Paraformer, SenseVoice, CT-Transformer punctuation) — Apache-2.0 (NOTICE retained)
+- sherpa-onnx (VAD, Zipformer2-CTC streaming ASR, SenseVoice offline ASR) — Apache-2.0 (NOTICE retained)
 - Silero VAD model                                      — MIT (model weights; verify at lock time)
-- Paraformer / SenseVoice / CT-Transformer model weights — Apache-2.0 (verify at lock time)
+- Zipformer2-CTC / SenseVoice model weights             — Apache-2.0 (verify at lock time)
 - WiX Toolset (packaging only)                          — MS-RL
 - CMake (build tool only)                               — BSD-3-Clause
 - Googletest / QtTest (tests only)                      — BSD-3-Clause / Qt license

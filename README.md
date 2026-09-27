@@ -1,20 +1,19 @@
 # Realtime Caption Player / 实时字幕播放器
 
 本地优先、离线可用的 Windows x64 实时字幕播放器。基于 C++20 + Qt 6 Widgets + libmpv，
-使用独立 `caption-worker.exe` 进程运行本地 ASR（Online Paraformer + SenseVoice + Silero VAD，
+使用独立 `caption-worker.exe` 进程运行本地 ASR（Zipformer2-CTC 流式 + SenseVoice + Silero VAD，
 由 sherpa-onnx 提供运行时），实时生成中文优先的字幕并支持 SRT 导出。
 
 > 分发许可：**GPL-3.0-or-later**（见 `LICENSE` 与 `NOTICE`）。任何闭源分发路线必须先替换 libmpv 播放内核。
 
-## 当前状态（诚实记录）
+## 当前状态（诚实记录，2026-09-27 重新基线）
 
-- 本仓库初始仅包含产品/技术/任务文档（资料包）。
-- 已建立工程骨架、Agent 接力文档、`reference/` 开源调研、P0 ADR 决策集与核心可测模块骨架。
-- **构建工具链缺口（环境相关，非代码缺陷）：** 本机已具备 MSVC `cl.exe`（VS2022 BuildTools）与 `git`/`gh`，
-  但 `cmake`、Qt 6、libmpv、FFmpeg、sherpa-onnx、WiX 尚未就绪。正在后台安装 `cmake`+`ninja`+`Qt 6.8.1`，
-  以便对**不依赖原生媒体库的纯逻辑模块**进行真实编译与 QtTest 运行。
-- 依赖 libmpv/FFmpeg/sherpa-onnx 的模块（播放内核、worker ASR、IPC 真机联调、MSI 打包）在工具链补全前标记为 `BLOCKED`，
-  **不会伪造构建/测试通过**。详见 `docs/implementation-status.md`。
+- **预览版**：当前是「能打开视频播放并叠加显示实时生成字幕」的演示级实现，距 PRD/技术方案的 MVP 验收
+  尚有明确缺口（字幕不随 seek/倍速/暂停/切轨同步、持久化、CI、文件关联、日志脱敏等未实现）。
+  完整清单与修复路线见 `docs/review/2026-09-25-全面代码审查与后续规划.md` 与根目录 `todolist.md`（阶段 A→E）。
+- 已验证（2026-09-27 复验）：`tools/build-release.sh` 全新 configure + 全目标构建 rc=0、
+  QtTest 21/21 PASS、模型白名单自包含运行时、MSI 打包流水线。
+- 项目规则与开发协议见 `AGENTS.md`；状态详见 `docs/implementation-status.md`。
 
 ## 目录结构（要点）
 
