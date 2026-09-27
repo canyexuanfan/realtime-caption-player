@@ -10,7 +10,7 @@ $repo = Split-Path -Parent $PSScriptRoot
 $fail = 0
 
 $status = Get-Content (Join-Path $repo 'docs\implementation-status.md') -Raw -Encoding UTF8
-if ($status -match 'RELEASE READY' -and $status -notmatch 'withdrawal declaration') {
+if ($status -match 'RELEASE READY' -and $status -notmatch '声明撤回') {
     Write-Output 'FAIL: implementation-status still claims RELEASE READY without a withdrawal banner'
     $fail++
 }
