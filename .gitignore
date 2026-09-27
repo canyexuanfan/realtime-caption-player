@@ -70,3 +70,5 @@ Desktop.ini
 .tmp-build/
 .workbuddy/
 # ZCode 会话工具产物（不入库）
+.zcodeignore/
+.zcodeignore
