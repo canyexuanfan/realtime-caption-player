@@ -4,6 +4,9 @@ add_executable(caption_worker
     main.cpp
     IpcServer.cpp
     IpcServer.h
+    CaptionPipeline.cpp
+    CaptionPipeline.h
+    PlaybackState.h
 )
 
 target_include_directories(caption_worker PRIVATE

@@ -5,23 +5,34 @@
 #include "ipc/Protocol.h"
 
 #include <QCoreApplication>
-#include <QtConcurrent/QtConcurrent>
 #include <QUuid>
 
 namespace rcp::worker {
 
 IpcServer::IpcServer(QObject* parent) : QObject(parent) {
-    m_engine.setCaptionCallback([this](const rcp::asr::CaptionUtterance& u) {
-        emit captionReady(u);
-    });
-    connect(this, &IpcServer::captionReady, this, &IpcServer::onCaptionReady);
-
     // 心跳 2s：主进程按"3 次未到即失联"判定（B4 生命周期）。
     m_heartbeat = new QTimer(this);
     m_heartbeat->setInterval(2000);
     connect(m_heartbeat, &QTimer::timeout, this, [this]() {
         if (m_sock) sendEvent(rcp::ipc::EventType::Heartbeat, QJsonObject{}, m_generation);
     });
+
+    // B2 管线：出站字幕事件 30ms 排空（partial 限频在引擎内，无高频风暴）。
+    m_pipeline = new CaptionPipeline(this);
+    connect(m_pipeline, &CaptionPipeline::mediaOpened, this, [this](const QString& path) {
+        sendEvent(rcp::ipc::EventType::MediaOpened, QJsonObject{{"path", path}}, m_generation);
+    });
+    connect(m_pipeline, &CaptionPipeline::pipelineError, this, [this](const QString& msg) {
+        sendEvent(rcp::ipc::EventType::Error, QJsonObject{{"message", msg}}, m_generation);
+    });
+    connect(m_pipeline, &CaptionPipeline::overloadDetected, this, [this](double rtf) {
+        sendEvent(rcp::ipc::EventType::Overload,
+                  QJsonObject{{"rtf", rtf}}, m_generation);
+    });
+    m_drainTimer = new QTimer(this);
+    m_drainTimer->setInterval(30);
+    connect(m_drainTimer, &QTimer::timeout, this, &IpcServer::drainOutbound);
+    m_drainTimer->start();
 }
 
 bool IpcServer::listen(const QString& name) {
@@ -33,6 +44,7 @@ bool IpcServer::listen(const QString& name) {
 
 void IpcServer::setModelsRoot(const QString& r) {
     m_modelsRoot = r;
+    m_pipeline->setModelsRoot(r);
 }
 
 void IpcServer::onNewConnection() {
@@ -71,6 +83,26 @@ void IpcServer::onReadyRead() {
     }
 }
 
+void IpcServer::drainOutbound() {
+    if (!m_sock) return;
+    CaptionSegment seg;
+    while (m_pipeline->popOutbound(seg)) {
+        QJsonObject payload;
+        payload["id"] = seg.id;
+        payload["text"] = seg.text;
+        payload["start_ms"] = seg.startMs;
+        payload["end_ms"] = seg.endMs;
+        payload["confidence"] = seg.confidence;
+        payload["language"] = seg.language;
+        sendEvent(seg.kind == rcp::CaptionKind::Partial
+                      ? rcp::ipc::EventType::CaptionPartial
+                      : (seg.kind == rcp::CaptionKind::Revision
+                             ? rcp::ipc::EventType::CaptionRevision
+                             : rcp::ipc::EventType::CaptionFinal),
+                  payload, seg.generation);
+    }
+}
+
 void IpcServer::handleCommand(const rcp::ipc::Envelope& env) {
     if (!m_sock) return;
     const QJsonObject& p = env.payload;
@@ -83,34 +115,64 @@ void IpcServer::handleCommand(const rcp::ipc::Envelope& env) {
         break;
     case rcp::ipc::CommandType::OpenMedia: {
         const QString path = p.value(QStringLiteral("path")).toString();
-        const int track = p.value(QStringLiteral("audio_track")).toInt(-1);
         if (path.isEmpty()) {
             sendAck(env, false, QStringLiteral("open_media: path is required"));
             break;
         }
-        // 会话级命令：采用主进程下发的 generation（B2 起驱动管线重建）。
         if (env.generation != 0) m_generation = env.generation;
+        m_mediaPath = path;
+        m_audioTrack = p.value(QStringLiteral("audio_track")).toInt(-1);
         sendAck(env, true, {});
-        startCaptioning(path, track, m_generation);
+        m_pipeline->start(m_mediaPath, m_audioTrack, m_generation);
         break;
     }
-    case rcp::ipc::CommandType::Seek:
-        if (env.generation != 0) m_generation = env.generation; // 旧代事件将被两端丢弃
+    case rcp::ipc::CommandType::SetPlayhead:
+        m_playheadMs = static_cast<qint64>(p.value(QStringLiteral("playhead_ms")).toInteger());
+        m_pipeline->updatePlayback(m_playheadMs, m_speed, m_paused);
         sendAck(env, true, {});
         break;
+    case rcp::ipc::CommandType::SetPaused:
+        m_paused = p.value(QStringLiteral("paused")).toBool(false);
+        m_pipeline->updatePlayback(m_playheadMs, m_speed, m_paused);
+        sendAck(env, true, {});
+        break;
+    case rcp::ipc::CommandType::SetSpeed:
+        m_speed = p.value(QStringLiteral("speed")).toDouble(1.0);
+        if (m_speed <= 0) m_speed = 1.0;
+        m_pipeline->updatePlayback(m_playheadMs, m_speed, m_paused);
+        sendAck(env, true, {});
+        break;
+    case rcp::ipc::CommandType::Seek: {
+        if (env.generation != 0) m_generation = env.generation;  // 旧代事件两端丢弃
+        m_playheadMs = static_cast<qint64>(p.value(QStringLiteral("target_ms")).toInteger());
+        m_pipeline->seek(m_playheadMs, m_generation);
+        sendAck(env, true, {});
+        break;
+    }
     case rcp::ipc::CommandType::SetAudioTrack:
+        if (env.generation != 0) m_generation = env.generation;
+        m_audioTrack = p.value(QStringLiteral("audio_track")).toInt(-1);
+        m_pipeline->start(m_mediaPath, m_audioTrack, m_generation);  // 换轨 = 重建会话
+        sendAck(env, true, {});
+        break;
     case rcp::ipc::CommandType::SetLanguage:
+        if (env.generation != 0) m_generation = env.generation;
+        m_pipeline->setLanguage(p.value(QStringLiteral("language")).toString(QStringLiteral("auto")), m_generation);
+        sendAck(env, true, {});
+        break;
     case rcp::ipc::CommandType::SetProfile:
         if (env.generation != 0) m_generation = env.generation;
+        m_pipeline->setProfile(p.value(QStringLiteral("profile")).toString(QStringLiteral("balanced")), m_generation);
         sendAck(env, true, {});
         break;
     case rcp::ipc::CommandType::CloseMedia:
     case rcp::ipc::CommandType::StopCaptioning:
-        m_running = false;
+        m_pipeline->stop();
         sendAck(env, true, {});
         break;
     case rcp::ipc::CommandType::Shutdown:
         sendAck(env, true, {});
+        m_pipeline->stop();
         QCoreApplication::quit();
         break;
     case rcp::ipc::CommandType::Unknown:
@@ -118,46 +180,9 @@ void IpcServer::handleCommand(const rcp::ipc::Envelope& env) {
         sendAck(env, false, QStringLiteral("unknown command: %1").arg(env.type));
         break;
     default:
-        // SetPlayhead/SetPaused/SetSpeed/LoadModelBundle/StartCaptioning：
-        // B1 仍为全速预识别模型下的空操作；B2 管线接管后转为实时控制。
         sendAck(env, true, {});
         break;
     }
-}
-
-void IpcServer::startCaptioning(const QString& path, int audioTrack, quint64 generation) {
-    if (m_running) return;
-    if (!m_ex.open(path, audioTrack)) {
-        sendEvent(rcp::ipc::EventType::Error,
-                  QJsonObject{{"message", "open failed: " + m_ex.lastError()}}, generation);
-        return;
-    }
-    if (!m_engine.load(m_modelsRoot + "/zipformer-ctc", m_modelsRoot + "/silero", m_modelsRoot + "/sensevoice")) {
-        sendEvent(rcp::ipc::EventType::Error,
-                  QJsonObject{{"message", "asr load failed: " + m_engine.lastError()}}, generation);
-        return;
-    }
-    sendEvent(rcp::ipc::EventType::MediaOpened, QJsonObject{{"path", path}}, generation);
-
-    m_running = true;
-    // B1 仍为同步全速模型：后台线程抽取+识别，Stop 仅置位（B2 管线接管后可中断）。
-    QtConcurrent::run([this]() {
-        m_ex.extract(0.1, [this](const float* s, int n, double /*t*/) {
-            m_engine.feed(s, n);
-        });
-        m_engine.flush();
-        m_running = false;
-    });
-}
-
-void IpcServer::onCaptionReady(const rcp::asr::CaptionUtterance& u) {
-    QJsonObject payload;
-    payload["text"] = u.text;
-    payload["start_ms"] = u.startMs;
-    payload["end_ms"] = u.endMs;
-    sendEvent(u.isPartial ? rcp::ipc::EventType::CaptionPartial
-                          : rcp::ipc::EventType::CaptionFinal,
-              payload, m_generation);
 }
 
 void IpcServer::sendEvent(rcp::ipc::EventType t, const QJsonObject& payload, quint64 generation) {

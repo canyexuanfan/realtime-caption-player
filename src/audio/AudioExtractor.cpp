@@ -7,9 +7,11 @@ extern "C" {
 #include <libswresample/swresample.h>
 #include <libavutil/channel_layout.h>
 #include <libavutil/error.h>
+#include <libavutil/timestamp.h>
 }
 
 #include <QByteArray>
+#include <cmath>
 
 namespace rcp::audio {
 
@@ -23,19 +25,25 @@ struct AudioExtractor::Private {
     QString          error;
 };
 
-AudioExtractor::~AudioExtractor() {
-    if (d_) {
-        swr_free(&d_->swr);
-        avcodec_free_context(&d_->ctx);
-        avformat_close_input(&d_->fmt);
-        delete d_;
-        d_ = nullptr;
-    }
+AudioExtractor::AudioExtractor() : d_(new Private) {}
+AudioExtractor::~AudioExtractor() { close(); }
+
+void AudioExtractor::close() {
+    if (!d_) return;
+    if (d_->swr) swr_free(&d_->swr);
+    if (d_->ctx) avcodec_free_context(&d_->ctx);
+    if (d_->fmt) avformat_close_input(&d_->fmt);
+    d_->chosen = -1;
+    m_acc.clear();
+    m_totalOut = 0;
+    m_chosen = -1;
 }
 
 bool AudioExtractor::open(const QString& path, int audioStreamIndex) {
-    delete d_;
-    d_ = new Private;
+    // RAII：重复 open 先完整释放旧上下文（原先 delete d_ 只释放壳，FFmpeg
+    // 上下文泄漏，审查 §1.1-7）。
+    close();
+    if (!d_) d_ = new Private;
 
     const QByteArray p = path.toUtf8();
     if (avformat_open_input(&d_->fmt, p.constData(), nullptr, nullptr) < 0) {
@@ -78,18 +86,57 @@ bool AudioExtractor::open(const QString& path, int audioStreamIndex) {
     return true;
 }
 
-long long AudioExtractor::extract(double chunkSec, const ChunkCallback& cb) {
-    if (!d_ || !d_->fmt) return 0;
+double AudioExtractor::durationSec() const {
+    if (!d_ || !d_->fmt) return -1.0;
+    if (d_->fmt->duration > 0) return static_cast<double>(d_->fmt->duration) / AV_TIME_BASE;
+    if (d_->chosen >= 0 && d_->fmt->streams[d_->chosen] && d_->fmt->streams[d_->chosen]->duration > 0) {
+        const AVStream* st = d_->fmt->streams[d_->chosen];
+        return static_cast<double>(st->duration) * av_q2d(st->time_base);
+    }
+    return -1.0;
+}
 
-    const int chunkSamples = static_cast<int>(chunkSec * d_->outRate);  // mono
+bool AudioExtractor::seekToSec(double sec) {
+    if (!d_ || !d_->fmt || !d_->ctx || d_->chosen < 0) return false;
+    AVStream* st = d_->fmt->streams[d_->chosen];
+    const int64_t target = static_cast<int64_t>(sec / av_q2d(st->time_base));
+    // 后向 seek 到目标之前的关键帧，保证解码器有参考帧；实际锚点由首帧 PTS 校正。
+    if (avformat_seek_file(d_->fmt, d_->chosen, INT64_MIN, target, target, 0) < 0) {
+        d_->error = QStringLiteral("avformat_seek_file failed");
+        return false;
+    }
+    avcodec_flush_buffers(d_->ctx);
+    m_acc.clear();
+    m_totalOut = 0;
+    m_anchorSec = -1.0;  // 负值 = 未锚定，extract 收到首个有效 PTS 时重锚
+    return true;
+}
+
+long long AudioExtractor::extract(double chunkSec, const ChunkCallback& cb,
+                                  const rcp::CancellationToken& tok) {
+    if (!d_ || !d_->fmt || !d_->ctx) return 0;
+    // 参数防御：chunkSec*rate<=0 会导致分块死循环（审查 §1.1-9）。
+    if (chunkSec <= 0.0) chunkSec = 0.1;
+    const int chunkSamples = static_cast<int>(chunkSec * d_->outRate);
+    if (chunkSamples <= 0) return 0;
+
     AVPacket* pkt = av_packet_alloc();
     AVFrame* frame = av_frame_alloc();
     m_totalOut = 0;
     m_acc.clear();
 
-    auto processFrame = [&](AVFrame* f) {
+    auto processFrame = [&](AVFrame* f) -> bool {
+        // PTS 锚定：块时间 = 锚点 + 累计输出/采样率。首帧或 PTS 跳变 >0.5s 时重锚，
+        // 修正"时间戳=累计样本数、不看 PTS"的偏差（审查 §1.1-6）。
+        if (f->pts != AV_NOPTS_VALUE) {
+            const double ptsSec = static_cast<double>(f->pts) * av_q2d(d_->fmt->streams[d_->chosen]->time_base);
+            const double expected = m_anchorSec + static_cast<double>(m_totalOut) / d_->outRate;
+            if (m_anchorSec < 0.0 || std::abs(ptsSec - expected) > 0.5) {
+                m_anchorSec = ptsSec - static_cast<double>(m_totalOut) / d_->outRate;
+            }
+        }
         int outEst = swr_get_out_samples(d_->swr, f->nb_samples);
-        if (outEst <= 0) return;
+        if (outEst <= 0) return true;
         std::vector<uint8_t> ob(static_cast<size_t>(outEst) * d_->outChannels * sizeof(float));
         uint8_t* op = ob.data();
         int converted = swr_convert(d_->swr, &op, outEst,
@@ -98,35 +145,36 @@ long long AudioExtractor::extract(double chunkSec, const ChunkCallback& cb) {
             const float* fdata = reinterpret_cast<const float*>(ob.data());
             m_acc.insert(m_acc.end(), fdata, fdata + static_cast<size_t>(converted) * d_->outChannels);
             while (static_cast<int>(m_acc.size()) >= chunkSamples * d_->outChannels) {
-                if (cb) cb(m_acc.data(), chunkSamples, static_cast<double>(m_totalOut) / d_->outRate);
+                if (tok.isCanceled()) return false;
+                if (cb) cb(m_acc.data(), chunkSamples,
+                           m_anchorSec + static_cast<double>(m_totalOut) / d_->outRate);
                 m_totalOut += chunkSamples;
                 m_acc.erase(m_acc.begin(), m_acc.begin() + chunkSamples * d_->outChannels);
             }
         }
+        return true;
     };
 
     while (av_read_frame(d_->fmt, pkt) >= 0) {
+        if (tok.isCanceled()) { av_packet_unref(pkt); break; }
         if (pkt->stream_index != d_->chosen) { av_packet_unref(pkt); continue; }
         if (avcodec_send_packet(d_->ctx, pkt) < 0) { av_packet_unref(pkt); continue; }
+        bool canceled = false;
         while (avcodec_receive_frame(d_->ctx, frame) >= 0) {
-            processFrame(frame);
+            if (!processFrame(frame)) { canceled = true; break; }
         }
         av_packet_unref(pkt);
+        if (canceled) break;
     }
-    // flush
-    avcodec_send_packet(d_->ctx, nullptr);
-    while (avcodec_receive_frame(d_->ctx, frame) >= 0) {
-        processFrame(frame);
+    if (!tok.isCanceled()) {
+        // flush
+        avcodec_send_packet(d_->ctx, nullptr);
+        while (avcodec_receive_frame(d_->ctx, frame) >= 0) {
+            if (!processFrame(frame)) break;
+        }
     }
-
-    // 余量
-    if (!m_acc.empty() && cb) {
-        cb(m_acc.data(), static_cast<int>(m_acc.size() / d_->outChannels),
-           static_cast<double>(m_totalOut) / d_->outRate);
-    }
-
-    av_frame_free(&frame);
     av_packet_free(&pkt);
+    av_frame_free(&frame);
     return m_totalOut;
 }
 

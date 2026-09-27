@@ -55,6 +55,17 @@ public:
         return item;
     }
 
+    /// Non-blocking pop. Returns nullopt when the queue is empty (or shut
+    /// down / cancelled). Used by timer-driven drains (IPC outbound).
+    std::optional<T> tryPop() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (items_.empty()) return std::nullopt;
+        T item = std::move(items_.front());
+        items_.pop();
+        notFull_.notify_one();
+        return item;
+    }
+
     size_t size() const {
         std::lock_guard<std::mutex> lock(mutex_);
         return items_.size();
@@ -66,6 +77,16 @@ public:
     void shutdown() {
         std::lock_guard<std::mutex> lock(mutex_);
         shutdown_ = true;
+        notFull_.notify_all();
+        notEmpty_.notify_all();
+    }
+
+    /// Clear items and reopen a shut-down queue. Must only be called when no
+    /// thread is blocked inside push/pop (pipeline joins its threads first).
+    void reset() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        items_ = {};
+        shutdown_ = false;
         notFull_.notify_all();
         notEmpty_.notify_all();
     }
