@@ -162,9 +162,13 @@ protected:
     }
     // 把文字路径渲染成纯黑模糊阴影图（pad 防裁边）；maxAlpha 为 CSS rgba 的
     // 不透明度（255 制）——影子中心不得满格，否则比设计浓、出现"磨砂玻璃"观感。
+    // 返回图内文字左上角位于 (pad,pad)；调用方必须按 pad 对位（此前用
+    // bb.left()-width/2 定位，影子整体左移半个文字宽 → 字幕旁一大团黑糊，
+    // 真机亮画面上呈"磨砂玻璃"，本行修复即用户投诉根因）。
     static QImage makeBlurredShadow(const QPainterPath& path, const QRectF& bb,
-                                    int radius, int maxAlpha = 255) {
+                                    int radius, int maxAlpha, int* padOut) {
         const int pad = radius * 2 + 4;
+        if (padOut) *padOut = pad;
         QImage img(qCeil(bb.width()) + 2 * pad, qCeil(bb.height()) + 2 * pad,
                    QImage::Format_ARGB32_Premultiplied);
         img.fill(Qt::transparent);
@@ -229,22 +233,25 @@ protected:
                             QString::number(int(m_style)), f.key());
         if (key != m_shadowKey) {
             m_shadowKey = key;
+            // 峰值补偿：两趟盒模糊为平顶形态，同峰值下半影比 CSS 高斯浓 ~6%；
+            // 峰值各降 ~0.05 使融合亮度剖面与 CSS 一致（探针剖面实测校准）。
             if (Partial == m_style) {
-                m_shadowImg = makeBlurredShadow(allPath, bb, 2, 242);    // 3px 层 .95
-                m_shadowImg2 = makeBlurredShadow(allPath, bb, 4, 230);   // 8px 层 .90
+                m_shadowImg = makeBlurredShadow(allPath, bb, 2, 232, &m_shadowPad);    // 3px 层（.95 峰→.91）
+                m_shadowImg2 = makeBlurredShadow(allPath, bb, 4, 218, &m_shadowPad2);  // 8px 层（.90 峰→.855）
             } else {
-                m_shadowImg = makeBlurredShadow(allPath, bb, 9, 217);    // 13px 层 .85
+                m_shadowImg = makeBlurredShadow(allPath, bb, 8, 205, &m_shadowPad);    // 13px blur（.85 峰→.80）
                 m_shadowImg2 = QImage();
             }
         }
-        auto drawShadow = [&](qreal dx, qreal dy, const QImage& img) {
+        // 影子图内文字位于 (pad,pad)：目标左上 = 文字 bbox 左上 - pad + CSS 偏移。
+        auto drawShadow = [&](qreal dx, qreal dy, const QImage& img, int pad) {
             if (img.isNull()) return;
-            p.drawImage(QPointF(bb.left() - img.width() / 2.0 + dx,
-                                bb.top() - img.height() / 2.0 + dy), img);
+            p.drawImage(QPointF(bb.left() - pad + dx,
+                                bb.top() - pad + dy), img);
         };
         if (Partial == m_style) {
-            drawShadow(0, 0, m_shadowImg2);   // 0 0 8px .90（扩散晕，无偏移）
-            drawShadow(0, 2, m_shadowImg);    // 0 2px 3px .95（紧贴层后画，叠于晕上）
+            drawShadow(0, 0, m_shadowImg2, m_shadowPad2);   // 0 0 8px .90（扩散晕，无偏移）
+            drawShadow(0, 2, m_shadowImg, m_shadowPad);     // 0 2px 3px .95（紧贴层后画，叠于晕上）
             p.setPen(Qt::NoPen);
             p.setBrush(m_color);
             p.drawPath(allPath);
@@ -261,7 +268,7 @@ protected:
                         p.drawPath(t2);
                     }
                 }
-                drawShadow(0, 4, m_shadowImg);   // 0 4px 13px .85
+                drawShadow(0, 4, m_shadowImg, m_shadowPad);   // 0 4px 13px .85
             }
             p.setPen(Qt::NoPen);
             p.setBrush(m_color);
@@ -282,6 +289,8 @@ private:
     QString m_shadowKey;    // 阴影图缓存键（文本+宽+样式+字体）
     QImage m_shadowImg;     // 主影子层
     QImage m_shadowImg2;    // partial 第二层（8px 晕）
+    int m_shadowPad = 0;    // 主影子图内文字边衬（对位用）
+    int m_shadowPad2 = 0;   // 第二层边衬
 };
 
 // .waveform 复刻：36 根 2px 圆角条，渐变 #a79cff→#6555ef，识别活动驱动。

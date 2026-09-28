@@ -1,0 +1,5 @@
+# spikes/visual-probe/CMakeLists.txt - caption rendering probe (visual QA vs CSS reference)
+add_executable(caption_probe CaptionProbe.cpp)
+target_include_directories(caption_probe PRIVATE ${CMAKE_SOURCE_DIR}/src/player)
+target_link_libraries(caption_probe PRIVATE rcp_player Qt6::Core Qt6::Gui Qt6::Widgets)
+set_target_properties(caption_probe PROPERTIES WIN32_EXECUTABLE NO)
