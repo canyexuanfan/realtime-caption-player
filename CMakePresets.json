@@ -80,6 +80,15 @@
       "name": "windows-ninja-release",
       "inherits": "windows-ninja-base",
       "displayName": "Windows Ninja Release（player+worker+tests）"
+    },
+    {
+      "name": "windows-ninja-ci",
+      "inherits": "windows-ninja-base",
+      "displayName": "Windows Ninja CI（core+tests，无原生依赖）",
+      "cacheVariables": {
+        "BUILD_PLAYER": "OFF",
+        "BUILD_WORKER": "OFF"
+      }
     }
   ],
   "buildPresets": [
