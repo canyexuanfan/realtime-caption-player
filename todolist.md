@@ -48,7 +48,7 @@
 - [x] D2 KeymapService（setBinding/冲突检测）+ hotkeyDefs 动作表接线（C5 前置）
 - [x] D3 SettingsService::load 接入 SettingsMigration
 - [x] D4 日志脱敏（路径→<path>）+ 字节级轮转计数 + 单实例（QLocalServer 唤起）+ 崩溃转储（MiniDump）
-- [x] D5 GitHub Actions（windows-msvc-ci configure/build/test）+ tools/check-status.ps1（本地 PASS）——CI 绿标待推送后由 GitHub 跑出
+- [x] D5 GitHub Actions + tools/check-status.ps1（本地 PASS）。**2026-10-18 修复并首次全绿**：原 windows-msvc-ci 预设硬编码 VS2022 生成器，runner 镜像升级 vs2026 后全部 push 的 CI 均 configure 3 秒失败（此前无人跟进，"绿标待跑出"从未成立）；另有 configure 依赖 gitignore 的 model-bundles.json 与 .tools/wix 两处本地文件。修复：新增 windows-ninja-ci 预设（Ninja + core/tests，免原生依赖）、ci.yml 加 install-qt-action(6.8.1)+msvc-dev-cmd、model-bundles.json 缺失写空占位、WiX 缺失时禁用 package_msi、tests 构建期自动部署 QSQLITE 插件（顺带修复干净构建目录 test_sql_persistence 必挂）。CI run 39130368143 全绿
 
 ## 阶段 E Windows 集成与发布（完成可执行项，commit 已 push）
 
