@@ -15,9 +15,16 @@
 #   2) candle product.wxs + files.wxs   -> .wixobj
 #   3) light .wixobj*                   -> .msi
 
-find_program(WIX_HEAT   NAMES heat   PATHS ${CMAKE_SOURCE_DIR}/.tools/wix NO_DEFAULT_PATH REQUIRED)
-find_program(WIX_CANDLE NAMES candle PATHS ${CMAKE_SOURCE_DIR}/.tools/wix NO_DEFAULT_PATH REQUIRED)
-find_program(WIX_LIGHT  NAMES light  PATHS ${CMAKE_SOURCE_DIR}/.tools/wix NO_DEFAULT_PATH REQUIRED)
+# WiX 工具链是本地 .tools/ 的一部分（gitignored）。仅在存在时注册 package_msi 目标，
+# 使 CI / 干净克隆的 configure 不因缺少 WiX 而失败（2026-10-18 CI 修复）。
+find_program(WIX_HEAT   NAMES heat   PATHS ${CMAKE_SOURCE_DIR}/.tools/wix NO_DEFAULT_PATH)
+find_program(WIX_CANDLE NAMES candle PATHS ${CMAKE_SOURCE_DIR}/.tools/wix NO_DEFAULT_PATH)
+find_program(WIX_LIGHT  NAMES light  PATHS ${CMAKE_SOURCE_DIR}/.tools/wix NO_DEFAULT_PATH)
+
+if(NOT WIX_HEAT OR NOT WIX_CANDLE OR NOT WIX_LIGHT)
+  message(STATUS "packaging/wix: WiX toolchain (.tools/wix) not found; package_msi targets disabled")
+  return()
+endif()
 
 function(rcp_package_wix)
   set(options "")
